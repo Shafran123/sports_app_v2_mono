@@ -17,7 +17,7 @@ const links = [
 export function PlayerNav() {
   const pathname = usePathname();
   const { user } = useAuth();
-  const { unread } = useUnread();
+  const unread = useUnread();
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-surface/85 backdrop-blur-lg">

@@ -83,7 +83,8 @@ export function EventDetailPage({ eventId }: { eventId: string }) {
               <CalendarDays className="h-3.5 w-3.5" /> {formatDateLong(event.start_at)}
             </span>
             <span className="inline-flex items-center gap-1">
-              <Clock className="h-3.5 w-3.5" /> {formatTime12(event.start_at)} – {formatTime12(event.end_at)}
+              <Clock className="h-3.5 w-3.5" /> {formatTime12(event.start_at)}
+              {event.end_at ? ` – ${formatTime12(event.end_at)}` : ""}
             </span>
           </div>
         </div>

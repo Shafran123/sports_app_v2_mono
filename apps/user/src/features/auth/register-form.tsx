@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toApiFailure } from "@spots/api";
 import { Button, Input } from "@spots/ui";
-import { loginWithGoogle, registerWithEmail } from "@/services/firebaseAuth";
+import { loginWithGoogle, registerWithEmail } from "@spots/auth";
 
 const FIREBASE_MESSAGES: Record<string, string> = {
   "auth/email-already-in-use": "An account with this email already exists. Try logging in.",

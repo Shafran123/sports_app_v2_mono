@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   AvailabilitySchema,
   BlockSchema,
+  BusinessOverviewSchema,
   BookingSchema,
   CheckoutResultSchema,
   CourtSchema,
@@ -17,6 +18,7 @@ import {
 export { TOKEN_KEY } from "./client";
 export { toApiFailure, getClient, setClient, createClient, type ApiFailure } from "./client";
 export { parseData, parseList, parsePaginated } from "./parse";
+export { submitPayHere, PAYHERE_CHECKOUT_URL, type PayHereUserFields } from "./payhere";
 
 import { getClient } from "./client";
 import { parseData, parseList, parsePaginated } from "./parse";
@@ -33,7 +35,7 @@ interface VenueQuery {
 }
 
 export const venues = {
-  async list(client: AxiosInstance = getClient(), query: VenueQuery = {}) {
+  async list(query: VenueQuery = {}, client: AxiosInstance = getClient()) {
     const res = await client.get("/venues", { params: query });
     return parsePaginated(VenueSchema, res.data);
   },
@@ -53,7 +55,6 @@ export const venues = {
 
 export const courts = {
   async create(
-    client: AxiosInstance = getClient(),
     input: {
       venue_id: string;
       name: string;
@@ -62,13 +63,13 @@ export const courts = {
       slot_duration_min?: number;
       capacity?: number;
       is_indoor?: boolean;
-    }
+    },
+    client: AxiosInstance = getClient()
   ) {
     const res = await client.post("/business/courts", input);
     return parseData(CourtSchema, res.data.data ?? res.data);
   },
   async update(
-    client: AxiosInstance = getClient(),
     id: string,
     input: Partial<{
       name: string;
@@ -78,7 +79,8 @@ export const courts = {
       capacity: number;
       is_indoor: boolean;
       is_active: boolean;
-    }>
+    }>,
+    client: AxiosInstance = getClient()
   ) {
     const res = await client.patch(`/business/courts/${id}`, input);
     return parseData(CourtSchema, res.data.data ?? res.data);
@@ -87,13 +89,13 @@ export const courts = {
 
 export const bookings = {
   async checkout(
-    client: AxiosInstance = getClient(),
-    input: { court_id: string; start_at: string; end_at: string }
+    input: { court_id: string; start_at: string; end_at: string },
+    client: AxiosInstance = getClient()
   ) {
     const res = await client.post("/bookings/checkout", input);
     return parseData(CheckoutResultSchema, res.data.data ?? res.data);
   },
-  async list(client: AxiosInstance = getClient(), status?: string) {
+  async list(status?: string, client: AxiosInstance = getClient()) {
     const res = await client.get("/bookings", { params: status ? { status } : {} });
     return parseList(BookingSchema, res.data.data ?? res.data);
   },
@@ -109,15 +111,15 @@ export const bookings = {
 
 export const events = {
   async list(
-    client: AxiosInstance = getClient(),
-    query: { city?: string; sport?: string; page?: number; limit?: number } = {}
+    query: { city?: string; sport?: string; page?: number; limit?: number } = {},
+    client: AxiosInstance = getClient()
   ) {
     const res = await client.get("/events", { params: query });
-    return parseList(EventSchema, res.data.data ?? res.data);
+    return parseList(EventSchema, res.data.data ?? res.data).map(normalizeEvent);
   },
   async detail(id: string, client: AxiosInstance = getClient()) {
     const res = await client.get(`/events/${id}`);
-    return parseData(EventSchema, res.data.data ?? res.data);
+    return normalizeEvent(parseData(EventSchema, res.data.data ?? res.data));
   },
   async register(id: string, client: AxiosInstance = getClient()) {
     const res = await client.post(`/events/${id}/register`);
@@ -128,23 +130,28 @@ export const events = {
     return res.data;
   },
   async create(
-    client: AxiosInstance = getClient(),
     input: {
-      title: string;
+      name: string;
       description?: string;
       city?: string;
       sport?: string;
       venue_id?: string;
       start_at: string;
-      end_at: string;
+      end_at?: string;
       capacity: number;
       price: number;
-    }
+    },
+    client: AxiosInstance = getClient()
   ) {
     const res = await client.post("/events", input);
-    return parseData(EventSchema, res.data.data ?? res.data);
+    return normalizeEvent(parseData(EventSchema, res.data.data ?? res.data));
   }
 };
+
+/** sp_be persists events as `name`; the UI consumes `title`. Normalize after parse. */
+function normalizeEvent<T extends { title?: string; name?: string | null }>(event: T): T & { title: string } {
+  return { ...event, title: event.title ?? event.name ?? "Untitled event" } as T & { title: string };
+}
 
 export const sports = {
   async list(client: AxiosInstance = getClient()) {
@@ -184,25 +191,18 @@ export const notifications = {
 
 // Domains with sp_be business/admin endpoints (typed, Zod-validated)
 
-const BusinessOverviewResponse = z.object({
-  bookings_count: z.number(),
-  revenue: z.number(),
-  month_revenue: z.number(),
-  date: z.string().nullable()
-});
-
 export const business = {
-  async overview(client: AxiosInstance = getClient(), date?: string) {
+  async overview(date?: string, client: AxiosInstance = getClient()) {
     const res = await client.get("/business/overview", { params: date ? { date } : {} });
-    return BusinessOverviewResponse.parse(res.data.data ?? res.data);
+    return BusinessOverviewSchema.parse(res.data.data ?? res.data);
   },
-  async listBookings(client: AxiosInstance = getClient(), params: { date?: string } = {}) {
+  async listBookings(params: { date?: string } = {}, client: AxiosInstance = getClient()) {
     const res = await client.get("/business/bookings", { params });
     return parseList(BookingSchema, res.data.data ?? res.data);
   },
   async manualBooking(
-    client: AxiosInstance = getClient(),
-    input: { court_id: string; start_at: string; end_at: string; player_name?: string; player_phone?: string; amount?: number }
+    input: { court_id: string; start_at: string; end_at: string; player_name?: string; player_phone?: string; amount?: number },
+    client: AxiosInstance = getClient()
   ) {
     const res = await client.post("/business/bookings/manual", input);
     return parseData(BookingSchema, res.data.data ?? res.data);

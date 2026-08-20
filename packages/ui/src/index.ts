@@ -22,7 +22,7 @@ export * from "./components/ui/toast";
 // Domain components
 export * from "./components/domain/venue-visual";
 export * from "./components/domain/venue-card";
-export * from "./components/domain/slot-grid";
+export * from "./components/domain/slot-styles";
 export * from "./components/domain/countdown-pill";
 export * from "./components/domain/booking-card";
 export * from "./components/domain/activity-card";

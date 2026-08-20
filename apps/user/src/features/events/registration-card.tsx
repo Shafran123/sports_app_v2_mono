@@ -61,9 +61,7 @@ export function RegistrationCard({ event, user }: { event: Event; user: User | n
           last_name,
           email: user?.email ?? "",
           phone: user?.phone ?? "",
-          address: "",
-          city: user?.city ?? "",
-          country: "Sri Lanka"
+          city: user?.city ?? ""
         }}
       />
     );

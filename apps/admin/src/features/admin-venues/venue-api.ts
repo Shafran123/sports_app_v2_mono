@@ -1,6 +1,6 @@
 import type { AxiosInstance } from "axios";
 import { z } from "zod";
-import { getClient, parseList } from "@spots/api";
+import { getClient, parseList, venues } from "@spots/api";
 import { CourtSchema, VenueSchema } from "@spots/types";
 import type { VenueHours } from "@spots/types";
 
@@ -44,8 +44,8 @@ export interface CreateVenueInput {
 }
 
 export async function fetchMyVenues(client: AxiosInstance = getClient()): Promise<MyVenue[]> {
-  const res = await client.get("/venues/mine");
-  return parseList(MyVenueSchema, res.data.data ?? res.data);
+  const rows = await venues.mine(client);
+  return z.array(MyVenueSchema).parse(rows);
 }
 
 export async function fetchOwnerCourts(client: AxiosInstance = getClient()): Promise<OwnerCourt[]> {

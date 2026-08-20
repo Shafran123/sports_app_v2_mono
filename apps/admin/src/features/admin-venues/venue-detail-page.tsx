@@ -153,7 +153,7 @@ export function VenueDetailPage({ venueId }: { venueId: string }) {
     }
     setAddingCourt(true);
     try {
-      await courts.create(getClient(), {
+      await courts.create({
         venue_id: venueId,
         name: courtDraft.name.trim(),
         sport: courtDraft.sport,
@@ -176,7 +176,7 @@ export function VenueDetailPage({ venueId }: { venueId: string }) {
     setTogglingCourtId(courtId);
     setCourtActionError("");
     try {
-      await courts.update(getClient(), courtId, { is_active: !isActive });
+      await courts.update(courtId, { is_active: !isActive });
       await refreshCourts();
     } catch (err) {
       setCourtActionError(toApiFailure(err).message);

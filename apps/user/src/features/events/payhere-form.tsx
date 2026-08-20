@@ -1,22 +1,10 @@
 "use client";
 
-import * as React from "react";
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { ArrowRight, CreditCard, Loader2 } from "lucide-react";
 import { Button, Card } from "@spots/ui";
 import { formatLkr } from "@spots/utils";
-
-const PAYHERE_CHECKOUT_URL = "https://sandbox.payhere.com/pay/checkout";
-
-export interface Payer {
-  first_name: string;
-  last_name: string;
-  email: string;
-  phone: string;
-  address: string;
-  city: string;
-  country: string;
-}
+import { submitPayHere, type PayHereUserFields } from "@spots/api";
 
 export function PayHereForm({
   payment,
@@ -27,13 +15,11 @@ export function PayHereForm({
   payment: Record<string, unknown>;
   amount?: number;
   currency?: string;
-  buyer: Payer;
+  buyer: PayHereUserFields;
 }) {
-  const formRef = useRef<HTMLFormElement>(null);
-
   useEffect(() => {
-    formRef.current?.submit();
-  }, []);
+    submitPayHere(payment, buyer);
+  }, [payment, buyer]);
 
   return (
     <Card className="p-6">
@@ -46,24 +32,11 @@ export function PayHereForm({
         Redirecting you to the payment gateway…
       </p>
 
-      <form ref={formRef} method="POST" action={PAYHERE_CHECKOUT_URL} className="hidden">
-        {Object.entries(payment).map(([name, value]) => (
-          <input key={name} type="hidden" name={name} value={String(value ?? "")} />
-        ))}
-        <input type="hidden" name="first_name" value={buyer.first_name} />
-        <input type="hidden" name="last_name" value={buyer.last_name} />
-        <input type="hidden" name="email" value={buyer.email} />
-        <input type="hidden" name="phone" value={buyer.phone} />
-        <input type="hidden" name="address" value={buyer.address} />
-        <input type="hidden" name="city" value={buyer.city} />
-        <input type="hidden" name="country" value={buyer.country} />
-      </form>
-
       <Button
         variant="secondary"
         size="sm"
         className="mt-5 w-full"
-        onClick={() => formRef.current?.submit()}
+        onClick={() => submitPayHere(payment, buyer)}
       >
         <Loader2 className="h-4 w-4" /> Continue to payment <ArrowRight className="h-4 w-4" />
       </Button>

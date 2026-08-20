@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@spots/api": "workspace:*",
+    "@spots/auth": "workspace:^",
     "@spots/types": "workspace:*",
     "@spots/ui": "workspace:*",
     "@spots/utils": "workspace:*",

@@ -9,7 +9,7 @@ import { bookings, toApiFailure } from "@spots/api";
 import { Badge, Button, Card, CardContent, CountdownPill, ErrorState, Skeleton } from "@spots/ui";
 import { formatDateLong, formatLkr, formatTime12 } from "@spots/utils";
 import { useAuth } from "@/context/auth";
-import { submitPayHereForm } from "./payhere-submit";
+import { submitPayHere } from "@spots/api";
 
 export function CheckoutPage({ venueId }: { venueId: string }) {
   const router = useRouter();
@@ -29,7 +29,7 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
 
   const checkout = useMutation({
     mutationFn: () =>
-      bookings.checkout(undefined, { court_id: courtId, start_at: startAt, end_at: endAt })
+      bookings.checkout({ court_id: courtId, start_at: startAt, end_at: endAt })
   });
 
   const started = React.useRef(false);
@@ -68,8 +68,9 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
   const handlePay = () => {
     if (!result || paying) return;
     setPaying(true);
-    submitPayHereForm(result.payment_params, {
-      name: user?.name,
+    submitPayHere(result.payment_params, {
+      first_name: user?.name,
+      last_name: user?.name,
       email: user?.email,
       phone: user?.phone,
       city: user?.city

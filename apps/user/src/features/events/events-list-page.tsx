@@ -48,7 +48,7 @@ export function EventsListPage() {
   const listQuery = useQuery({
     queryKey: ["events", city, sport, page],
     queryFn: () =>
-      events.list(undefined, {
+      events.list({
         city: city || undefined,
         sport: sport || undefined,
         page,

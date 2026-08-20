@@ -11,7 +11,7 @@ import {
   loginWithEmail,
   loginWithGoogle,
   sendPhoneOtp
-} from "@/services/firebaseAuth";
+} from "@spots/auth";
 
 const FIREBASE_MESSAGES: Record<string, string> = {
   "auth/email-already-in-use": "An account with this email already exists.",

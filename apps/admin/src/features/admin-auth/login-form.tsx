@@ -4,7 +4,7 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { toApiFailure } from "@spots/api";
 import { Button, Input } from "@spots/ui";
-import { loginWithEmail } from "@/services/firebaseAuth";
+import { loginWithEmail } from "@spots/auth";
 
 const FIREBASE_MESSAGES: Record<string, string> = {
   "auth/invalid-email": "Enter a valid email address.",

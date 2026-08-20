@@ -171,10 +171,12 @@ export type ManualBookingInput = z.infer<typeof ManualBookingInputSchema>;
 
 export const EventSchema = z.object({
   id: z.string(),
-  title: z.string(),
+  title: z.string().optional(),
+  name: z.string().nullable().optional(),
   description: z.string().nullable(),
   start_at: z.string(),
-  end_at: z.string(),
+  end_at: z.string().nullable(),
+  image_url: z.string().nullable().optional(),
   capacity: z.number().nullable(),
   price: z.number(),
   city: z.string().nullable(),

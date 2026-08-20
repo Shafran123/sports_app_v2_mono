@@ -24,7 +24,7 @@ export function useManualBooking(venueId: string | undefined, dateKey: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (input: ManualBookingInput) => business.manualBooking(undefined, input),
+    mutationFn: (input: ManualBookingInput) => business.manualBooking(input),
     onSuccess: (_data, input) => {
       if (venueId) {
         queryClient.setQueryData<Availability>(["admin-availability", venueId, dateKey], (old) =>

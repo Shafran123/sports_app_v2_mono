@@ -32,7 +32,7 @@ describe("venues.list", () => {
       data: [venueRow],
       meta: { page: 1, limit: 12, total: 1 }
     }));
-    const result = await venues.list(client, { city: "Colombo" });
+    const result = await venues.list({ city: "Colombo" }, client);
     expect(result.data).toHaveLength(1);
     expect(result.data[0]!.name).toBe("Smash Arena");
     expect(result.meta.total).toBe(1);
@@ -41,7 +41,7 @@ describe("venues.list", () => {
   it("passes query params through", async () => {
     const get = vi.fn(async () => ({ data: { data: [], meta: { page: 1, limit: 12, total: 0 } } }));
     const client = { get, post: vi.fn(), patch: vi.fn() } as unknown as AxiosInstance;
-    await venues.list(client, { sport: "badminton", city: "Colombo", page: 2 });
+    await venues.list({ sport: "badminton", city: "Colombo", page: 2 }, client);
     expect(get).toHaveBeenCalledWith("/venues", { params: { sport: "badminton", city: "Colombo", page: 2 } });
   });
 });
@@ -69,7 +69,7 @@ describe("bookings.checkout", () => {
       expires_at: "2026-08-21T06:10:00+05:30",
       payment_params: { hash: "abc" }
     }));
-    const result = await bookings.checkout(client, { court_id: "c1", start_at: "x", end_at: "y" });
+    const result = await bookings.checkout({ court_id: "c1", start_at: "x", end_at: "y" }, client);
     expect(result.currency).toBe("LKR");
     expect(result.amount).toBe(1500);
   });
@@ -78,7 +78,7 @@ describe("bookings.checkout", () => {
     const client = mockClient(() => [
       { id: "b1", court_id: "c1", user_id: "u1", start_at: "x", end_at: "y", price_per_slot: 1500, total_price: 1500, status: "confirmed", court_name: "Court 1", venue_name: "Smash Arena", sport: "Badminton" }
     ]);
-    const list = await bookings.list(client);
+    const list = await bookings.list(undefined, client);
     expect(list[0]!.status).toBe("confirmed");
   });
 });
@@ -88,7 +88,7 @@ describe("events.list", () => {
     const client = mockClient(() => [
       { id: "e1", title: "Football 5v5", description: null, start_at: "x", end_at: "y", capacity: 10, price: 4500, city: "Colombo", venue_id: null, status: "active", sport_id: "s1", sport_name: "Football", sport_slug: "football", venue_name: null }
     ]);
-    const list = await events.list(client);
+    const list = await events.list(undefined, client);
     expect(list[0]!.title).toBe("Football 5v5");
   });
 });

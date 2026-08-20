@@ -4,8 +4,8 @@ import * as React from "react";
 import { useEffect, useState, type FormEvent } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { CalendarDays, Clock, MapPin, Plus, Users } from "lucide-react";
-import { getClient, sports, venues, events as eventsApi, toApiFailure } from "@spots/api";
-import { EventSchema, type Event } from "@spots/types";
+import { sports, venues, events as eventsApi, toApiFailure } from "@spots/api";
+import type { Event } from "@spots/types";
 import {
   Button,
   Card,
@@ -27,20 +27,6 @@ import {
 import { formatDateLong, formatLkr, formatTime12 } from "@spots/utils";
 import { useToasts } from "./toasts";
 
-function normalizeEvent(row: Record<string, unknown>): Event {
-  return EventSchema.parse({
-    ...row,
-    title: row.name ?? row.title,
-    end_at: row.end_at ?? row.start_at
-  });
-}
-
-async function fetchEvents(limit = 50): Promise<Event[]> {
-  const res = await getClient().get("/events", { params: { page: 1, limit } });
-  const body = res.data?.data ?? res.data;
-  if (!Array.isArray(body)) return [];
-  return body.map((row) => normalizeEvent(row as Record<string, unknown>));
-}
 
 type CreateEventPayload = {
   name: string;
@@ -54,11 +40,6 @@ type CreateEventPayload = {
   price: number;
 };
 
-async function createEvent(input: CreateEventPayload): Promise<Event> {
-  const res = await getClient().post("/events", input);
-  const body = res.data?.data ?? res.data;
-  return normalizeEvent(body as Record<string, unknown>);
-}
 
 interface FormState {
   title: string;
@@ -95,7 +76,7 @@ export function EventsManager() {
 
   const listQuery = useQuery({
     queryKey: ["admin-console-events"],
-    queryFn: () => fetchEvents(50)
+    queryFn: () => eventsApi.list({ page: 1, limit: 50 })
   });
 
   const sportsQuery = useQuery({
@@ -139,7 +120,7 @@ export function EventsManager() {
   };
 
   const createMutation = useMutation({
-    mutationFn: createEvent,
+    mutationFn: (payload: CreateEventPayload) => eventsApi.create(payload),
     onSuccess: (event) => {
       setEventsList((prev) => [event, ...prev]);
       setForm(EMPTY_FORM);

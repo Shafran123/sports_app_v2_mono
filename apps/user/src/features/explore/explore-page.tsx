@@ -82,7 +82,7 @@ export function ExplorePage() {
   const { data, isPending, isError, isFetching, refetch } = useQuery({
     queryKey: ["explore-venues", filterKey, page],
     queryFn: () =>
-      venues.list(undefined, {
+      venues.list({
         ...(search ? { search } : {}),
         ...(sport ? { sport } : {}),
         ...(city ? { city } : {}),

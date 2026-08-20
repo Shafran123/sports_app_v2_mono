@@ -39,7 +39,7 @@ export function CalendarPage() {
 
   const dayQuery = useQuery({
     queryKey: ["admin-bookings", dateKey],
-    queryFn: () => business.listBookings(undefined, { date: dateKey }),
+    queryFn: () => business.listBookings({ date: dateKey }),
     enabled: !!selectedVenueId
   });
 

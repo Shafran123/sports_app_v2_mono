@@ -38,7 +38,7 @@ export function BookingsPage() {
 
   const bookingsQuery = useQuery({
     queryKey: ["admin-bookings", dateKey],
-    queryFn: () => business.listBookings(undefined, { date: dateKey })
+    queryFn: () => business.listBookings({ date: dateKey })
   });
 
   const rows = bookingsQuery.data ?? [];

@@ -10,7 +10,7 @@ const CARD_SKELETONS = Array.from({ length: 6 });
 export function VenuesNearYou() {
   const { data, isPending, isError, refetch } = useQuery({
     queryKey: ["venues", "near-you"],
-    queryFn: () => venues.list(undefined, { limit: 6 })
+    queryFn: () => venues.list({ limit: 6 })
   });
 
   const venueList = data?.data ?? [];
