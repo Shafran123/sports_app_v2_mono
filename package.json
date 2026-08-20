@@ -1,0 +1,19 @@
+{
+  "name": "spots",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@8.6.12",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev --parallel",
+    "dev:user": "pnpm --filter @spots/user dev",
+    "dev:admin": "pnpm --filter @spots/admin dev",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "test:watch": "turbo run test:watch"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.3"
+  }
+}

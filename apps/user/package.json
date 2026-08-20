@@ -1,0 +1,40 @@
+{
+  "name": "@spots/user",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "echo 'no tests in app yet'"
+  },
+  "dependencies": {
+    "@spots/api": "workspace:*",
+    "@spots/types": "workspace:*",
+    "@spots/ui": "workspace:*",
+    "@spots/utils": "workspace:*",
+    "@tanstack/react-query": "^5.66.0",
+    "axios": "^1.7.9",
+    "firebase": "^11.4.0",
+    "lucide-react": "^0.469.0",
+    "next": "15.2.2",
+    "qrcode": "^1.5.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-hook-form": "^7.54.2",
+    "zod": "^3.24.1",
+    "zustand": "^5.0.3"
+  },
+  "devDependencies": {
+    "@spots/config": "workspace:*",
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^22.10.7",
+    "@types/qrcode": "^1.5.5",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.7.2"
+  }
+}

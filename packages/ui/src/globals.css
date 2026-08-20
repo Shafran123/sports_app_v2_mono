@@ -1,0 +1,118 @@
+@import "tailwindcss";
+
+/* ============================================================
+   Spots light-premium identity (ADR-0005)
+   Replaces the dark SmashZone identity (ADR-0004).
+   ============================================================ */
+
+@theme {
+  /* ---------- Base ---------- */
+  --color-paper: #fafaf7;        /* page base */
+  --color-surface: #ffffff;      /* cards / elevated panels */
+  --color-surface-2: #f4f4f0;    /* subtle inset / wells */
+  --color-ink: #0e1512;          /* primary text */
+  --color-ink-2: #4b5563;        /* secondary text */
+  --color-ink-3: #9ca3af;        /* muted text */
+  --color-border: #e7eae5;       /* hairline borders */
+  --color-border-strong: #d3d8d1;
+
+  /* ---------- Brand ---------- */
+  --color-primary: #16a34a;      /* court green */
+  --color-primary-hover: #15803d;
+  --color-primary-light: #dcfce7;
+  --color-accent: #2563eb;       /* blue */
+  --color-accent-light: #dbeafe;
+
+  /* ---------- Status ---------- */
+  --color-success: #16a34a;
+  --color-success-light: #dcfce7;
+  --color-warning: #d97706;
+  --color-warning-light: #fef3c7;
+  --color-error: #dc2626;
+  --color-error-light: #fee2e2;
+
+  --font-sans: var(--font-plus-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-sora), var(--font-plus-jakarta), ui-sans-serif, sans-serif;
+
+  /* ---------- Geometry ---------- */
+  --radius-2xl: 1rem;
+  --radius-3xl: 1.5rem;
+
+  --shadow-soft: 0 1px 2px rgb(14 21 18 / 0.04), 0 4px 16px rgb(14 21 18 / 0.06);
+  --shadow-lift: 0 2px 4px rgb(14 21 18 / 0.05), 0 12px 32px rgb(14 21 18 / 0.1);
+}
+
+:root {
+  --background: var(--color-paper);
+  --foreground: var(--color-ink);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-plus-jakarta), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--color-primary-light);
+  color: var(--color-ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ---------- Motion ---------- */
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes pop-in {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+.animate-fade-in { animation: fade-in 0.2s ease both; }
+.animate-fade-up { animation: fade-up 0.35s ease both; }
+.animate-pop-in { animation: pop-in 0.25s ease both; }
+
+.press {
+  transition: transform 0.12s ease, box-shadow 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+}
+.press:active { transform: scale(0.97); }
+.press-raise { transition: transform 0.18s ease, box-shadow 0.2s ease, border-color 0.2s ease; }
+.press-raise:hover { transform: translateY(-2px); box-shadow: var(--shadow-lift); }
+
+.skeleton {
+  background: linear-gradient(
+    110deg,
+    var(--color-surface-2) 8%,
+    #eceee9 18%,
+    var(--color-surface-2) 33%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

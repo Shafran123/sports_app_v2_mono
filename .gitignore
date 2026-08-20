@@ -1,0 +1,27 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# next.js
+.next/
+out/
+build/
+*.tsbuildinfo
+
+# turbo
+.turbo/
+
+# env
+.env
+.env*.local
+
+# tests
+coverage/
+
+# separate repos — sp_be and sp_fe keep their own git history
+/sp_be/
+/sp_fe/
+
+# misc
+.DS_Store
+*.log
