@@ -4,7 +4,7 @@
 
 **Blocked by:** 04 — Player auth and app shell.
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] Venue page: gallery (photos with thumbnails when the venue has more than one), info grid, sports and amenities, courts, opening hours, rules, cancellation policy
 - [ ] Slot picker: date strip, court list, and slot chips with clear state colors (available / selected / taken) driven by the live availability endpoint

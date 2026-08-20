@@ -4,7 +4,7 @@
 
 **Blocked by:** 02 — Shared UI kit and utils; 03 — Typed API layer and domain types.
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] Login (email+password, phone OTP with resend/countdown and change-number, Google), register — all in the new identity, no splash screen, no onboarding
 - [ ] Session restore via Firebase ID token → auth/me; the role is available to guards

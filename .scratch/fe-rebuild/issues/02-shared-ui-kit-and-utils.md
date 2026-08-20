@@ -4,7 +4,7 @@
 
 **Blocked by:** 01 — Scaffold the rebuild monorepo.
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] A shared UI package exports the full primitive set in the light-premium identity: Button, Input, Select, Textarea, Checkbox, Switch, Badge, StatusPill, Card, Dialog/Modal, Drawer/Sheet, Tabs, Table (sort/filter/pagination), StatCard, Skeleton, EmptyState, ErrorState, Toast, Avatar, Dropdown, Tooltip
 - [ ] Domain components: VenueCard, SlotGrid, CourtRow, BookingCard, ActivityCard, CountdownPill

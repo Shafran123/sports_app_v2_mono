@@ -4,7 +4,7 @@
 
 **Blocked by:** 04 — Player auth and app shell.
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] Events list: search/filter, imagery, price, capacity progress; loading/empty/error states
 - [ ] Event detail: hero, details, registration card with capacity + spots left, register CTA (via the event PayHere flow), login CTA when signed out, organizer cancel tool, cancelled banner

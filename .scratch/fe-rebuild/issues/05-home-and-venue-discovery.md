@@ -4,7 +4,7 @@
 
 **Blocked by:** 04 — Player auth and app shell.
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] Home: hero with a search feel, sport chips (from the live sports endpoint), nearby venue cards (image, name, price, sports, indoor/outdoor), popular sports; shimmer skeletons, error + retry, empty state
 - [ ] Explore: filter bar (sport / city / min-max price / indoor) + result grid + pagination; filter state lives in the URL and survives back-navigation

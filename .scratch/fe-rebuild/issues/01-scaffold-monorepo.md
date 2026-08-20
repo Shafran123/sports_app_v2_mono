@@ -4,7 +4,7 @@
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] Repo root is a git repo with pnpm workspaces + Turborepo; `apps/user` (player) and `apps/admin` (operator/dashboard) both run with `pnpm dev` and build with `pnpm build`
 - [ ] TypeScript strict in both apps and all packages; ESLint + Prettier wired; `pnpm lint` green

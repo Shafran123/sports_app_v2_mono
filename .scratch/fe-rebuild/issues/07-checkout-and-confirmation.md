@@ -4,7 +4,7 @@
 
 **Blocked by:** 06 — Venue detail and slot picker.
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] Checkout: summary card (venue / court / date / time / duration / total in Rs), hold countdown that turns red under 60s, PayHere redirect interstitial
 - [ ] 409 slot-taken: automatically refresh availability and offer alternative slots in a picker instead of a dead error

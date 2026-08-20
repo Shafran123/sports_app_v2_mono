@@ -4,7 +4,7 @@
 
 **Blocked by:** 04 — Player auth and app shell.
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] Bookings: history list with status pills (confirmed / checked_in / completed / cancelled / no_show), cancel action with confirmation dialog, loading/empty/error states
 - [ ] Notifications: list with unread indicator, mark-read and mark-all; bell badge in the shell reflects the unread count

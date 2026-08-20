@@ -85,9 +85,6 @@ export function AdminSidebar({ role, children }: { role: "admin" | "venue_owner"
     router.replace("/login");
   };
 
-  const isActive = (href: string) =>
-    href === "/" ? pathname === "/" : pathname.startsWith(href);
-
   return (
     <>
       <aside
@@ -120,7 +117,7 @@ export function AdminSidebar({ role, children }: { role: "admin" | "venue_owner"
               <div className="space-y-0.5">
                 {group.items.map((item) => {
                   const Icon = item.icon;
-                  const active = item.href !== "/" ? isActive(item.href) : pathname === "/" || pathname === "/bookings" || pathname.startsWith("/venues") || pathname.startsWith("/calendar") || pathname.startsWith("/events");
+                  const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
                   return (
                     <Link
                       key={item.href}
