@@ -25,3 +25,8 @@ coverage/
 # misc
 .DS_Store
 *.log
+# firebase service account (never commit)
+*.json
+!/sp_be/.env*
+!/sp_fe/.env*
+sports-app-20029-firebase*.json
