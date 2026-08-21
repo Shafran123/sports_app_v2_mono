@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { business } from "@spots/api";
+import { bookings, business } from "@spots/api";
 
 export function useBookingActions(extraKeys: string[][] = []) {
   const queryClient = useQueryClient();
@@ -9,12 +9,14 @@ export function useBookingActions(extraKeys: string[][] = []) {
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ["admin-bookings"] });
     queryClient.invalidateQueries({ queryKey: ["admin-availability"] });
+    queryClient.invalidateQueries({ queryKey: ["front-desk-bookings"] });
     extraKeys.forEach((key) => queryClient.invalidateQueries({ queryKey: key }));
   };
 
   const checkIn = useMutation({ mutationFn: (id: string) => business.checkIn(id), onSuccess: refresh });
   const markNoShow = useMutation({ mutationFn: (id: string) => business.markNoShow(id), onSuccess: refresh });
   const cancel = useMutation({ mutationFn: (id: string) => business.cancelBooking(id), onSuccess: refresh });
+  const markPaid = useMutation({ mutationFn: (id: string) => bookings.markPaid(id), onSuccess: refresh });
 
-  return { checkIn, markNoShow, cancel };
+  return { checkIn, markNoShow, cancel, markPaid };
 }

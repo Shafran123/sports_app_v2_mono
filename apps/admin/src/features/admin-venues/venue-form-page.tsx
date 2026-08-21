@@ -11,6 +11,7 @@ import { Button, Card, Checkbox, Input, Select, Skeleton, Textarea } from "@spot
 import { cn } from "@spots/utils";
 import type { VenueHours } from "@spots/types";
 import { submitCreateVenue, type CourtInput } from "./venue-api";
+import { PhotoUploader } from "./photo-uploader";
 
 const DAYS = [
   "Sunday",
@@ -60,7 +61,8 @@ export function NewVenuePage() {
   const [courtRows, setCourtRows] = useState<CourtDraft[]>([blankCourt()]);
   const [hours, setHours] = useState<VenueHours[]>(blankHours());
   const [amenities, setAmenities] = useState<string[]>([]);
-  const [photoUrls, setPhotoUrls] = useState<string[]>([""]);
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [acceptsCash, setAcceptsCash] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [submitted, setSubmitted] = useState(false);
@@ -96,10 +98,6 @@ export function NewVenuePage() {
 
   const updateHour = (day: number, field: "open_time" | "close_time", value: string) => {
     setHours((prev) => prev.map((h) => (h.day_of_week === day ? { ...h, [field]: value } : h)));
-  };
-
-  const updatePhoto = (index: number, value: string) => {
-    setPhotoUrls((prev) => prev.map((u, i) => (i === index ? value : u)));
   };
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -160,8 +158,9 @@ export function NewVenuePage() {
         address: details.address.trim(),
         city: details.city.trim(),
         phone: details.phone.trim() || undefined,
-        photos: photoUrls.map((u) => u.trim()).filter(Boolean),
+        photos,
         amenities,
+        accepts_cash: acceptsCash,
         sports: selectedSports,
         courts: payloadCourts,
         hours: hours
@@ -469,38 +468,29 @@ export function NewVenuePage() {
 
         <Card className="p-5 md:p-6">
           <h2 className="font-display text-lg font-extrabold tracking-tight text-ink">Photos</h2>
-          <p className="mt-0.5 text-xs text-ink-3">Paste image URLs for now — uploads coming soon.</p>
-          <div className="mt-4 space-y-2">
-            {photoUrls.map((url, index) => (
-              <div key={index} className="flex items-center gap-2">
-                <Input
-                  type="url"
-                  value={url}
-                  onChange={(e) => updatePhoto(index, e.target.value)}
-                  placeholder="https://example.com/photo.jpg"
-                />
-                {photoUrls.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => setPhotoUrls((prev) => prev.filter((_, i) => i !== index))}
-                    aria-label="Remove photo URL"
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-ink-3 transition-colors hover:bg-error-light hover:text-error"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-            ))}
+          <p className="mt-0.5 text-xs text-ink-3">
+            Add photos of your venue so players know what to expect.
+          </p>
+          <div className="mt-4">
+            <PhotoUploader photos={photos} onChange={setPhotos} />
           </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="mt-3"
-            onClick={() => setPhotoUrls((prev) => [...prev, ""])}
-          >
-            <Plus className="h-4 w-4" /> Add another photo URL
-          </Button>
+        </Card>
+
+        <Card className="p-5 md:p-6">
+          <label className="flex items-start gap-3">
+            <Checkbox
+              checked={acceptsCash}
+              onChange={(e) => setAcceptsCash(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span>
+              <span className="block font-semibold text-ink">Accept pay-at-venue (cash)</span>
+              <span className="mt-0.5 block text-sm text-ink-2">
+                Let players book now and pay in cash when they arrive. You record the payment from
+                your console.
+              </span>
+            </span>
+          </label>
         </Card>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">

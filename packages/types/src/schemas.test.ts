@@ -153,7 +153,21 @@ describe("CheckoutResultSchema", () => {
       payment_params: { hash: "abc", merchant_id: "m" }
     });
     expect(result.currency).toBe("LKR");
-    expect(result.payment_params.hash).toBe("abc");
+    expect(result.payment_params?.hash).toBe("abc");
+  });
+
+  it("parses a cash checkout result (booking, no payment params)", () => {
+    const result = CheckoutResultSchema.parse({
+      booking: {
+        id: "b1", court_id: "c1", user_id: "u1", start_at: "x", end_at: "y",
+        price_per_slot: 1500, total_price: 1500, status: "confirmed",
+        payment_method: "cash", qr_token: "tok"
+      },
+      amount: 1500,
+      currency: "LKR"
+    });
+    expect(result.booking?.status).toBe("confirmed");
+    expect(result.payment_params).toBeUndefined();
   });
 });
 

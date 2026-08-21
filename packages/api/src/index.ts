@@ -10,8 +10,10 @@ import {
   EventRegisterResultSchema,
   EventSchema,
   NotificationSchema,
+  PaymentSchema,
   SportSchema,
   UserSchema,
+  VenueAuditSchema,
   VenueDetailSchema,
   VenueSchema
 } from "@spots/types";
@@ -46,6 +48,48 @@ export const venues = {
   async mine(client: AxiosInstance = getClient()) {
     const res = await client.get("/venues/mine");
     return parseList(VenueSchema, res.data.data ?? res.data);
+  },
+  async create(
+    input: {
+      name: string;
+      description?: string;
+      address: string;
+      city: string;
+      phone?: string;
+      lat?: number;
+      lng?: number;
+      photos?: string[];
+      amenities?: string[];
+      accepts_cash?: boolean;
+      sports: string[];
+      courts: Array<{ name: string; sport: string; price_per_slot: number; slot_duration_min?: number; capacity?: number; is_indoor?: boolean }>;
+      hours: Array<{ day_of_week: number; open_time: string; close_time: string }>;
+    },
+    client: AxiosInstance = getClient()
+  ) {
+    const res = await client.post("/venues", input);
+    return parseData(VenueSchema, res.data.data ?? res.data);
+  },
+  async update(
+    id: string,
+    input: Partial<{
+      name: string;
+      description: string;
+      address: string;
+      city: string;
+      phone: string;
+      photos: string[];
+      amenities: string[];
+      accepts_cash: boolean;
+    }>,
+    client: AxiosInstance = getClient()
+  ) {
+    const res = await client.patch(`/venues/${id}`, input);
+    return parseData(VenueSchema, res.data.data ?? res.data);
+  },
+  async resubmit(id: string, client: AxiosInstance = getClient()) {
+    const res = await client.post(`/venues/${id}/resubmit`);
+    return parseData(VenueSchema, res.data.data ?? res.data);
   },
   async availability(id: string, date: string, client: AxiosInstance = getClient()) {
     const res = await client.get(`/venues/${id}/availability`, { params: { date } });
@@ -89,7 +133,13 @@ export const courts = {
 
 export const bookings = {
   async checkout(
-    input: { court_id: string; start_at: string; end_at: string; idempotency_key: string },
+    input: {
+      court_id: string;
+      start_at: string;
+      end_at: string;
+      idempotency_key: string;
+      payment_method?: "online" | "cash";
+    },
     client: AxiosInstance = getClient()
   ) {
     const res = await client.post("/bookings/checkout", input);
@@ -106,6 +156,10 @@ export const bookings = {
   async cancel(id: string, client: AxiosInstance = getClient()) {
     const res = await client.post(`/bookings/${id}/cancel`);
     return parseData(BookingSchema, res.data.data ?? res.data);
+  },
+  async markPaid(id: string, client: AxiosInstance = getClient()) {
+    const res = await client.post(`/business/bookings/${id}/mark-paid`);
+    return parseData(PaymentSchema, res.data.data ?? res.data);
   }
 };
 
@@ -211,6 +265,14 @@ export const business = {
     const res = await client.post(`/business/bookings/${bookingId}/check-in`);
     return res.data;
   },
+  async qrCheckin(token: string, client: AxiosInstance = getClient()) {
+    const res = await client.post("/business/qr-checkin", { token });
+    return parseData(BookingSchema, res.data.data ?? res.data);
+  },
+  async qrLookup(token: string, client: AxiosInstance = getClient()) {
+    const res = await client.post("/business/qr-lookup", { token });
+    return parseData(BookingSchema, res.data.data ?? res.data);
+  },
   async markNoShow(bookingId: string, client: AxiosInstance = getClient()) {
     const res = await client.post(`/business/bookings/${bookingId}/no-show`);
     return res.data;
@@ -245,15 +307,28 @@ export const business = {
   }
 };
 
+export const uploads = {
+  async upload(file: { filename: string; data: string }, client: AxiosInstance = getClient()) {
+    const res = await client.post("/uploads", file);
+    return z.object({ url: z.string() }).parse(res.data.data ?? res.data);
+  }
+};
+
 const PendingVenueSchema = VenueSchema.extend({
   owner_name: z.string().nullable().optional(),
   owner_email: z.string().nullable().optional(),
-  courts_count: z.number().optional()
+  courts_count: z.number().optional(),
+  court_count: z.number().optional(),
+  created_at: z.string().optional()
 });
 
 export const admin = {
   async pendingVenues(client: AxiosInstance = getClient()) {
     const res = await client.get("/admin/venues/pending");
+    return parseList(PendingVenueSchema, res.data.data ?? res.data);
+  },
+  async listVenues(status?: string, client: AxiosInstance = getClient()) {
+    const res = await client.get("/admin/venues", { params: status ? { status } : {} });
     return parseList(PendingVenueSchema, res.data.data ?? res.data);
   },
   async approveVenue(id: string, client: AxiosInstance = getClient()) {
@@ -263,5 +338,25 @@ export const admin = {
   async rejectVenue(id: string, body: { reason?: string }, client: AxiosInstance = getClient()) {
     const res = await client.post(`/admin/venues/${id}/reject`, body);
     return res.data;
+  },
+  async suspendVenue(id: string, body: { reason?: string } = {}, client: AxiosInstance = getClient()) {
+    const res = await client.post(`/admin/venues/${id}/suspend`, body);
+    return parseData(VenueSchema, res.data.data ?? res.data);
+  },
+  async unsuspendVenue(id: string, client: AxiosInstance = getClient()) {
+    const res = await client.post(`/admin/venues/${id}/unsuspend`);
+    return parseData(VenueSchema, res.data.data ?? res.data);
+  },
+  async banVenue(id: string, body: { reason?: string } = {}, client: AxiosInstance = getClient()) {
+    const res = await client.post(`/admin/venues/${id}/ban`, body);
+    return parseData(VenueSchema, res.data.data ?? res.data);
+  },
+  async archiveVenue(id: string, client: AxiosInstance = getClient()) {
+    const res = await client.post(`/admin/venues/${id}/archive`);
+    return parseData(VenueSchema, res.data.data ?? res.data);
+  },
+  async venueAudit(id: string, client: AxiosInstance = getClient()) {
+    const res = await client.get(`/admin/venues/${id}/audit`);
+    return parseList(VenueAuditSchema, res.data.data ?? res.data);
   }
 };

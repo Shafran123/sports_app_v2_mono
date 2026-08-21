@@ -38,6 +38,7 @@ export interface CreateVenueInput {
   phone?: string;
   photos?: string[];
   amenities?: string[];
+  accepts_cash?: boolean;
   sports: string[];
   courts: CourtInput[];
   hours?: VenueHours[];

@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Clock, Info, Lock, MapPin, Plus, Trash2 } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft, Clock, Info, Lock, MapPin, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { courts, sports, venues, business, getClient, toApiFailure } from "@spots/api";
 import {
   Badge,
@@ -25,6 +25,7 @@ import {
 import { dayName, formatLkr } from "@spots/utils";
 import type { Block, VenueHours } from "@spots/types";
 import { fetchMyVenues, fetchOwnerCourts } from "./venue-api";
+import { PhotoUploader } from "./photo-uploader";
 
 const STATUS_LABEL: Record<string, string> = {
   pending: "Pending",
@@ -132,6 +133,41 @@ export function VenueDetailPage({ venueId }: { venueId: string }) {
   const [blockBusyId, setBlockBusyId] = useState<string | null>(null);
   const [blockDeletingId, setBlockDeletingId] = useState<string | null>(null);
   const [blockError, setBlockError] = useState("");
+
+  const resubmit = useMutation({
+    mutationFn: () => venues.resubmit(venueId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["my-venues"] });
+    }
+  });
+
+  const [photos, setPhotos] = useState<string[]>(venue?.photos ?? []);
+  const [acceptsCash, setAcceptsCash] = useState(Boolean(venue?.accepts_cash));
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [settingsNotice, setSettingsNotice] = useState("");
+  const [settingsError, setSettingsError] = useState("");
+
+  useEffect(() => {
+    if (venue) {
+      setPhotos(venue.photos ?? []);
+      setAcceptsCash(Boolean(venue.accepts_cash));
+    }
+  }, [venue]);
+
+  const saveSettings = async () => {
+    setSettingsNotice("");
+    setSettingsError("");
+    setSavingSettings(true);
+    try {
+      await venues.update(venueId, { photos, accepts_cash: acceptsCash });
+      setSettingsNotice("Venue settings saved.");
+      void queryClient.invalidateQueries({ queryKey: ["my-venues"] });
+    } catch (err) {
+      setSettingsError(toApiFailure(err).message);
+    } finally {
+      setSavingSettings(false);
+    }
+  };
 
   const refreshCourts = () => queryClient.invalidateQueries({ queryKey: ["owner-courts"] });
   const refreshBlocks = () => queryClient.invalidateQueries({ queryKey: ["venue-blocks"] });
@@ -332,13 +368,24 @@ export function VenueDetailPage({ venueId }: { venueId: string }) {
       </div>
 
       {venue.status !== "approved" && (
-        <div className="flex items-start gap-3 rounded-2xl border border-warning/40 bg-warning-light px-4 py-3 text-sm text-warning">
-          <Info className="mt-0.5 h-4 w-4 shrink-0" />
-          <p>
-            {venue.status === "rejected"
-              ? "Your venue was not approved. Fix the issues and submit again."
-              : "Your venue is being reviewed. Players will see it once it's approved."}
-          </p>
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-warning/40 bg-warning-light px-4 py-3 text-sm text-warning">
+          <div className="flex items-start gap-3">
+            <Info className="mt-0.5 h-4 w-4 shrink-0" />
+            <p>
+              {venue.status === "changes_requested" || venue.status === "rejected"
+                ? "This venue needs changes before it can go live."
+                : "Your venue is being reviewed. Players will see it once it's approved."}
+            </p>
+          </div>
+          {(venue.status === "changes_requested" || venue.status === "rejected") && (
+            <Button
+              size="sm"
+              loading={resubmit.isPending}
+              onClick={() => resubmit.mutate()}
+            >
+              <RefreshCw className="h-4 w-4" /> Resubmit for review
+            </Button>
+          )}
         </div>
       )}
 
@@ -347,6 +394,7 @@ export function VenueDetailPage({ venueId }: { venueId: string }) {
           <TabsTrigger value="courts" className="shrink-0">Courts</TabsTrigger>
           <TabsTrigger value="hours" className="shrink-0">Hours</TabsTrigger>
           <TabsTrigger value="blocks" className="shrink-0">Blocks</TabsTrigger>
+          <TabsTrigger value="settings" className="shrink-0">Settings</TabsTrigger>
         </TabsList>
 
         <TabsContent value="courts">
@@ -671,6 +719,49 @@ export function VenueDetailPage({ venueId }: { venueId: string }) {
                 })}
               </div>
             )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="settings">
+          <div className="space-y-4">
+            <Card className="p-5 md:p-6">
+              <label className="flex items-start gap-3">
+                <Checkbox
+                  checked={acceptsCash}
+                  onChange={(e) => setAcceptsCash(e.target.checked)}
+                  className="mt-0.5"
+                />
+                <span>
+                  <span className="block font-semibold text-ink">Accept pay-at-venue (cash)</span>
+                  <span className="mt-0.5 block text-sm text-ink-2">
+                    Let players book now and pay in cash when they arrive. You record the payment
+                    from your console.
+                  </span>
+                </span>
+              </label>
+            </Card>
+
+            <Card className="p-5 md:p-6">
+              <h2 className="font-display text-lg font-extrabold tracking-tight text-ink">Photos</h2>
+              <p className="mt-0.5 text-xs text-ink-3">
+                Photos show on your venue&apos;s public listing.
+              </p>
+              <div className="mt-4">
+                <PhotoUploader photos={photos} onChange={setPhotos} />
+              </div>
+            </Card>
+
+            {settingsNotice && (
+              <p className="rounded-xl bg-success-light px-3 py-2 text-sm text-success">{settingsNotice}</p>
+            )}
+            {settingsError && (
+              <p className="rounded-xl bg-error-light px-3 py-2 text-sm text-error">{settingsError}</p>
+            )}
+            <div className="flex justify-end">
+              <Button onClick={saveSettings} loading={savingSettings}>
+                {savingSettings ? "Saving…" : "Save settings"}
+              </Button>
+            </div>
           </div>
         </TabsContent>
       </Tabs>

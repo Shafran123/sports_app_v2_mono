@@ -19,6 +19,8 @@
     "@tanstack/react-query": "^5.66.0",
     "axios": "^1.7.9",
     "firebase": "^11.4.0",
+    "jsqr": "^1.4.0",
+    "lucide-react": "^0.469.0",
     "next": "15.2.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

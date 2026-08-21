@@ -25,6 +25,7 @@ const OWNER_NAV = [
     section: "Operations",
     items: [
       { href: "/", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/front-desk", label: "Front desk", icon: StoreIcon },
       { href: "/venues", label: "Venues", icon: Building2 },
       { href: "/calendar", label: "Calendar", icon: CalendarDays },
       { href: "/events", label: "Events", icon: Ticket }
@@ -44,6 +45,7 @@ const ADMIN_NAV = [
     section: "Platform",
     items: [
       { href: "/approvals", label: "Venue approvals", icon: ShieldCheckIcon },
+      { href: "/admin-venues", label: "Venues", icon: Building2 },
       { href: "/events", label: "Events", icon: Ticket },
       { href: "/sports", label: "Sports", icon: TrophyIcon }
     ]
@@ -55,6 +57,16 @@ function ShieldCheckIcon({ className }: { className?: string }) {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
       <path d="M12 22s8-3.5 8-10V5l-8-3-8 3v7c0 6.5 8 10 8 10z" />
       <path d="m9 12 2 2 4-4" />
+    </svg>
+  );
+}
+
+function StoreIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M3 9l1.5-5h15L21 9" />
+      <path d="M3 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0" />
+      <path d="M4 12v8h16v-8M9 20v-5h6v5" />
     </svg>
   );
 }

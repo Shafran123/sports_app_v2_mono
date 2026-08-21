@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AxiosInstance } from "axios";
-import { venues, bookings, events, notifications, auth } from "./index";
+import { venues, bookings, events, notifications, auth, business, admin, uploads } from "./index";
 
 function mockClient(handler: (method: string, url: string, opts?: unknown) => unknown): AxiosInstance {
   return {
@@ -108,6 +108,79 @@ describe("bookings.checkout", () => {
     const list = await bookings.list(undefined, client);
     expect(list[0]!.status).toBe("confirmed");
   });
+
+  it("sends payment_method=cash on a cash checkout and parses the booking result", async () => {
+    const post = vi.fn(async () => ({
+      data: {
+        booking: {
+          id: "b2", court_id: "c1", user_id: "u1", start_at: "x", end_at: "y",
+          price_per_slot: 1500, total_price: 1500, status: "confirmed",
+          payment_method: "cash", qr_token: "tok-1"
+        },
+        amount: 1500,
+        currency: "LKR"
+      }
+    }));
+    const client = { get: vi.fn(), post, patch: vi.fn() } as unknown as AxiosInstance;
+    const result = await bookings.checkout(
+      { court_id: "c1", start_at: "x", end_at: "y", idempotency_key: "ik-2", payment_method: "cash" },
+      client
+    );
+    expect(post).toHaveBeenCalledWith("/bookings/checkout", {
+      court_id: "c1", start_at: "x", end_at: "y", idempotency_key: "ik-2", payment_method: "cash"
+    });
+    expect(result.booking?.status).toBe("confirmed");
+    expect(result.booking?.qr_token).toBe("tok-1");
+  });
+
+  it("markPaid posts to the business endpoint and parses a payment", async () => {
+    const post = vi.fn(async () => ({
+      data: { id: "p1", booking_id: "b1", amount: 1500, currency: "LKR", status: "paid", payment_method: "cash" }
+    }));
+    const client = { get: vi.fn(), post, patch: vi.fn() } as unknown as AxiosInstance;
+    const payment = await bookings.markPaid("b1", client);
+    expect(post).toHaveBeenCalledWith("/business/bookings/b1/mark-paid");
+    expect(payment.status).toBe("paid");
+    expect(payment.payment_method).toBe("cash");
+  });
+
+  it("qrCheckin posts a token to the business endpoint", async () => {
+    const post = vi.fn(async () => ({
+      data: { id: "b1", court_id: "c1", user_id: "u1", start_at: "x", end_at: "y", price_per_slot: 1500, total_price: 1500, status: "checked_in" }
+    }));
+    const client = { get: vi.fn(), post, patch: vi.fn() } as unknown as AxiosInstance;
+    const booking = await business.qrCheckin("tok-9", client);
+    expect(post).toHaveBeenCalledWith("/business/qr-checkin", { token: "tok-9" });
+    expect(booking.status).toBe("checked_in");
+  });
+
+  it("admin venue lifecycle calls hit the admin endpoints", async () => {
+    const post = vi.fn(async () => ({ data: { ...venueRow, status: "suspended" } }));
+    const get = vi.fn(async () => ({ data: [{ action: "suspended", created_at: "t", reason: null }] }));
+    const client = { get, post, patch: vi.fn() } as unknown as AxiosInstance;
+
+    const suspended = await admin.suspendVenue("v1", { reason: "test" }, client);
+    expect(post).toHaveBeenCalledWith("/admin/venues/v1/suspend", { reason: "test" });
+    expect(suspended.status).toBe("suspended");
+
+    const audit = await admin.venueAudit("v1", client);
+    expect(get).toHaveBeenCalledWith("/admin/venues/v1/audit");
+    expect(audit[0]!.action).toBe("suspended");
+  });
+
+  it("venues.update and resubmit hit the owner endpoints", async () => {
+    const patch = vi.fn(async () => ({ data: { ...venueRow, status: "changes_requested", accepts_cash: true } }));
+    const post = vi.fn(async () => ({ data: { ...venueRow, status: "pending" } }));
+    const client = { get: vi.fn(), post, patch } as unknown as AxiosInstance;
+
+    const updated = await venues.update("v1", { accepts_cash: true }, client);
+    expect(patch).toHaveBeenCalledWith("/venues/v1", { accepts_cash: true });
+    expect(updated.accepts_cash).toBe(true);
+
+    const resubmitted = await venues.resubmit("v1", client);
+    expect(post).toHaveBeenCalledWith("/venues/v1/resubmit");
+    expect(resubmitted.status).toBe("pending");
+  });
 });
 
 describe("events.list", () => {
@@ -117,6 +190,16 @@ describe("events.list", () => {
     ]);
     const list = await events.list(undefined, client);
     expect(list[0]!.title).toBe("Football 5v5");
+  });
+});
+
+describe("uploads.upload", () => {
+  it("posts the file and returns a url", async () => {
+    const post = vi.fn(async () => ({ data: { url: "/uploads/abc.png" } }));
+    const client = { get: vi.fn(), post, patch: vi.fn() } as unknown as AxiosInstance;
+    const result = await uploads.upload({ filename: "a.png", data: "abc==" }, client);
+    expect(post).toHaveBeenCalledWith("/uploads", { filename: "a.png", data: "abc==" });
+    expect(result.url).toBe("/uploads/abc.png");
   });
 });
 

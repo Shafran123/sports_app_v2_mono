@@ -26,7 +26,15 @@ export const SLOT_STATE = z.enum([
 ]);
 export type SlotState = z.infer<typeof SLOT_STATE>;
 
-export const VENUE_STATUS = z.enum(["pending", "approved", "rejected"]);
+export const VENUE_STATUS = z.enum([
+  "pending",
+  "approved",
+  "rejected",
+  "changes_requested",
+  "suspended",
+  "banned",
+  "archived"
+]);
 export type VenueStatus = z.infer<typeof VENUE_STATUS>;
 
 /* ---------- Identity ---------- */
@@ -67,6 +75,7 @@ export const VenueSchema = z.object({
   cancellation_policy: z.string().nullable(),
   min_price: z.number().nullable().optional(),
   max_price: z.number().nullable().optional(),
+  accepts_cash: z.boolean().optional(),
   sports: z.array(z.string()).optional()
 });
 export type Venue = z.infer<typeof VenueSchema>;
@@ -143,17 +152,36 @@ export const BookingSchema = z.object({
   venue_address: z.string().nullable().optional(),
   venue_city: z.string().nullable().optional(),
   sport: z.string().nullable().optional(),
-  qr_token: z.string().nullable().optional()
+  qr_token: z.string().nullable().optional(),
+  checked_in_at: z.string().nullable().optional(),
+  cancelled_at: z.string().nullable().optional(),
+  created_at: z.string().nullable().optional(),
+  refund_amount: z.number().nullable().optional(),
+  cash_payment_status: z.string().nullable().optional(),
+  paid_at: z.string().nullable().optional()
 });
 export type Booking = z.infer<typeof BookingSchema>;
 
-export const CheckoutResultSchema = z.object({
-  hold_id: z.string(),
-  idempotency_key: z.string(),
+export const PaymentSchema = z.object({
+  id: z.string(),
+  booking_id: z.string().nullable(),
   amount: z.number(),
-  currency: z.literal("LKR"),
-  expires_at: z.string(),
-  payment_params: z.record(z.string(), z.unknown())
+  currency: z.string(),
+  status: z.string(),
+  payment_method: z.string().nullable().optional(),
+  paid_at: z.string().nullable().optional(),
+  created_at: z.string().nullable().optional()
+});
+export type Payment = z.infer<typeof PaymentSchema>;
+
+export const CheckoutResultSchema = z.object({
+  hold_id: z.string().optional(),
+  idempotency_key: z.string().optional(),
+  booking: BookingSchema.optional(),
+  amount: z.number(),
+  currency: z.string(),
+  expires_at: z.string().optional(),
+  payment_params: z.record(z.string(), z.unknown()).optional()
 });
 export type CheckoutResult = z.infer<typeof CheckoutResultSchema>;
 
@@ -217,6 +245,8 @@ export type Notification = z.infer<typeof NotificationSchema>;
 export const BusinessOverviewSchema = z.object({
   bookings_count: z.number(),
   revenue: z.number(),
+  online_revenue: z.number().optional(),
+  cash_revenue: z.number().optional(),
   month_revenue: z.number(),
   date: z.string().nullable()
 });
@@ -238,6 +268,16 @@ export const ApiErrorSchema = z.object({
   })
 });
 export type ApiError = z.infer<typeof ApiErrorSchema>;
+
+export const VenueAuditSchema = z.object({
+  id: z.string().optional(),
+  action: z.string(),
+  reason: z.string().nullable(),
+  created_at: z.string(),
+  actor_name: z.string().nullable().optional(),
+  actor_email: z.string().nullable().optional()
+});
+export type VenueAudit = z.infer<typeof VenueAuditSchema>;
 
 export const PaginatedSchema = <T extends z.ZodType>(item: T) =>
   z.object({

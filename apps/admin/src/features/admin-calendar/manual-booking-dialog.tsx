@@ -44,7 +44,7 @@ export function ManualBookingDialog({
 
   const failure = manual.error ? toApiFailure(manual.error) : null;
   const slotTaken = failure?.status === 409;
-  const canSubmit = !!court && !!slot && name.trim().length > 0 && amount.trim().length > 0 && Number(amount) > 0;
+  const canSubmit = !!court && !!slot && amount.trim().length > 0 && Number(amount) > 0;
 
   const submit = () => {
     if (!court || !slot || !canSubmit) return;
