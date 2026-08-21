@@ -1,15 +1,32 @@
 import * as React from "react";
+import Link from "next/link";
 import { MapPin, Star } from "lucide-react";
 import { formatLkr, firstSportSlug } from "@spots/utils";
 import type { Venue } from "@spots/types";
 import { cn } from "@spots/utils";
 import { VenueVisual } from "./venue-visual";
 
-export function VenueCard({ venue, className, onFavorite, favorited }: { venue: Venue; className?: string; onFavorite?: () => void; favorited?: boolean }) {
+export function VenueCard({
+  venue,
+  className,
+  href,
+  onFavorite,
+  favorited
+}: {
+  venue: Venue;
+  className?: string;
+  href?: string;
+  onFavorite?: () => void;
+  favorited?: boolean;
+}) {
   const location = [venue.city, venue.address].filter(Boolean).join(" · ");
   const slug = firstSportSlug(venue.sports as unknown[]);
+  const linkHref = href ?? `/venues/${venue.id}`;
   return (
-    <div className={cn("press-raise group overflow-hidden rounded-3xl border border-border bg-surface shadow-soft", className)}>
+    <Link
+      href={linkHref}
+      className={cn("press-raise group block overflow-hidden rounded-3xl border border-border bg-surface shadow-soft", className)}
+    >
       <div className="relative h-40 w-full overflow-hidden">
         <VenueVisual
           venue={venue as { photos?: unknown; sports?: unknown[] }}
@@ -21,7 +38,7 @@ export function VenueCard({ venue, className, onFavorite, favorited }: { venue: 
           <button
             onClick={onFavorite}
             aria-label={favorited ? "Remove from favorites" : "Add to favorites"}
-            className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-surface/90 text-ink-2 shadow-soft transition-colors hover:text-error"
+            className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-surface/90 text-ink-2 shadow-soft transition-colors hover:text-error"
           >
             <Star className={cn("h-4 w-4", favorited && "fill-warning text-warning")} />
           </button>
@@ -39,6 +56,6 @@ export function VenueCard({ venue, className, onFavorite, favorited }: { venue: 
           </p>
         </div>
       </div>
-    </div>
+    </Link>
   );
 }

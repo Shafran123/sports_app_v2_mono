@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { auth as authApi } from "@spots/api";
+import { auth as authApi, TOKEN_KEY } from "@spots/api";
 import type { Role, User } from "@spots/types";
 import { watchAuth } from "./firebase";
 import { logoutFirebase } from "./firebaseAuth";
@@ -27,6 +27,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
       try {
+        // Derive and persist the token BEFORE calling /auth/me — the watcher can
+        // fire before the caller's own persistToken runs, which would send the
+        // request without an Authorization header (401 → bounced to /login).
+        const token = await fbUser.getIdToken();
+        if (typeof window !== "undefined") window.localStorage.setItem(TOKEN_KEY, token);
         const me = await authApi.me();
         setUser(me);
       } catch {

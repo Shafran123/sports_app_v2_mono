@@ -3,5 +3,6 @@
   "compilerOptions": {
     "jsx": "react-jsx"
   },
+  "exclude": ["src/**/*.test.tsx", "src/vitest.setup.ts"],
   "include": ["src"]
 }

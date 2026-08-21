@@ -1,0 +1,64 @@
+import { describe, expect, it, vi, beforeEach } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
+import type { User } from "@spots/types";
+
+const watchAuthMock = vi.fn();
+const meMock = vi.fn();
+const logoutFirebaseMock = vi.fn();
+
+vi.mock("./firebase", () => ({
+  watchAuth: (cb: unknown) => watchAuthMock(cb)
+}));
+vi.mock("./firebaseAuth", () => ({ logoutFirebase: () => logoutFirebaseMock() }));
+vi.mock("@spots/api", () => ({
+  auth: { me: () => meMock() },
+  TOKEN_KEY: "spots_token"
+}));
+
+import { AuthProvider, useAuth } from "./auth-context";
+
+function Probe() {
+  const { user, loading } = useAuth();
+  return <div>{loading ? "loading" : user ? `user:${user.email}` : "anon"}</div>;
+}
+
+const FB_USER = {
+  getIdToken: vi.fn().mockResolvedValue("id-token-abc")
+};
+
+const SPOTS_USER: User = {
+  id: "u1",
+  email: "dev@spots.app",
+  name: "Dev",
+  phone: null,
+  city: null,
+  role: "player"
+};
+
+describe("AuthProvider — token before /auth/me (login race regression)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.localStorage.clear();
+    watchAuthMock.mockImplementation((cb) => {
+      // simulate firebase emitting a signed-in user
+      cb(FB_USER);
+      return () => {};
+    });
+    meMock.mockResolvedValue(SPOTS_USER);
+  });
+
+  it("persists the token BEFORE calling /auth/me", async () => {
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>
+    );
+
+    await waitFor(() => expect(meMock).toHaveBeenCalledTimes(1));
+
+    // me() must have been called, and the token must already be in storage when it ran
+    expect(meMock).toHaveBeenCalledTimes(1);
+    expect(window.localStorage.getItem("spots_token")).toBe("id-token-abc");
+    expect(await screen.findByText(/user:dev@spots\.app/)).toBeInTheDocument();
+  });
+});
