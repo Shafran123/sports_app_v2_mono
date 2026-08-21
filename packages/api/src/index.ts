@@ -89,7 +89,7 @@ export const courts = {
 
 export const bookings = {
   async checkout(
-    input: { court_id: string; start_at: string; end_at: string },
+    input: { court_id: string; start_at: string; end_at: string; idempotency_key: string },
     client: AxiosInstance = getClient()
   ) {
     const res = await client.post("/bookings/checkout", input);

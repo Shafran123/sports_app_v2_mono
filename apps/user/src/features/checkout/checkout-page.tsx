@@ -27,9 +27,19 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
 
   const incomplete = !courtId || !startAt || !endAt;
 
+  const idempotencyRef = React.useRef<string | null>(null);
+  if (!idempotencyRef.current) {
+    idempotencyRef.current = crypto.randomUUID();
+  }
+
   const checkout = useMutation({
     mutationFn: () =>
-      bookings.checkout({ court_id: courtId, start_at: startAt, end_at: endAt })
+      bookings.checkout({
+        court_id: courtId,
+        start_at: startAt,
+        end_at: endAt,
+        idempotency_key: idempotencyRef.current!
+      })
   });
 
   const started = React.useRef(false);

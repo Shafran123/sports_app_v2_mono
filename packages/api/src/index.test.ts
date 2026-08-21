@@ -69,9 +69,36 @@ describe("bookings.checkout", () => {
       expires_at: "2026-08-21T06:10:00+05:30",
       payment_params: { hash: "abc" }
     }));
-    const result = await bookings.checkout({ court_id: "c1", start_at: "x", end_at: "y" }, client);
+    const result = await bookings.checkout(
+      { court_id: "c1", start_at: "x", end_at: "y", idempotency_key: "ik" },
+      client
+    );
     expect(result.currency).toBe("LKR");
     expect(result.amount).toBe(1500);
+  });
+
+  it("sends idempotency_key in the checkout body", async () => {
+    const post = vi.fn(async () => ({
+      data: {
+        hold_id: "h1",
+        idempotency_key: "ik-1",
+        amount: 1500,
+        currency: "LKR",
+        expires_at: "2026-08-21T06:10:00+05:30",
+        payment_params: { hash: "abc" }
+      }
+    }));
+    const client = { get: vi.fn(), post, patch: vi.fn() } as unknown as AxiosInstance;
+    await bookings.checkout(
+      { court_id: "c1", start_at: "x", end_at: "y", idempotency_key: "ik-1" },
+      client
+    );
+    expect(post).toHaveBeenCalledWith("/bookings/checkout", {
+      court_id: "c1",
+      start_at: "x",
+      end_at: "y",
+      idempotency_key: "ik-1"
+    });
   });
 
   it("parses a booking from the list", async () => {

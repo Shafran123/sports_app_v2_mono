@@ -4,9 +4,9 @@ import { Footer } from "@/components/shell/footer";
 
 export default function ShellLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-paper text-ink">
+    <div className="flex min-h-screen flex-col bg-paper text-ink">
       <PlayerNav />
-      {children}
+      <div className="flex-1">{children}</div>
       <Footer />
       <BottomTabs />
     </div>
