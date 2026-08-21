@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarDays, CalendarX2, Clock } from "lucide-react";
+import { CalendarDays, CalendarX2, ChevronRight, Clock } from "lucide-react";
 import { bookings as bookingsApi, toApiFailure } from "@spots/api";
 import {
   Button,
@@ -23,6 +23,7 @@ import {
 import { formatDateLong, formatLkr, formatTime12 } from "@spots/utils";
 import type { Booking } from "@spots/types";
 import { useAuth } from "@/context/auth";
+import { BookingDetailDialog } from "./booking-detail-dialog";
 
 const TABS = [
   { value: "upcoming", label: "Upcoming" },
@@ -77,6 +78,7 @@ export function BookingsList() {
   });
 
   const [cancelTarget, setCancelTarget] = useState<Booking | null>(null);
+  const [detail, setDetail] = useState<Booking | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
 
@@ -180,6 +182,7 @@ export function BookingsList() {
                     <BookingRow
                       key={booking.id}
                       booking={booking}
+                      onOpen={() => setDetail(booking)}
                       onCancel={() => setCancelTarget(booking)}
                     />
                   ))
@@ -211,14 +214,24 @@ export function BookingsList() {
           </DialogContent>
         )}
       </Dialog>
+
+      <BookingDetailDialog booking={detail} open={!!detail} onOpenChange={(open) => !open && setDetail(null)} />
     </main>
   );
 }
 
-function BookingRow({ booking, onCancel }: { booking: Booking; onCancel: () => void }) {
+function BookingRow({
+  booking,
+  onOpen,
+  onCancel
+}: {
+  booking: Booking;
+  onOpen: () => void;
+  onCancel: () => void;
+}) {
   return (
     <Card className="p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <button type="button" onClick={onOpen} className="flex w-full items-start justify-between gap-3 text-left">
         <div className="min-w-0 flex-1">
           <p className="truncate font-semibold text-ink">{booking.venue_name}</p>
           <p className="mt-0.5 text-sm text-ink-2">
@@ -227,7 +240,7 @@ function BookingRow({ booking, onCancel }: { booking: Booking; onCancel: () => v
           </p>
         </div>
         <StatusPill status={booking.status} />
-      </div>
+      </button>
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-2">
         <span className="inline-flex items-center gap-1">
           <CalendarDays className="h-3.5 w-3.5" />
@@ -240,16 +253,21 @@ function BookingRow({ booking, onCancel }: { booking: Booking; onCancel: () => v
       </div>
       <div className="mt-3 flex items-center justify-between">
         <span className="font-display text-lg font-extrabold text-ink">{formatLkr(booking.total_price)}</span>
-        {CANCELLABLE.has(booking.status) && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-error hover:bg-error-light hover:text-error"
-            onClick={onCancel}
-          >
-            Cancel
+        <div className="flex items-center gap-2">
+          {CANCELLABLE.has(booking.status) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-error hover:bg-error-light hover:text-error"
+              onClick={onCancel}
+            >
+              Cancel
+            </Button>
+          )}
+          <Button variant="outline" size="sm" onClick={onOpen}>
+            View <ChevronRight className="h-3.5 w-3.5" />
           </Button>
-        )}
+        </div>
       </div>
     </Card>
   );

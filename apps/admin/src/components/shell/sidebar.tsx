@@ -191,7 +191,7 @@ export function AdminSidebar({ role, children }: { role: "admin" | "venue_owner"
         </p>
       </header>
 
-      <main className="px-4 pb-20 pt-6 lg:px-8">{children}</main>
+      <main className="px-5 pb-24 pt-5 lg:px-8 lg:pt-8">{children}</main>
     </>
   );
 }

@@ -1,6 +1,7 @@
 import type { AxiosInstance } from "axios";
 import { z } from "zod";
 import {
+  AdminOverviewSchema,
   AvailabilitySchema,
   BlockSchema,
   BusinessOverviewSchema,
@@ -9,6 +10,7 @@ import {
   CourtSchema,
   EventRegisterResultSchema,
   EventSchema,
+  MyVenueSchema,
   NotificationSchema,
   PaymentSchema,
   SportSchema,
@@ -47,7 +49,7 @@ export const venues = {
   },
   async mine(client: AxiosInstance = getClient()) {
     const res = await client.get("/venues/mine");
-    return parseList(VenueSchema, res.data.data ?? res.data);
+    return parseList(MyVenueSchema, res.data.data ?? res.data);
   },
   async create(
     input: {
@@ -354,6 +356,10 @@ export const admin = {
   async archiveVenue(id: string, client: AxiosInstance = getClient()) {
     const res = await client.post(`/admin/venues/${id}/archive`);
     return parseData(VenueSchema, res.data.data ?? res.data);
+  },
+  async overview(client: AxiosInstance = getClient()) {
+    const res = await client.get("/admin/overview");
+    return parseData(AdminOverviewSchema, res.data.data ?? res.data);
   },
   async venueAudit(id: string, client: AxiosInstance = getClient()) {
     const res = await client.get(`/admin/venues/${id}/audit`);

@@ -279,6 +279,21 @@ export const VenueAuditSchema = z.object({
 });
 export type VenueAudit = z.infer<typeof VenueAuditSchema>;
 
+export const MyVenueSchema = VenueSchema.extend({
+  court_count: z.number().int().optional(),
+  created_at: z.string().optional()
+});
+export type MyVenue = z.infer<typeof MyVenueSchema>;
+
+export const AdminOverviewSchema = z.object({
+  revenue_today: z.number(),
+  bookings_today: z.number(),
+  total_venues: z.number(),
+  pending_approvals: z.number(),
+  date: z.string().nullable().optional()
+});
+export type AdminOverview = z.infer<typeof AdminOverviewSchema>;
+
 export const PaginatedSchema = <T extends z.ZodType>(item: T) =>
   z.object({
     data: z.array(item),

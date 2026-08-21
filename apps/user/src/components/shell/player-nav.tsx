@@ -55,16 +55,16 @@ export function PlayerNav() {
           <Link
             href="/notifications"
             aria-label={`Notifications${unread > 0 ? `, ${unread} unread` : ""}`}
-            className="press relative flex h-10 w-10 items-center justify-center rounded-full border border-border bg-surface text-ink-2 transition-colors hover:border-primary/40"
+            className="press relative flex h-10 w-10 items-center justify-center rounded-full text-ink-2 transition-colors hover:text-ink"
           >
-            <Bell className="h-[18px] w-[18px]" />
+            <Bell className="h-[22px] w-[22px]" />
             {unread > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-error px-1 text-[10px] font-bold text-white">
+              <span className="absolute right-0 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-error px-1 text-[10px] font-bold text-white">
                 {unread > 9 ? "9+" : unread}
               </span>
             )}
           </Link>
-          <Link href={user ? "/profile" : "/login"} aria-label="Profile">
+          <Link href={user ? "/profile" : "/login"} aria-label="Profile" className="press rounded-full transition-transform hover:scale-105">
             <Avatar name={user?.name ?? "G"} size="sm" />
           </Link>
         </div>

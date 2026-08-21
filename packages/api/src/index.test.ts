@@ -181,6 +181,26 @@ describe("bookings.checkout", () => {
     expect(post).toHaveBeenCalledWith("/venues/v1/resubmit");
     expect(resubmitted.status).toBe("pending");
   });
+
+  it("venues.mine keeps court_count so owner cards show real numbers", async () => {
+    const client = mockClient(() => [{ ...venueRow, court_count: 3, created_at: "2026-01-01" }]);
+    const list = await venues.mine(client);
+    expect(list[0]!.court_count).toBe(3);
+  });
+
+  it("admin.overview parses platform numbers", async () => {
+    const get = vi.fn(async () => ({
+      data: {
+        data: { revenue_today: 1500, bookings_today: 3, total_venues: 5, pending_approvals: 1, date: "2026-08-21" }
+      }
+    }));
+    const client = { get, post: vi.fn(), patch: vi.fn() } as unknown as AxiosInstance;
+    const overview = await admin.overview(client);
+    expect(get).toHaveBeenCalledWith("/admin/overview");
+    expect(overview.revenue_today).toBe(1500);
+    expect(overview.total_venues).toBe(5);
+    expect(overview.pending_approvals).toBe(1);
+  });
 });
 
 describe("events.list", () => {

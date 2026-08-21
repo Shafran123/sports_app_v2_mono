@@ -5,7 +5,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import jsQR from "jsqr";
 import { Button, Dialog, DialogContent, ErrorState, Input, StatusPill } from "@spots/ui";
 import { toApiFailure, business } from "@spots/api";
-import { SHEET_CLASS } from "@/features/admin-calendar/dialog-sheet";
+import { SHEET_CLASS } from "@spots/ui";
 import { formatDateLong, formatLkr, formatTime12 } from "@spots/utils";
 import type { Booking } from "@spots/types";
 
@@ -143,14 +143,15 @@ export function QrScanDialog({
                 </div>
               )}
 
-              <div className="flex gap-2">
+              <div className="flex items-center gap-2">
                 <Input
                   value={manualToken}
                   onChange={(e) => setManualToken(e.target.value)}
                   placeholder="Or paste the booking code here"
                   onKeyDown={(e) => e.key === "Enter" && submitManual()}
+                  className="min-w-0 flex-1"
                 />
-                <Button variant="secondary" onClick={submitManual} disabled={!manualToken.trim()}>
+                <Button variant="secondary" onClick={submitManual} disabled={!manualToken.trim()} className="shrink-0">
                   Look up
                 </Button>
               </div>

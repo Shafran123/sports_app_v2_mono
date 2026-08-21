@@ -7,7 +7,7 @@ import { bookings, toApiFailure } from "@spots/api";
 import { Button, Card, Dialog, DialogContent, ErrorState, Skeleton, StatusPill } from "@spots/ui";
 import { formatDateLong, formatLkr, formatTime12 } from "@spots/utils";
 import type { Booking } from "@spots/types";
-import { SHEET_CLASS } from "@/features/admin-calendar/dialog-sheet";
+import { SHEET_CLASS } from "@spots/ui";
 import { useBookingActions } from "./use-booking-actions";
 import { BookingStatusSteps } from "./status-steps";
 

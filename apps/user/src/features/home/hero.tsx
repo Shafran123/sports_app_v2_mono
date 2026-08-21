@@ -34,9 +34,9 @@ export function Hero() {
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search venues, sports or activities"
           aria-label="Search venues, sports or activities"
-          className="h-12 flex-1 rounded-full bg-paper/70"
+          className="h-14 w-full flex-1 rounded-full bg-paper/70 text-base sm:h-12"
         />
-        <Button type="submit" size="lg" className="sm:h-12">
+        <Button type="submit" size="lg" className="w-full sm:h-12 sm:w-auto">
           <Search className="h-4 w-4" /> Find Sports
         </Button>
       </form>

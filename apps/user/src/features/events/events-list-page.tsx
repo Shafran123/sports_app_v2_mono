@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { MapPin, SearchX } from "lucide-react";
 import { events, sports } from "@spots/api";
-import { ActivityCard, Button, EmptyState, ErrorState, Input, Select, SkeletonCard } from "@spots/ui";
+import { ActivityCard, Button, EmptyState, ErrorState, Input, SelectSheet, SkeletonCard } from "@spots/ui";
 import type { Event } from "@spots/types";
 
 const LIMIT = 9;
@@ -91,14 +91,14 @@ export function EventsListPage() {
             className="pl-10"
           />
         </div>
-        <Select value={sport} onChange={(e) => updateSport(e.target.value)} className="sm:w-56">
+        <SelectSheet value={sport} onChange={(e) => updateSport(e.target.value)} className="sm:w-56">
           <option value="">All sports</option>
           {sportsQuery.data?.map((s) => (
             <option key={s.id} value={s.slug}>
               {s.name}
             </option>
           ))}
-        </Select>
+        </SelectSheet>
       </div>
 
       {isError && items.length === 0 ? (

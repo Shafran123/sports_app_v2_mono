@@ -19,7 +19,7 @@ import {
   ErrorState,
   Input,
   Progress,
-  Select,
+  SelectSheet,
   Skeleton,
   StatusPill,
   Textarea
@@ -207,25 +207,25 @@ export function EventsManager() {
                   />
                 </Field>
                 <Field label="Sport">
-                  <Select value={form.sport} onChange={(e) => setField("sport", e.target.value)}>
+                  <SelectSheet value={form.sport} onChange={(e) => setField("sport", e.target.value)}>
                     <option value="">None</option>
                     {sportsQuery.data?.map((s) => (
                       <option key={s.id} value={s.slug}>
                         {s.name}
                       </option>
                     ))}
-                  </Select>
+                  </SelectSheet>
                 </Field>
               </div>
               <Field label="Venue">
-                <Select value={form.venue_id} onChange={(e) => setField("venue_id", e.target.value)}>
+                <SelectSheet value={form.venue_id} onChange={(e) => setField("venue_id", e.target.value)}>
                   <option value="">No venue</option>
                   {venuesQuery.data?.map((v) => (
                     <option key={v.id} value={v.id}>
                       {v.name}
                     </option>
                   ))}
-                </Select>
+                </SelectSheet>
               </Field>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Starts" error={fieldErrors.start_at}>

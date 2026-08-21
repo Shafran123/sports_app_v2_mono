@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { business, venues } from "@spots/api";
-import { buttonVariants, Card, EmptyState, ErrorState, Input, Select, StatusPill, Table, TableBody, TableHead, TableRow, Th, Td } from "@spots/ui";
+import { buttonVariants, Card, EmptyState, ErrorState, Input, SelectSheet, StatusPill, Table, TableBody, TableHead, TableRow, Th, Td } from "@spots/ui";
 import { SkeletonRow } from "@spots/ui";
 import { cn, formatLkr, formatTime12, toDateKey } from "@spots/utils";
 import { useAuth } from "@/context/auth";
@@ -75,7 +75,7 @@ export function BookingsPage() {
             <label htmlFor="bookings-venue" className="text-xs font-semibold uppercase tracking-wide text-ink-3">
               Venue
             </label>
-            <Select
+            <SelectSheet
               id="bookings-venue"
               value={venueFilter}
               onChange={(e) => setVenueFilter(e.target.value)}
@@ -87,14 +87,14 @@ export function BookingsPage() {
                   {v.name}
                 </option>
               ))}
-            </Select>
+            </SelectSheet>
           </div>
         )}
         <div className="w-full space-y-1.5 sm:w-52">
           <label htmlFor="bookings-status" className="text-xs font-semibold uppercase tracking-wide text-ink-3">
             Status
           </label>
-          <Select
+          <SelectSheet
             id="bookings-status"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
@@ -105,7 +105,7 @@ export function BookingsPage() {
                 {o.label}
               </option>
             ))}
-          </Select>
+          </SelectSheet>
         </div>
       </Card>
 

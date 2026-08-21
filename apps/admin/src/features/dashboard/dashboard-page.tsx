@@ -20,9 +20,9 @@ export function DashboardPage() {
     enabled: !!user && !isAdmin
   });
 
-  const { data: pendingCount } = useQuery({
-    queryKey: ["admin-pending-count"],
-    queryFn: async () => (await admin.pendingVenues()).length,
+  const { data: adminOverview, isLoading: adminLoading, isError: adminError, refetch: refetchAdmin } = useQuery({
+    queryKey: ["admin-overview", today],
+    queryFn: () => admin.overview(),
     enabled: !!user && isAdmin
   });
 
@@ -36,29 +36,40 @@ export function DashboardPage() {
       </div>
 
       {isAdmin ? (
-        <div className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-3">
-            <StatCard
-              title="Pending approvals"
-              value={pendingCount ?? "—"}
-              icon={ShieldCheck}
-              changeLabel="venues awaiting review"
-            />
-            <StatCard title="Revenue today" value={formatLkr(overview?.revenue ?? 0)} icon={Wallet} />
-            <StatCard title="Bookings today" value={overview?.bookings_count ?? 0} icon={CalendarDays} />
+        adminLoading ? (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="skeleton h-32 rounded-3xl" />
+            ))}
           </div>
-          <div className="rounded-3xl border border-border bg-surface p-6 shadow-soft">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 className="font-semibold text-ink">Admin console</h2>
-                <p className="mt-1 text-sm text-ink-2">
-                  Review venue submissions and manage platform content.
-                </p>
+        ) : adminError || !adminOverview ? (
+          <EmptyState
+            title="Could not load the platform overview"
+            message="We could not load the admin numbers right now."
+            actionLabel="Try again"
+            onAction={() => refetchAdmin()}
+          />
+        ) : (
+          <div className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <StatCard title="Revenue today" value={formatLkr(adminOverview.revenue_today)} icon={Wallet} />
+              <StatCard title="Bookings today" value={adminOverview.bookings_today} icon={CalendarDays} />
+              <StatCard title="Total venues" value={adminOverview.total_venues} icon={Building2} />
+              <StatCard title="Pending approvals" value={adminOverview.pending_approvals} icon={ShieldCheck} changeLabel="venues awaiting review" />
+            </div>
+            <div className="rounded-3xl border border-border bg-surface p-6 shadow-soft">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="font-semibold text-ink">Admin console</h2>
+                  <p className="mt-1 text-sm text-ink-2">
+                    Review venue submissions and manage platform content.
+                  </p>
+                </div>
+                <Button onClick={() => router.push("/approvals")}>Open approvals</Button>
               </div>
-              <Button onClick={() => router.push("/approvals")}>Open approvals</Button>
             </div>
           </div>
-        </div>
+        )
       ) : isLoading ? (
         <div className="grid gap-4 sm:grid-cols-3">
           {[0, 1, 2].map((i) => (

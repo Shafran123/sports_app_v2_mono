@@ -77,3 +77,15 @@ _Avoid_: anonymous booking, off-book
 
 **Admin**:
 Platform staff with full oversight over users, venues, bookings, payments, events, and configuration.
+
+**Booking Reminder**:
+An Email Notification sent ahead of a Booking's slot (one day before) to prompt the Player. Distinct from the Booking Confirmation sent at creation.
+_Avoid_: reminder booking
+
+**Email Notification**:
+A transactional email about a domain event — signup welcome, booking confirmation, booking reminder, venue approved/rejected. Sent fire-and-forget via Mailgun; never blocks the request.
+_Avoid_: marketing email, newsletter
+
+**SMS Notification**:
+A transactional SMS about a Booking — sent only on **booking confirmation** and **admin-initiated cancellation** (via SMSGo.lk). Not used for marketing or reminders.
+_Avoid_: broadcast SMS, promo SMS

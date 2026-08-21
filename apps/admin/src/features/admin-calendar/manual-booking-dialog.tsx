@@ -5,7 +5,7 @@ import { Button, Dialog, DialogContent, Input } from "@spots/ui";
 import { formatDateLong, formatLkr, formatTime12 } from "@spots/utils";
 import { toApiFailure } from "@spots/api";
 import type { CourtAvailability, Slot } from "@spots/types";
-import { SHEET_CLASS } from "./dialog-sheet";
+import { SHEET_CLASS } from "@spots/ui";
 import { useManualBooking } from "./use-manual-booking";
 
 export function ManualBookingDialog({

@@ -14,7 +14,7 @@ import {
   EmptyState,
   ErrorState,
   Input,
-  Select,
+  SelectSheet,
   Skeleton,
   StatusPill,
   Tabs,
@@ -420,7 +420,7 @@ export function VenueDetailPage({ venueId }: { venueId: string }) {
                     <span className="mb-1.5 block text-xs font-medium text-ink-2">
                       Sport <span className="text-error">*</span>
                     </span>
-                    <Select
+                    <SelectSheet
                       value={courtDraft.sport}
                       onChange={(e) => setCourtDraft({ ...courtDraft, sport: e.target.value })}
                     >
@@ -430,7 +430,7 @@ export function VenueDetailPage({ venueId }: { venueId: string }) {
                           {s.name}
                         </option>
                       ))}
-                    </Select>
+                    </SelectSheet>
                   </label>
                   <label className="block">
                     <span className="mb-1.5 block text-xs font-medium text-ink-2">

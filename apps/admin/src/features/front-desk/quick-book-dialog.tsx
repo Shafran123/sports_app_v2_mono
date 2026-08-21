@@ -3,10 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { venues, business, toApiFailure } from "@spots/api";
-import { Button, Dialog, DialogContent, Input, Select, Skeleton } from "@spots/ui";
+import { Button, Dialog, DialogContent, Input, SelectSheet, Skeleton } from "@spots/ui";
 import { formatLkr, formatTime12, toDateKey } from "@spots/utils";
 import type { Venue } from "@spots/types";
-import { SHEET_CLASS } from "@/features/admin-calendar/dialog-sheet";
+import { SHEET_CLASS } from "@spots/ui";
 import { useManualBooking } from "@/features/admin-calendar/use-manual-booking";
 
 export function QuickBookDialog({
@@ -108,14 +108,14 @@ export function QuickBookDialog({
             <label htmlFor="qb-venue" className="text-xs font-semibold uppercase tracking-wide text-ink-3">
               Venue
             </label>
-            <Select id="qb-venue" value={venueId} onChange={(e) => { setVenueId(e.target.value); setCourtId(""); setStartAt(""); }}>
+            <SelectSheet id="qb-venue" value={venueId} onChange={(e) => { setVenueId(e.target.value); setCourtId(""); setStartAt(""); }}>
               <option value="">Select a venue</option>
               {myVenues.map((v) => (
                 <option key={v.id} value={v.id}>
                   {v.name}
                 </option>
               ))}
-            </Select>
+            </SelectSheet>
           </div>
 
           <div className="space-y-1.5">
@@ -132,7 +132,7 @@ export function QuickBookDialog({
             {availabilityQuery.isLoading ? (
               <Skeleton className="h-11 w-full rounded-2xl" />
             ) : (
-              <Select
+              <SelectSheet
                 id="qb-court"
                 value={courtId}
                 onChange={(e) => { setCourtId(e.target.value); setStartAt(""); }}
@@ -143,7 +143,7 @@ export function QuickBookDialog({
                     {c.name} · {formatLkr(c.price_per_slot)}
                   </option>
                 ))}
-              </Select>
+              </SelectSheet>
             )}
           </div>
 
@@ -161,7 +161,7 @@ export function QuickBookDialog({
                       key={s.start_at}
                       type="button"
                       onClick={() => pickSlot(s)}
-                      className={`rounded-2xl border px-3 py-2.5 text-sm font-semibold transition-colors ${
+                      className={`flex items-center justify-center rounded-2xl border px-3 py-2.5 text-sm font-semibold transition-colors ${
                         startAt === s.start_at
                           ? "border-primary bg-primary-light text-primary"
                           : "border-border bg-surface text-ink hover:border-ink-3"

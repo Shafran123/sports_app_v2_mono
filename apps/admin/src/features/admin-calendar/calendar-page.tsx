@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { business, venues } from "@spots/api";
-import { Button, EmptyState, Select, Skeleton } from "@spots/ui";
+import { Button, EmptyState, SelectSheet, Skeleton } from "@spots/ui";
 import { dayjs, toDateKey } from "@spots/utils";
 import type { CourtAvailability, Slot } from "@spots/types";
 import { AvailabilityView } from "./availability-view";
@@ -93,7 +93,7 @@ export function CalendarPage() {
           <label htmlFor="calendar-venue" className="text-xs font-semibold uppercase tracking-wide text-ink-3">
             Venue
           </label>
-          <Select
+          <SelectSheet
             id="calendar-venue"
             value={selectedVenueId ?? ""}
             onChange={(e) => setVenueId(e.target.value)}
@@ -104,7 +104,7 @@ export function CalendarPage() {
                 {v.name}
               </option>
             ))}
-          </Select>
+          </SelectSheet>
         </div>
         {dateKey !== todayKey && (
           <Button variant="secondary" size="sm" onClick={() => setDateKey(todayKey)}>

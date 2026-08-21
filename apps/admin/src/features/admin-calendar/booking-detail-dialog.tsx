@@ -7,7 +7,7 @@ import { formatDateLong, formatLkr, formatTime12 } from "@spots/utils";
 import { toApiFailure } from "@spots/api";
 import type { Booking, CourtAvailability, Slot } from "@spots/types";
 import { useBookingActions } from "@/features/admin-bookings/use-booking-actions";
-import { SHEET_CLASS } from "./dialog-sheet";
+import { SHEET_CLASS } from "@spots/ui";
 
 function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (

@@ -7,7 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { CheckCircle2, Plus, X } from "lucide-react";
 import { sports } from "@spots/api";
 import { toApiFailure } from "@spots/api";
-import { Button, Card, Checkbox, Input, Select, Skeleton, Textarea } from "@spots/ui";
+import { Button, Card, Checkbox, Input, SelectSheet, Skeleton, Textarea } from "@spots/ui";
 import { cn } from "@spots/utils";
 import type { VenueHours } from "@spots/types";
 import { submitCreateVenue, type CourtInput } from "./venue-api";
@@ -362,7 +362,7 @@ export function NewVenuePage() {
                   </label>
                   <label className="block">
                     <span className="mb-1.5 block text-xs font-medium text-ink-2">Sport</span>
-                    <Select
+                    <SelectSheet
                       value={court.sport}
                       onChange={(e) => updateCourt(index, { sport: e.target.value })}
                     >
@@ -375,7 +375,7 @@ export function NewVenuePage() {
                           </option>
                         ))
                       )}
-                    </Select>
+                    </SelectSheet>
                   </label>
                   <label className="block">
                     <span className="mb-1.5 block text-xs font-medium text-ink-2">

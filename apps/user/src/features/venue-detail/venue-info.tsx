@@ -8,6 +8,7 @@ import {
   Lightbulb,
   Lock,
   MapPin,
+  Navigation,
   Shirt,
   Star,
   UtensilsCrossed,
@@ -44,6 +45,14 @@ function clock12(time: string): string {
   return `${hh}:${m[2]} ${suffix}`;
 }
 
+function mapsUrl(venue: VenueDetail): string {
+  if (venue.lat != null && venue.lng != null) {
+    return `https://www.google.com/maps/search/?api=1&query=${venue.lat},${venue.lng}`;
+  }
+  const location = [venue.address, venue.city].filter(Boolean).join(", ");
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`;
+}
+
 export function VenueInfo({ venue }: { venue: VenueDetail }) {
   const rating = (venue as VenueDetail & { rating?: number | null }).rating;
   const location = [venue.address, venue.city].filter(Boolean).join(", ");
@@ -61,6 +70,15 @@ export function VenueInfo({ venue }: { venue: VenueDetail }) {
               <MapPin className="h-4 w-4 shrink-0 text-primary" />
               {location}
             </p>
+            <a
+              href={mapsUrl(venue)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-1.5 inline-flex items-center gap-1 text-sm font-semibold text-primary transition-colors hover:text-primary-hover"
+            >
+              <Navigation className="h-4 w-4" aria-hidden="true" />
+              Get directions
+            </a>
           </div>
           {venue.min_price != null && (
             <p className="text-sm text-ink-3">

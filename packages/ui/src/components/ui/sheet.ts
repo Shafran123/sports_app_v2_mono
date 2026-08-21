@@ -1,2 +1,4 @@
+// Shared bottom-sheet positioning used by dialogs that should slide up on
+// mobile and sit centered on larger screens.
 export const SHEET_CLASS =
   "top-auto bottom-0 translate-y-0 rounded-b-none border-b-0 max-h-[90dvh] sm:top-1/2 sm:bottom-auto sm:-translate-y-1/2 sm:rounded-3xl sm:rounded-b-3xl sm:border-b sm:max-h-[85vh]";

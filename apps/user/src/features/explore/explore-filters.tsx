@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { sports } from "@spots/api";
-import { Checkbox, Input, Select } from "@spots/ui";
+import { Checkbox, Input, SelectSheet } from "@spots/ui";
 
 export interface ExploreFiltersProps {
   sport: string;
@@ -26,7 +26,7 @@ export function ExploreFilters({ sport, city, minPrice, maxPrice, indoor, onChan
           <label htmlFor="explore-sport" className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-3">
             Sport
           </label>
-          <Select
+          <SelectSheet
             id="explore-sport"
             value={sport}
             onChange={(e) => onChange("sport", e.target.value)}
@@ -38,7 +38,7 @@ export function ExploreFilters({ sport, city, minPrice, maxPrice, indoor, onChan
                 {s.name}
               </option>
             ))}
-          </Select>
+          </SelectSheet>
         </div>
         <div>
           <label htmlFor="explore-city" className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-3">
