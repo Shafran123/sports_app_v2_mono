@@ -21,3 +21,6 @@ Charts + tax configuration live in the admin console.
 - [ ] typecheck + existing admin tests pass.
 
 Blocked by: 01
+## Completed
+
+Implemented. Evidence: sp_be commit `b50c281` (backend) + root commit `2a1b4ed` (frontend/types/spec). Backend suite 214/214, user 39/39, admin 11/11, api 22/22 green; all packages typecheck.

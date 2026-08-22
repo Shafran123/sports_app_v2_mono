@@ -22,3 +22,6 @@ Players and venues get a professional, immutable invoice that doubles as a check
 - [ ] tests: pdfkit output non-empty, refund state, walk-in skip.
 
 Blocked by: 05
+## Completed
+
+Implemented. Evidence: sp_be commit `b50c281` (backend) + root commit `2a1b4ed` (frontend/types/spec). Backend suite 214/214, user 39/39, admin 11/11, api 22/22 green; all packages typecheck.

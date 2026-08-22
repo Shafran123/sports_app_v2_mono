@@ -3,8 +3,8 @@
 import * as React from "react";
 import { useEffect, useState, type FormEvent } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { CalendarDays, Clock, MapPin, Plus, Users } from "lucide-react";
-import { sports, venues, events as eventsApi, toApiFailure } from "@spots/api";
+import { CalendarDays, Clock, MapPin, Plus, Users, AlertTriangle } from "lucide-react";
+import { sports, venues, events as eventsApi, featureFlags, toApiFailure } from "@spots/api";
 import type { Event } from "@spots/types";
 import {
   Button,
@@ -89,6 +89,15 @@ export function EventsManager() {
     queryFn: () => venues.mine()
   });
 
+  // The discovery state (enabled / coming_soon / hidden) pauses player-facing
+  // listings; owners keep creating events against the eventual flip back.
+  const flagsQuery = useQuery({
+    queryKey: ["feature-flags"],
+    queryFn: () => featureFlags.get()
+  });
+  const discovery = flagsQuery.data?.events_discovery_state ?? "enabled";
+  const brandName = flagsQuery.data?.brand_name ?? "Spots";
+
   useEffect(() => {
     if (listQuery.data) setEventsList(listQuery.data);
   }, [listQuery.data]);
@@ -171,6 +180,16 @@ export function EventsManager() {
         <h1 className="font-display text-2xl font-extrabold tracking-tight text-ink md:text-3xl">Events</h1>
         <p className="mt-1 text-sm text-ink-2">Create one-off activities and manage registrations.</p>
       </div>
+
+      {discovery !== "enabled" && (
+        <div className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            Listing paused by {brandName} — players {discovery === "coming_soon" ? "see teaser cards only" : "can't see events at all"}{" "}
+            until the platform re-enables event listings. You can still create and edit events.
+          </span>
+        </div>
+      )}
 
       <div className="grid items-start gap-6 xl:grid-cols-[26rem_1fr]">
         <Card>

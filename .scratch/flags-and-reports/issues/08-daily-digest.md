@@ -21,3 +21,6 @@ Admins get a 6am summary without logging in.
 - [ ] tests render HTML without throwing; no send when Mailgun unconfigured (log).
 
 Blocked by: 05, 07
+## Completed
+
+Implemented. Evidence: sp_be commit `b50c281` (backend) + root commit `2a1b4ed` (frontend/types/spec). Backend suite 214/214, user 39/39, admin 11/11, api 22/22 green; all packages typecheck.

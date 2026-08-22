@@ -22,3 +22,6 @@ Flags live in `platform_config` (key/value jsonb). The admin console (apps/admin
 - [ ] Tests: flag mutation, audit row written, invalid enum rejected.
 
 Blocked by: none
+## Completed
+
+Implemented. Evidence: sp_be commit `b50c281` (backend) + root commit `2a1b4ed` (frontend/types/spec). Backend suite 214/214, user 39/39, admin 11/11, api 22/22 green; all packages typecheck.
