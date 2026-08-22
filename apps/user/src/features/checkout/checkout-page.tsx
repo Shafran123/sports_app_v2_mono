@@ -10,6 +10,7 @@ import { Badge, Button, Card, CardContent, CountdownPill, ErrorState, Skeleton }
 import { formatDateLong, formatLkr, formatTime12 } from "@spots/utils";
 import { useAuth } from "@/context/auth";
 import { submitPayHere } from "@spots/api";
+import { VerifyPhoneModal } from "@/features/verify-phone/verify-phone-modal";
 
 type PaymentMethod = "online" | "cash";
 
@@ -17,6 +18,8 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuth();
+  const [verifyOpen, setVerifyOpen] = React.useState(false);
+  const verified = !!user?.phone_verified_at;
 
   const courtId = searchParams?.get("court_id") ?? "";
   const startAt = searchParams?.get("start_at") ?? "";
@@ -55,12 +58,17 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
         start_at: startAt,
         end_at: endAt,
         idempotency_key: checkoutKey,
-        payment_method: method
+        payment_method: method,
+        player_phone: user?.phone ?? undefined
       })
   });
 
   React.useEffect(() => {
     if (incomplete || venueQuery.isLoading) return;
+    if (!verified) {
+      setVerifyOpen(true);
+      return;
+    }
     // For venues that accept cash, wait for the player to pick a method before
     // creating a hold/booking. Online-only venues auto-checkout as before.
     if (!chosen && acceptsCash) return;
@@ -68,7 +76,7 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
     if (checkout.data || checkout.error) return;
     void checkout.mutate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [incomplete, venueQuery.isLoading, chosen, acceptsCash, method, checkoutKey]);
+  }, [incomplete, venueQuery.isLoading, chosen, acceptsCash, method, checkoutKey, verified]);
 
   const result = checkout.data;
   const isCash = !!result?.booking;
@@ -95,6 +103,17 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
   const slotTaken = failure?.code === "BOOKING_SLOT_UNAVAILABLE";
   const dateKey = startAt.slice(0, 10);
   const venueHref = venueSlug ? `/venues/${venueSlug}?date=${dateKey}` : "/venues";
+
+  const renderVerifyModal = () => (
+    <VerifyPhoneModal
+      open={verifyOpen}
+      onClose={() => setVerifyOpen(false)}
+      onVerified={() => {
+        setVerifyOpen(false);
+        checkout.reset();
+      }}
+    />
+  );
 
   const chooseMethod = (next: PaymentMethod) => {
     if (checkout.isPending) return;
@@ -141,9 +160,22 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
   }
 
   if (checkout.error) {
+    const needsVerify = failure?.code === "VERIFIED_PHONE_REQUIRED";
     return (
       <main className="mx-auto max-w-3xl px-4 pb-24 pt-8">
-        {slotTaken ? (
+        {needsVerify ? (
+          <>
+            <ErrorState
+              title="Verify your phone first"
+              message="You need a verified phone to book. We'll text you a code — it takes a second."
+            />
+            <div className="mt-6 flex justify-center">
+              <Button size="lg" onClick={() => setVerifyOpen(true)}>
+                Verify phone
+              </Button>
+            </div>
+          </>
+        ) : slotTaken ? (
           <>
             <ErrorState
               title="This slot was taken"
@@ -162,6 +194,7 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
             onRetry={() => checkout.mutate()}
           />
         )}
+        {renderVerifyModal()}
       </main>
     );
   }
@@ -220,6 +253,19 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
           <p className="mt-1 text-sm text-ink-2">Confirm your slot and pay to lock it in.</p>
         </div>
 
+        {!verified && (
+          <div className="mt-5 rounded-3xl border border-warning/40 bg-warning-light px-4 py-3 text-sm font-medium">
+            You need a verified phone to book.{" "}
+            <button
+              type="button"
+              className="font-semibold text-primary underline-offset-2 hover:underline"
+              onClick={() => setVerifyOpen(true)}
+            >
+              Verify now
+            </button>
+          </div>
+        )}
+
         {showSelector && (
           <div className="mt-6 grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Payment method">
             <MethodCard
@@ -242,6 +288,8 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
         )}
 
         {!showSelector && <Skeleton className="mt-6 h-6 w-1/2" />}
+
+        {renderVerifyModal()}
       </main>
     );
   }

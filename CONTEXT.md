@@ -87,9 +87,13 @@ A transactional email about a domain event — signup welcome, booking confirmat
 _Avoid_: marketing email, newsletter
 
 **Phone Sign-in**:
-Signing in to a Spots account using a one-time code received by SMS to the Player's phone number (Firebase Auth). Opportunistic — any account seeded this way can later be linked to richer sign-in methods.
+Signing in to a Spots account using a one-time code received by SMS to the Player's phone number (Firebase Auth). Opportunistic — any account seeded this way can later be linked to richer sign-in methods. Distinct from **Phone Verification**: completing a Phone Sign-in does **not** verify the phone.
 _Avoid_: OTP login, SMS login (a code is not the sign-in; the phone number is)
 _Note_: Distinct from **SMS Notification**, which is an outbound transactional SMS about a Booking.
+
+**Verified Phone**:
+A phone number on a Player account proven to belong to that Player by passing an SMS OTP challenge sent by the Spots backend (SMSGo.lk), or by explicit Admin marking. Only a Verified Phone may be used to create court Bookings. A phone typed into a form, or used for Phone Sign-in, is not verified until the challenge completes. Changing the phone number clears verified status until the new number is re-verified.
+_Avoid_: confirmed phone, validated phone, trusted number
 
 **SMS Notification**:
 A transactional SMS about a Booking — sent only on **booking confirmation** and **admin-initiated cancellation** (via SMSGo.lk). Not used for marketing or reminders.

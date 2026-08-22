@@ -11,6 +11,7 @@ import {
   Menu,
   ShieldCheck,
   Ticket,
+  Users,
   X
 } from "lucide-react";
 import { cn } from "@spots/utils";
@@ -47,7 +48,8 @@ const ADMIN_NAV = [
       { href: "/approvals", label: "Venue approvals", icon: ShieldCheckIcon },
       { href: "/admin-venues", label: "Venues", icon: Building2 },
       { href: "/events", label: "Events", icon: Ticket },
-      { href: "/sports", label: "Sports", icon: TrophyIcon }
+      { href: "/sports", label: "Sports", icon: TrophyIcon },
+      { href: "/players", label: "Players", icon: Users }
     ]
   }
 ];

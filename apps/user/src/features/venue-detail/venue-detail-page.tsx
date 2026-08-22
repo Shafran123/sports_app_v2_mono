@@ -6,6 +6,9 @@ import { venues, toApiFailure } from "@spots/api";
 import { Card, ErrorState, Skeleton, SkeletonCard } from "@spots/ui";
 import { dayjs, firstSportSlug, formatLkr, toDateKey } from "@spots/utils";
 import type { CourtAvailability, Slot } from "@spots/types";
+import { useAuth } from "@/context/auth";
+import { VerifiedPhonePrompt } from "@/features/verify-phone/verified-phone-prompt";
+import { VerifyPhoneModal } from "@/features/verify-phone/verify-phone-modal";
 import { Gallery } from "./gallery";
 import { VenueInfo } from "./venue-info";
 import { DateStrip } from "./date-strip";
@@ -39,9 +42,11 @@ function VenueDetailSkeleton() {
 }
 
 export function VenueDetailPage({ venueId }: { venueId: string }) {
+  const { user } = useAuth();
   const [date, setDate] = useState(() => toDateKey(new Date()));
   const [heroIndex, setHeroIndex] = useState(0);
   const [selected, setSelected] = useState<SelectedSlots>({});
+  const [verifyOpen, setVerifyOpen] = useState(false);
 
   const venueQuery = useQuery({
     queryKey: ["venue-detail", venueId],
@@ -87,6 +92,14 @@ export function VenueDetailPage({ venueId }: { venueId: string }) {
         index={heroIndex}
         onSelect={setHeroIndex}
       />
+
+      {user && !user.phone_verified_at && (
+        <div className="mx-auto mt-4 max-w-3xl">
+          <VerifiedPhonePrompt onVerify={() => setVerifyOpen(true)} />
+        </div>
+      )}
+
+      <VerifyPhoneModal open={verifyOpen} onClose={() => setVerifyOpen(false)} />
 
       <div className="mt-6 grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="min-w-0 space-y-8">

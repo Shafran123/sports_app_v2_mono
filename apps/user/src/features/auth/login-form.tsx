@@ -10,9 +10,10 @@ import type { ConfirmationResult } from "firebase/auth";
 import {
   confirmPhoneOtp,
   loginWithEmail,
-  loginWithGoogle,
   sendPhoneOtp
 } from "@spots/auth";
+import { VerifyPhoneModal } from "@/features/verify-phone/verify-phone-modal";
+import { useGoogleVerify } from "@/features/verify-phone/use-google-verify";
 
 const FIREBASE_MESSAGES: Record<string, string> = {
   "auth/email-already-in-use": "An account with this email already exists.",
@@ -64,10 +65,12 @@ function GoogleGlyph() {
 
 export function LoginForm() {
   const router = useRouter();
+  const { login: loginViaGoogle, verifyOpen, closeVerify, busy: googleBusy } = useGoogleVerify(() =>
+    router.push("/dashboard")
+  );
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
-  const [googleBusy, setGoogleBusy] = useState(false);
   const [error, setError] = useState("");
 
   const [phone, setPhone] = useState("");
@@ -102,14 +105,10 @@ export function LoginForm() {
 
   async function handleGoogle() {
     setError("");
-    setGoogleBusy(true);
     try {
-      await loginWithGoogle();
-      router.push("/dashboard");
+      await loginViaGoogle();
     } catch (err) {
       setError(messageFor(err));
-    } finally {
-      setGoogleBusy(false);
     }
   }
 
@@ -316,6 +315,8 @@ export function LoginForm() {
           Admin login
         </Link>
       </div>
+
+      <VerifyPhoneModal open={verifyOpen} onClose={closeVerify} onVerified={() => router.push("/dashboard")} />
     </section>
   );
 }

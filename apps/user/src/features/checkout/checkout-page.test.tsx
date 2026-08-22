@@ -4,7 +4,21 @@ import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { CheckoutPage } from "./checkout-page";
 
-const useSearchParams = vi.fn();
+const { verifySendMock, verifyConfirmMock, setUserMock, useSearchParams } = vi.hoisted(() => ({
+  verifySendMock: vi.fn(),
+  verifyConfirmMock: vi.fn(),
+  setUserMock: vi.fn(),
+  useSearchParams: vi.fn()
+}));
+
+let ctxUser: Record<string, unknown> = {
+  id: "u1",
+  name: "Test",
+  email: "t@spots.app",
+  role: "player",
+  phone: "+94771234567",
+  phone_verified_at: "2026-08-22T10:00:00.000Z"
+};
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
@@ -13,9 +27,10 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("@/context/auth", () => ({
   useAuth: () => ({
-    user: { id: "u1", name: "Test", email: "t@spots.app", role: "player" },
+    user: ctxUser,
     loading: false,
-    logout: vi.fn()
+    logout: vi.fn(),
+    setUser: setUserMock
   })
 }));
 
@@ -36,8 +51,18 @@ vi.mock("@spots/api", () => ({
     cancel: vi.fn(),
     markPaid: vi.fn()
   },
+  auth: {
+    updateMe: vi.fn(),
+    me: vi.fn(),
+    verifyPhoneSend: verifySendMock,
+    verifyPhoneConfirm: verifyConfirmMock
+  },
   submitPayHere: vi.fn(),
-  toApiFailure: () => ({ status: 0, code: "UNKNOWN", message: "err" }),
+  toApiFailure: (e: { code?: string; message?: string }) => ({
+    status: e?.code === "VERIFIED_PHONE_REQUIRED" ? 409 : 0,
+    code: e?.code ?? "UNKNOWN",
+    message: e?.message ?? "err"
+  }),
   getClient: vi.fn(),
   setClient: vi.fn()
 }));
@@ -80,6 +105,21 @@ function renderPage() {
 beforeEach(() => {
   vi.resetAllMocks();
   vi.mocked(venues.detail).mockResolvedValue(onlineVenue as never);
+  setUserMock.mockImplementation((u: Record<string, unknown>) => {
+    ctxUser = { ...ctxUser, ...u };
+  });
+  verifyConfirmMock.mockImplementation(async (_p: string, _c: string) => ({
+      ...ctxUser,
+      phone_verified_at: "2026-08-22T10:05:00.000Z"
+    }));
+  ctxUser = {
+    id: "u1",
+    name: "Test",
+    email: "t@spots.app",
+    role: "player",
+    phone: "+94771234567",
+    phone_verified_at: "2026-08-22T10:00:00.000Z"
+  };
   useSearchParams.mockReturnValue(
     new URLSearchParams({
       court_id: "court-1",
@@ -160,5 +200,51 @@ describe("CheckoutPage venue/court display", () => {
     await userEvent.click(cashOption);
     await screen.findByText("Pay on arrival");
     expect(screen.getByText("Smash Arena")).toBeInTheDocument();
+  });
+});
+
+describe("CheckoutPage verified-phone gate", () => {
+  it("blocks checkout and shows the verify modal for an unverified user", async () => {
+    ctxUser = { ...ctxUser, phone_verified_at: null };
+    vi.mocked(venues.detail).mockResolvedValue(onlineVenue as never);
+
+    renderPage();
+
+    expect(await screen.findByText(/You need a verified phone to book/)).toBeInTheDocument();
+    expect(bookings.checkout).not.toHaveBeenCalled();
+  });
+
+  it("proceeds with checkout after the user verifies, carrying their phone", async () => {
+    ctxUser = { ...ctxUser, phone_verified_at: null };
+    vi.mocked(venues.detail).mockResolvedValue(onlineVenue as never);
+    vi.mocked(bookings.checkout).mockResolvedValue(onlineResult as never);
+    verifySendMock.mockResolvedValue({ sent: true, resend_after_seconds: 60 });
+
+    renderPage();
+    await screen.findByText("Verify your phone");
+
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText("Phone number"), "+94771234567");
+    await user.click(screen.getByRole("button", { name: "Send verification code" }));
+    await user.type(await screen.findByLabelText("Verification code"), "123456");
+    await user.click(screen.getByRole("button", { name: "Verify & continue" }));
+
+    await waitFor(() => expect(bookings.checkout).toHaveBeenCalled());
+    expect(bookings.checkout).toHaveBeenCalledWith(
+      expect.objectContaining({ player_phone: "+94771234567" })
+    );
+  });
+
+  it("reopens the verify modal when the backend rejects with VERIFIED_PHONE_REQUIRED", async () => {
+    ctxUser = { ...ctxUser, phone_verified_at: "2026-08-22T10:00:00.000Z" };
+    vi.mocked(venues.detail).mockResolvedValue(onlineVenue as never);
+    vi.mocked(bookings.checkout).mockRejectedValue({
+      code: "VERIFIED_PHONE_REQUIRED",
+      message: "Verify your phone number before booking."
+    });
+
+    renderPage();
+
+    expect(await screen.findByText(/Verify your phone/)).toBeInTheDocument();
   });
 });

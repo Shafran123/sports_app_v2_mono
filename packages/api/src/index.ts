@@ -141,6 +141,7 @@ export const bookings = {
       end_at: string;
       idempotency_key: string;
       payment_method?: "online" | "cash";
+      player_phone?: string;
     },
     client: AxiosInstance = getClient()
   ) {
@@ -226,6 +227,14 @@ export const auth = {
     input: { name?: string; phone?: string; city?: string }
   ) {
     const res = await client.patch("/auth/me", input);
+    return parseData(UserSchema, res.data.data ?? res.data);
+  },
+  async verifyPhoneSend(phone: string, client: AxiosInstance = getClient()) {
+    const res = await client.post("/auth/verify-phone/send", { phone });
+    return res.data.data as { sent: boolean; resend_after_seconds: number };
+  },
+  async verifyPhoneConfirm(phone: string, code: string, client: AxiosInstance = getClient()) {
+    const res = await client.post("/auth/verify-phone/confirm", { phone, code });
     return parseData(UserSchema, res.data.data ?? res.data);
   }
 };
@@ -325,6 +334,14 @@ const PendingVenueSchema = VenueSchema.extend({
 });
 
 export const admin = {
+  async listPlayers(search = "", client: AxiosInstance = getClient()) {
+    const res = await client.get("/admin/players", { params: search ? { search } : {} });
+    return parseList(UserSchema, res.data.data ?? res.data);
+  },
+  async verifyPlayer(id: string, client: AxiosInstance = getClient()) {
+    const res = await client.post(`/admin/players/${id}/verify`);
+    return parseData(UserSchema, res.data.data ?? res.data);
+  },
   async pendingVenues(client: AxiosInstance = getClient()) {
     const res = await client.get("/admin/venues/pending");
     return parseList(PendingVenueSchema, res.data.data ?? res.data);

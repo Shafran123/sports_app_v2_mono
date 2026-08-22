@@ -3,9 +3,12 @@
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { toApiFailure } from "@spots/api";
+import { toApiFailure, auth as authApi } from "@spots/api";
 import { Button, Input, PasswordInput } from "@spots/ui";
 import { loginWithGoogle, registerWithEmail } from "@spots/auth";
+import { useAuth } from "@/context/auth";
+import { VerifyPhoneModal } from "@/features/verify-phone/verify-phone-modal";
+import { useGoogleVerify } from "@/features/verify-phone/use-google-verify";
 
 const FIREBASE_MESSAGES: Record<string, string> = {
   "auth/email-already-in-use": "An account with this email already exists. Try logging in.",
@@ -48,13 +51,16 @@ function GoogleGlyph() {
 
 export function RegisterForm() {
   const router = useRouter();
+  const { setUser } = useAuth();
+  const { login, verifyOpen, closeVerify, busy: googleBusy } = useGoogleVerify(() =>
+    router.push("/dashboard")
+  );
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [city, setCity] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
-  const [googleBusy, setGoogleBusy] = useState(false);
   const [error, setError] = useState("");
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
@@ -79,6 +85,13 @@ export function RegisterForm() {
     setBusy(true);
     try {
       await registerWithEmail(email.trim(), password);
+      await authApi.updateMe(undefined, {
+        name: name.trim(),
+        phone: phone.trim() || undefined,
+        city: city.trim() || undefined
+      });
+      const me = await authApi.me();
+      setUser(me);
       router.push("/dashboard");
     } catch (err) {
       setError(messageFor(err));
@@ -89,14 +102,10 @@ export function RegisterForm() {
 
   async function handleGoogle() {
     setError("");
-    setGoogleBusy(true);
     try {
-      await loginWithGoogle();
-      router.push("/dashboard");
+      await login();
     } catch (err) {
       setError(messageFor(err));
-    } finally {
-      setGoogleBusy(false);
     }
   }
 
@@ -201,6 +210,8 @@ export function RegisterForm() {
           Log in
         </Link>
       </div>
+
+      <VerifyPhoneModal open={verifyOpen} onClose={closeVerify} onVerified={() => router.push("/dashboard")} />
     </section>
   );
 }

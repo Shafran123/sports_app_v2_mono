@@ -45,7 +45,8 @@ export const UserSchema = z.object({
   name: z.string().nullable(),
   phone: z.string().nullable(),
   city: z.string().nullable(),
-  role: ROLE
+  role: ROLE,
+  phone_verified_at: z.string().nullable()
 });
 export type User = z.infer<typeof UserSchema>;
 

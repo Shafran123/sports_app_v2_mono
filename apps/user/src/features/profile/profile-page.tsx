@@ -2,11 +2,12 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { LogOut } from "lucide-react";
+import { LogOut, ShieldCheck } from "lucide-react";
 import { auth as authApi, toApiFailure } from "@spots/api";
 import { Avatar, Badge, Button, Card, Input, Toast } from "@spots/ui";
 import type { User } from "@spots/types";
 import { useAuth } from "@/context/auth";
+import { VerifyPhoneModal } from "@/features/verify-phone/verify-phone-modal";
 
 interface Feedback {
   tone: "success" | "error";
@@ -37,10 +38,13 @@ export function ProfilePage() {
 
 function ProfileForm({ user, onLogout }: { user: User; onLogout: () => Promise<void> }) {
   const router = useRouter();
+  const { setUser } = useAuth();
   const [me, setMe] = useState<User>(user);
   const [saving, setSaving] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [verifyOpen, setVerifyOpen] = useState(false);
+  const [enteredPhone, setEnteredPhone] = useState(user.phone ?? "");
 
   useEffect(() => {
     if (!feedback) return;
@@ -63,6 +67,7 @@ function ProfileForm({ user, onLogout }: { user: User; onLogout: () => Promise<v
         city: city || undefined
       });
       setMe(updated);
+      setUser(updated);
       router.refresh();
       setFeedback({ tone: "success", title: "Profile saved" });
     } catch (err) {
@@ -118,13 +123,35 @@ function ProfileForm({ user, onLogout }: { user: User; onLogout: () => Promise<v
             <label htmlFor="phone" className="mb-1.5 block text-sm font-medium text-ink">
               Phone
             </label>
-            <Input
-              id="phone"
-              name="phone"
-              defaultValue={me.phone ?? ""}
-              placeholder="+94 7X XXX XXXX"
-              inputMode="tel"
-            />
+            <div className="flex items-center gap-2">
+              <Input
+                id="phone"
+                name="phone"
+                defaultValue={me.phone ?? ""}
+                placeholder="+94 7X XXX XXXX"
+                inputMode="tel"
+                onChange={(e) => setEnteredPhone(e.target.value)}
+              />
+              {me.phone_verified_at && enteredPhone.trim() === (user.phone ?? "") ? (
+                <Badge variant="success" className="shrink-0">
+                  <ShieldCheck className="h-3 w-3" /> Verified
+                </Badge>
+              ) : (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="shrink-0"
+                  onClick={() => setVerifyOpen(true)}
+                >
+                  Verify phone
+                </Button>
+              )}
+            </div>
+            {!me.phone_verified_at && enteredPhone.trim() && enteredPhone.trim() !== (user.phone ?? "") ? (
+              <p className="mt-1.5 text-xs text-ink-2">
+                You&apos;ll need to verify the new number before booking.
+              </p>
+            ) : null}
           </div>
           <div>
             <label htmlFor="city" className="mb-1.5 block text-sm font-medium text-ink">
@@ -148,6 +175,12 @@ function ProfileForm({ user, onLogout }: { user: User; onLogout: () => Promise<v
           </Button>
         </div>
       </Card>
+
+      <VerifyPhoneModal
+        open={verifyOpen}
+        onClose={() => setVerifyOpen(false)}
+        onVerified={(verified) => setMe(verified)}
+      />
     </main>
   );
 }
