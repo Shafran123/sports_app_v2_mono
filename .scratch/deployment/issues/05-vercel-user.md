@@ -16,6 +16,11 @@ Status: ready-for-human
 3. Settings → Git: deployments **only on `main`** (no preview builds).
 4. Deploy; confirm `sports-app-user.vercel.app` loads the app and `/api/...` rewrites reach Railway.
 
+## Progress (automated)
+
+Done by agent: project `sports-app-user` created + linked to `sports_app_v2_mono` (rootDir `apps/user`, framework nextjs); Firebase 4 env vars set (production); git deployed from `main` only via `apps/user/vercel.json` `ignoreCommand`; first auto-deploy triggered by cutover push (will serve placeholder until `NEXT_PUBLIC_API_URL` is set).
+Remaining (human): set `NEXT_PUBLIC_API_URL` = Railway URL once ticket 04 exists; redeploy.
+
 ## Done
 
 - [ ] Project builds and serves; `/api/v1/health` through the rewrite → 200.

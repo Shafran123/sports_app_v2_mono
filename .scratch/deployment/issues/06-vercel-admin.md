@@ -15,6 +15,11 @@ Status: ready-for-human
 3. Settings → Git: deployments **only on `main`** (no preview builds).
 4. Deploy; confirm the front desk page sockets connect (network tab shows a `socket.io` handshake to Railway — the admin origin must be in `SOCKET_ALLOWED_ORIGINS`, ticket 04).
 
+## Progress (automated)
+
+Done by agent: project `sports-app-admin` created + linked to `sports_app_v2_mono` (rootDir `apps/admin`, framework nextjs); Firebase 4 env vars set (production); git deployed from `main` only via `apps/admin/vercel.json` `ignoreCommand`.
+Remaining (human): set `NEXT_PUBLIC_API_URL` + `NEXT_PUBLIC_SOCKET_URL` = Railway URL once ticket 04 exists; redeploy; verify socket handshake.
+
 ## Done
 
 - [ ] Project builds and serves; front-desk page establishes a live socket connection (not polling).
