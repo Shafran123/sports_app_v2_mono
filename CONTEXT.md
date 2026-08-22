@@ -34,7 +34,7 @@ _Avoid_: order, purchase
 _Note_: A booking has a payment method (online via PayHere, or cash collected at the venue). See **Payment** below.
 
 **QR Token**:
-A random, secret, single-use string minted when a Booking is created. Encoded in the player's check-in QR code; the venue consumes it by scanning and checking in. Re-scanning a consumed token returns "already used."
+A random, secret, single-use string minted when a Booking is created. Encoded in the player's check-in QR code; the venue consumes it by scanning and checking in. Re-scanning a consumed token returns "already used." Disclosed only to the Booking's Player (in their own app) and consumed only by the Venue Owner of the Venue the Booking was made on — the check-in validates ownership of the Venue as well as the identity of the Token. Never surfaced through player-facing or venue-facing read APIs.
 _Avoid_: ticket number, booking ID (the Booking UUID is NOT the QR token)
 
 **Payment**:
@@ -46,7 +46,7 @@ A Payment with method cash, recorded by the Venue Owner when the player pays at 
 _Avoid_: COD (wrong shipping framing), walk-in payment (the walk-in may still book online)
 
 **Check-in**:
-The act of a venue confirming a Booking on arrival by scanning its QR code and consuming the QR Token. Possible from booking creation until shortly after the slot ends; can happen early (walk-ins arrive before their slot).
+The act of a venue confirming a Booking on arrival by scanning its QR code and consuming the QR Token. Only the Venue Owner of the Venue the Booking was made on may check it in; the scan validates owner-side ownership as well as the Token. Possible from booking creation until shortly after the slot ends; can happen early (walk-ins arrive before their slot).
 _Avoid_: attendance
 
 **No-show**:
@@ -66,6 +66,14 @@ _Avoid_: event booking
 **Player**:
 An end user who browses, books, and registers.
 _Avoid_: user, customer, member
+
+**Player Suspension**:
+A temporary, reversible admin action that stops a Player from creating Bookings, registering for Events, or holding Slots. Existing confirmed Bookings remain valid and Check-in still works.
+_Avoid_: block, freeze
+
+**Player Ban**:
+A permanent admin action that revokes the Player's sign-in entirely. Distinct from Suspension, which is reversible.
+_Avoid_: delete account, deactivate
 
 **Venue Owner**:
 An operator account that manages one or more Venues.
