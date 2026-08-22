@@ -1,7 +1,7 @@
 # 02 — Backend origin split: SOCKET_ALLOWED_ORIGINS (socket CORS ≠ FRONTEND_URL)
 
 Type: task
-Status: ready-for-agent
+Status: completed
 
 ## Context
 
@@ -31,3 +31,7 @@ module.exports = { getAllowedOrigins };
 - [ ] `realtime.js` uses the allow-list; no other `FRONTEND_URL` consumer changed.
 
 Blocked by: 01
+
+## Completed
+
+Implemented. Evidence: commit `3daf839`. New `sp_be/utils/origins.js` (`getAllowedOrigins` — comma-split/trim, falls back to `FRONTEND_URL`, `[]` if none); `realtime.js` socket CORS uses the allow-list; `config/env.js` validates `SOCKET_ALLOWED_ORIGINS` when set (non-empty list, absolute http(s)); `.env.example` documents it. Full backend suite 218/218 (214 baseline + 4 new `test/origins.test.js`).

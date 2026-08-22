@@ -1,7 +1,7 @@
 # 03 — Vercel apps: /uploads rewrite (mirror of the /api rewrite)
 
 Type: task
-Status: ready-for-agent
+Status: completed
 
 ## Context
 
@@ -24,3 +24,7 @@ rewrites: async () => [
 - [ ] Local smoke: backend running with `NEXT_PUBLIC_API_URL` set → `GET /uploads/<existing file>` returns the image through the rewrite.
 
 Blocked by: 01
+
+## Completed
+
+Implemented. Evidence: commit `630e5aa`. Both `apps/user/next.config.mjs` and `apps/admin/next.config.mjs` gained the `/uploads/:path*` rewrite mirroring `/api`. `next build` + `tsc --noEmit` green for both apps. Note: `next lint` fails pre-existing on `main` (no ESLint config in either app — `next lint` prompts interactively); not introduced here.
