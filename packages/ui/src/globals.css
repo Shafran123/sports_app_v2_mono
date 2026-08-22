@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+/* Tailwind v4's automatic source detection does NOT scan workspace
+   packages from a consuming app — only app-local trees. Without this,
+   every utility used exclusively inside packages/ui/src (data-[state=*]
+   variants, SHEET_CLASS, focus-visible variants, arbitrary values) is
+   silently dropped from the compiled CSS. @source "." resolves relative
+   to this file, i.e. packages/ui/src. */
+@source ".";
+
 /* ============================================================
    Spots light-premium identity (ADR-0005)
    Replaces the dark SmashZone identity (ADR-0004).

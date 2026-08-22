@@ -16,3 +16,5 @@
 
 ## Notes
 - Screenshot: 2026-08-22 10.07.59.
+## Comments
+- 2026-08-22: Reported "still broken" three more times despite correct code. Root cause was NOT the components: see **49** — Tailwind never compiled `packages/ui/src` classes. Fixed in 49 (`@source "."`).

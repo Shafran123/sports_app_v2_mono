@@ -12,3 +12,5 @@
 - [ ] Player bottom nav active tab shows a filled pill
 - [ ] Active state readable at a glance on small screens
 - [ ] Inactive tabs unchanged
+## Comments
+- 2026-08-22: Same visible symptom as 36. Root cause is the CSS compilation boundary in **49** (ui-package classes never emitted). 49's `@source "."` makes this pill's fill visible; keep the curl probe as the regression.
