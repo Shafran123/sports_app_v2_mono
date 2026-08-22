@@ -17,8 +17,12 @@ Status: ready-for-human
 
 ## Progress (automated)
 
-Done by agent: project `sports-app-admin` created + linked to `sports_app_v2_mono` (rootDir `apps/admin`, framework nextjs); Firebase 4 env vars set (production); git deployed from `main` only via `apps/admin/vercel.json` `ignoreCommand`.
-Remaining (human): set `NEXT_PUBLIC_API_URL` + `NEXT_PUBLIC_SOCKET_URL` = Railway URL once ticket 04 exists; redeploy; verify socket handshake.
+Done by agent: project `sports-app-admin` created + linked to `sports_app_v2_mono` (rootDir `apps/admin`, framework nextjs); Firebase 4 env vars set (production); git deployed from `main` only via `apps/admin/vercel.json` `ignoreCommand`; Next bumped 15.2.2 → 15.5.23 (Vercel blocks vulnerable builds); alias `spots-admin-preprod.vercel.app` assigned (the name `sports-app-admin.vercel.app` is owned by a stale external project — zombie); admin project ssoProtection set to `preview` only (production URL public). Verified: home 200, `/api/sports` → real Railway JSON.
+
+IMPORTANT: Railway env `SOCKET_ALLOWED_ORIGINS` must use the REAL admin origin:
+`https://spots-admin-preprod.vercel.app,https://sports-app-user.vercel.app`
+
+Remaining (human): set `NEXT_PUBLIC_API_URL` + `NEXT_PUBLIC_SOCKET_URL` = Railway URL (DONE by agent via CLI — verify in dashboard), verify socket handshake on the front desk page.
 
 ## Done
 

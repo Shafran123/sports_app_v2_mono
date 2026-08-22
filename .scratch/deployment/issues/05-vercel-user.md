@@ -18,8 +18,7 @@ Status: ready-for-human
 
 ## Progress (automated)
 
-Done by agent: project `sports-app-user` created + linked to `sports_app_v2_mono` (rootDir `apps/user`, framework nextjs); Firebase 4 env vars set (production); git deployed from `main` only via `apps/user/vercel.json` `ignoreCommand`; first auto-deploy triggered by cutover push (will serve placeholder until `NEXT_PUBLIC_API_URL` is set).
-Remaining (human): set `NEXT_PUBLIC_API_URL` = Railway URL once ticket 04 exists; redeploy.
+Done by agent: project `sports-app-user` created + linked to `sports_app_v2_mono` (rootDir `apps/user`, framework nextjs); Firebase 4 env vars set (production); git deployed from `main` only via `apps/user/vercel.json` `ignoreCommand`; Next bumped 15.2.2 → 15.5.23 (Vercel blocks vulnerable builds); `NEXT_PUBLIC_API_URL` set to Railway (verified: home 200, `/api/sports` → real Railway JSON).
 
 ## Done
 
