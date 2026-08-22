@@ -1,0 +1,1 @@
+alter table holds add column if not exists player_phone text;

@@ -99,7 +99,7 @@ export function VenueDetailPage({ venueId }: { venueId: string }) {
         onSelect={setHeroIndex}
       />
 
-      {user && !user.phone_verified_at && flags?.phone_verification_required !== false && (
+      {user && !user.phone_verified_at && flags?.phone_verification_required === true && (
         <div className="mx-auto mt-4 max-w-3xl">
           <VerifiedPhonePrompt onVerify={() => setVerifyOpen(true)} />
         </div>

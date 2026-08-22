@@ -28,6 +28,7 @@ vi.mock("@/context/auth", () => ({
 
 vi.mock("@spots/api", () => ({
   auth: { me: meMock, verifyPhoneSend: vi.fn(), verifyPhoneConfirm: vi.fn() },
+  featureFlags: { get: vi.fn(async () => ({ phone_verification_required: true, sms_enabled: false, payhere_enabled: false, events_discovery_state: "enabled", brand_name: "Spots" })) },
   toApiFailure: (e: unknown) => ({ message: (e as Error).message })
 }));
 

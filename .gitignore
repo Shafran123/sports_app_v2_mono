@@ -18,15 +18,16 @@ build/
 # tests
 coverage/
 
-# separate repos — sp_be and sp_fe keep their own git history
-/sp_be/
-/sp_fe/
-
 # misc
 .DS_Store
 *.log
+
 # firebase service account (never commit)
 *.json
-!/sp_be/.env*
-!/sp_fe/.env*
 sports-app-20029-firebase*.json
+# sp_be manifests are required by Railway's nixpacks build
+!/sp_be/package.json
+!/sp_be/package-lock.json
+
+# backend local uploads (persist on the Railway volume, not in git)
+/sp_be/uploads/

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import * as QRCode from "qrcode";
 import { CircleCheckBig, Copy, MapPin, RefreshCw } from "lucide-react";
@@ -16,8 +16,6 @@ const POLL_TIMEOUT_MS = 60_000;
 
 export function BookingConfirmationPage({ bookingId }: { bookingId: string }) {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const venueSlug = searchParams?.get("venue_slug") ?? "";
 
   const [timedOut, setTimedOut] = React.useState(false);
   const [qrSrc, setQrSrc] = React.useState<string | null>(null);
@@ -152,9 +150,7 @@ export function BookingConfirmationPage({ bookingId }: { bookingId: string }) {
     );
   }
 
-  const viewVenueHref = venueSlug
-    ? `/venues/${venueSlug}`
-    : `/explore?search=${encodeURIComponent(booking.venue_name ?? "")}`;
+  const viewVenueHref = `/explore?search=${encodeURIComponent(booking.venue_name ?? "")}`;
 
   return (
     <main className="mx-auto max-w-2xl px-4 pb-32 pt-8 md:pb-14">

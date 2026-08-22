@@ -7,7 +7,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Banknote, ShieldCheck, Wallet } from "lucide-react";
 import { bookings, featureFlags, toApiFailure, venues } from "@spots/api";
 import { Badge, Button, Card, CardContent, CountdownPill, ErrorState, Skeleton } from "@spots/ui";
-import { formatDateLong, formatLkr, formatTime12 } from "@spots/utils";
+import { formatDateLong, formatLkr, formatTime12, uuidV4 } from "@spots/utils";
 import { useAuth } from "@/context/auth";
 import { submitPayHere } from "@spots/api";
 import { VerifyPhoneModal } from "@/features/verify-phone/verify-phone-modal";
@@ -37,7 +37,6 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
   const startAt = searchParams?.get("start_at") ?? "";
   const endAt = searchParams?.get("end_at") ?? "";
   const venueNameParam = searchParams?.get("venue") ?? "";
-  const venueSlug = searchParams?.get("venue_slug") ?? "";
   const courtNameParam = searchParams?.get("court") ?? "";
   const rawPricePerSlot = searchParams?.get("price_per_slot");
   const rawSlots = searchParams?.get("slots");
@@ -61,7 +60,7 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
 
   const [method, setMethod] = React.useState<PaymentMethod>("online");
   const [chosen, setChosen] = React.useState(false);
-  const [checkoutKey, setCheckoutKey] = React.useState(() => crypto.randomUUID());
+  const [checkoutKey, setCheckoutKey] = React.useState(() => uuidV4());
 
   // With online payments paused (payhere_enabled OFF) cash is the only option.
   const onlineAvailable = payhereEnabled;
@@ -80,19 +79,25 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
   });
 
   React.useEffect(() => {
-    if (incomplete || venueQuery.isLoading) return;
+    if (incomplete || venueQuery.isLoading || !flags) return;
     if (requiresVerification && !verified) {
       setVerifyOpen(true);
       return;
     }
     // For venues that accept cash with online still available, wait for the
-    // player to pick a method. Cash-only (payments paused) auto-checkouts.
+    // player to pick a method.
     if (!chosen && acceptsCash && onlineAvailable) return;
+    // When online payments are paused and the venue has no cash option there
+    // is nothing to offer — the paused card renders and no request fires.
+    if (!onlineAvailable && !acceptsCash) return;
+    // A cash booking is created server-side when it is confirmed, so it must
+    // never auto-fire: it needs an explicit confirmation of the summary.
+    if (effectiveMethod === "cash") return;
     if (checkout.isPending) return;
     if (checkout.data || checkout.error) return;
     void checkout.mutate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [incomplete, venueQuery.isLoading, chosen, acceptsCash, method, checkoutKey, verified, onlineAvailable, requiresVerification]);
+  }, [incomplete, venueQuery.isLoading, flags, chosen, acceptsCash, method, checkoutKey, verified, onlineAvailable, requiresVerification, effectiveMethod]);
 
   const result = checkout.data;
   const isCash = !!result?.booking;
@@ -118,7 +123,9 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
   const failure = checkout.error ? toApiFailure(checkout.error) : null;
   const slotTaken = failure?.code === "BOOKING_SLOT_UNAVAILABLE";
   const dateKey = startAt.slice(0, 10);
-  const venueHref = venueSlug ? `/venues/${venueSlug}?date=${dateKey}` : "/venues";
+  // The venue route segment is the venue UUID (venues/[id]) — never the sport
+  // slug that the CTA carries for display purposes.
+  const venueHref = `/venues/${venueId}?date=${dateKey}`;
 
   const renderVerifyModal = () => (
     <VerifyPhoneModal
@@ -133,10 +140,11 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
 
   const chooseMethod = (next: PaymentMethod) => {
     if (checkout.isPending) return;
+    if (!onlineAvailable && next === "online") return;
     if (next === method && chosen) return;
     setChosen(true);
     setMethod(next);
-    setCheckoutKey(crypto.randomUUID());
+    setCheckoutKey(uuidV4());
     checkout.reset();
   };
 
@@ -250,8 +258,23 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
     );
   }
 
+  const pricePerSlot = rawPricePerSlot ? Number(rawPricePerSlot) : null;
+  const slotsCount = rawSlots
+    ? Number(rawSlots)
+    : pricePerSlot && pricePerSlot > 0 && result?.amount
+      ? Math.max(1, Math.round(result.amount / pricePerSlot))
+      : null;
+  const rateLine =
+    slotsCount && pricePerSlot
+      ? `${slotsCount} × ${formatLkr(pricePerSlot)}`
+      : pricePerSlot
+        ? formatLkr(pricePerSlot)
+        : null;
+  const rateTotal =
+    slotsCount && pricePerSlot ? slotsCount * pricePerSlot : (result?.amount ?? 0);
+
   if (!result) {
-    const cashOnly = !onlineAvailable;
+    const pausedAndNoCash = !onlineAvailable && !acceptsCash;
     return (
       <main className="mx-auto max-w-3xl px-4 pb-24 pt-8">
         <Link
@@ -282,7 +305,7 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
           </div>
         )}
 
-        {cashOnly && !acceptsCash ? (
+        {pausedAndNoCash ? (
           <Card className="mt-6 p-6">
             <h2 className="font-semibold text-ink">Online payment is paused</h2>
             <p className="mt-1 text-sm text-ink-2">
@@ -293,49 +316,82 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
               Pick a different venue
             </Button>
           </Card>
-        ) : cashOnly ? (
-          <div className="mt-6 rounded-3xl border border-border bg-surface p-4 text-sm text-ink-2">
-            Online payments are paused — you&apos;ll pay at the venue in cash. Your slot will be
-            confirmed immediately.
-          </div>
         ) : (
-          <div className="mt-6 grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Payment method">
-            <MethodCard
-              icon={<Wallet className="h-5 w-5" />}
-              title="Pay online"
-              subtitle="PayHere · instant confirmation"
-              active={method === "online"}
-              onClick={() => chooseMethod("online")}
-              dataTestId="method-online"
-            />
-            <MethodCard
-              icon={<Banknote className="h-5 w-5" />}
-              title="Pay at venue"
-              subtitle="Cash on arrival"
-              active={method === "cash"}
-              onClick={() => chooseMethod("cash")}
-              dataTestId="method-cash"
-            />
-          </div>
+          <>
+            <div className="mt-6 grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Payment method">
+              <MethodCard
+                icon={<Wallet className="h-5 w-5" />}
+                title="Pay online"
+                subtitle={onlineAvailable ? "PayHere · instant confirmation" : "Temporarily unavailable"}
+                badge={onlineAvailable ? undefined : "Paused"}
+                active={onlineAvailable && method === "online"}
+                disabled={!onlineAvailable}
+                onClick={() => chooseMethod("online")}
+                dataTestId="method-online"
+              />
+              <MethodCard
+                icon={<Banknote className="h-5 w-5" />}
+                title="Pay at venue"
+                subtitle="Cash on arrival"
+                active={effectiveMethod === "cash"}
+                onClick={() => chooseMethod("cash")}
+                dataTestId="method-cash"
+              />
+            </div>
+
+            {effectiveMethod === "cash" && (
+              <>
+                <Card className="mt-6 overflow-hidden">
+                  <CardContent className="px-6 pt-8">
+                    <div className="min-w-0 flex-1">
+                      <h2 className="truncate font-semibold text-ink">{courtName || "Court"}</h2>
+                      <p className="mt-0.5 text-sm text-ink-2">{venueName || "Venue"}</p>
+                    </div>
+
+                    <dl className="mt-5 divide-y divide-border">
+                      <DetailRow label="Venue" value={venueName || "—"} />
+                      <DetailRow label="Date" value={formatDateLong(startAt)} />
+                      <DetailRow label="Time" value={`${formatTime12(startAt)} – ${formatTime12(endAt)}`} />
+                      {rateLine && <DetailRow label="Rate" value={rateLine} />}
+                    </dl>
+                  </CardContent>
+
+                  <div className="border-t border-border px-6 py-5">
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-sm text-ink-2">Total</span>
+                      <span className="font-display text-2xl font-extrabold tabular-nums text-ink">
+                        {formatLkr(rateTotal)}
+                      </span>
+                    </div>
+                    <Button
+                      size="lg"
+                      loading={checkout.isPending}
+                      onClick={() => {
+                        if (checkout.isPending) return;
+                        checkout.mutate();
+                      }}
+                      className="mt-4 w-full"
+                    >
+                      Confirm booking
+                    </Button>
+                  </div>
+                </Card>
+
+                <div className="mt-6 rounded-3xl border border-border bg-surface p-4 text-sm text-ink-2">
+                  <Banknote className="mr-1 inline h-4 w-4" />
+                  {onlineAvailable
+                    ? "You chose pay-at-venue — your slot is confirmed immediately and you pay in cash at the venue."
+                    : "Online payments are paused — you'll pay at the venue in cash once you confirm below."}
+                </div>
+              </>
+            )}
+          </>
         )}
 
         {renderVerifyModal()}
       </main>
     );
   }
-
-  const pricePerSlot = rawPricePerSlot ? Number(rawPricePerSlot) : null;
-  const slotsCount = rawSlots
-    ? Number(rawSlots)
-    : pricePerSlot && pricePerSlot > 0
-      ? Math.max(1, Math.round(result.amount / pricePerSlot))
-      : null;
-  const rateLine =
-    slotsCount && pricePerSlot
-      ? `${slotsCount} × ${formatLkr(pricePerSlot)}`
-      : pricePerSlot
-        ? formatLkr(pricePerSlot)
-        : null;
 
   return (
     <main className="mx-auto max-w-3xl px-4 pb-40 pt-8 md:pb-14">
@@ -365,6 +421,7 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
           </div>
 
           <dl className="mt-5 divide-y divide-border">
+            <DetailRow label="Venue" value={venueName || "—"} />
             <DetailRow label="Date" value={formatDateLong(startAt)} />
             <DetailRow label="Time" value={`${formatTime12(startAt)} – ${formatTime12(endAt)}`} />
             {rateLine && <DetailRow label="Rate" value={rateLine} />}
@@ -431,6 +488,8 @@ function MethodCard({
   title,
   subtitle,
   active,
+  disabled = false,
+  badge,
   onClick,
   dataTestId
 }: {
@@ -438,6 +497,8 @@ function MethodCard({
   title: string;
   subtitle: string;
   active: boolean;
+  disabled?: boolean;
+  badge?: string;
   onClick: () => void;
   dataTestId: string;
 }) {
@@ -446,15 +507,27 @@ function MethodCard({
       type="button"
       role="radio"
       aria-checked={active}
+      disabled={disabled}
       data-testid={dataTestId}
       onClick={onClick}
       className={`flex items-start gap-3 rounded-3xl border p-4 text-left transition-colors ${
-        active ? "border-primary bg-primary-light/40 ring-1 ring-primary" : "border-border bg-surface hover:border-ink-3"
+        disabled
+          ? "cursor-not-allowed border-border bg-surface/60 opacity-60"
+          : active
+            ? "border-primary bg-primary-light/40 ring-1 ring-primary"
+            : "border-border bg-surface hover:border-ink-3"
       }`}
     >
-      <span className={`mt-0.5 ${active ? "text-primary" : "text-ink-3"}`}>{icon}</span>
+      <span className={`mt-0.5 ${disabled ? "text-ink-3" : active ? "text-primary" : "text-ink-3"}`}>{icon}</span>
       <span>
-        <span className="block font-semibold text-ink">{title}</span>
+        <span className="flex items-center gap-2">
+          <span className={`block font-semibold ${disabled ? "text-ink-2" : "text-ink"}`}>{title}</span>
+          {badge && (
+            <span className="rounded-full bg-ink-3/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-ink-3">
+              {badge}
+            </span>
+          )}
+        </span>
         <span className="block text-sm text-ink-2">{subtitle}</span>
       </span>
     </button>

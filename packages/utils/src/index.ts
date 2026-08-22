@@ -20,3 +20,4 @@ export {
   eventVisualSrc
 } from "./imagery";
 export { cn } from "./cn";
+export { uuidV4 } from "./uuid";

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -76,7 +76,7 @@ vi.mock("@spots/api", () => ({
   setClient: vi.fn()
 }));
 
-import { venues, bookings, submitPayHere } from "@spots/api";
+import { venues, bookings, featureFlags, submitPayHere } from "@spots/api";
 
 const onlineVenue = {
   id: "v1", name: "Smash Arena", status: "approved", description: null,
@@ -170,6 +170,7 @@ describe("CheckoutPage payment method", () => {
     renderPage();
     const cashOption = await screen.findByTestId("method-cash");
     await userEvent.click(cashOption);
+    await userEvent.click(await screen.findByRole("button", { name: /Confirm booking/i }));
 
     await screen.findByText("Pay on arrival");
     expect(bookings.checkout).toHaveBeenCalledWith(
@@ -185,8 +186,69 @@ describe("CheckoutPage payment method", () => {
     renderPage();
     const cashOption = await screen.findByTestId("method-cash");
     await userEvent.click(cashOption);
+    await userEvent.click(await screen.findByRole("button", { name: /Confirm booking/i }));
     await waitFor(() => expect(screen.getByText("Pay on arrival")).toBeInTheDocument());
     expect(submitPayHere).not.toHaveBeenCalled();
+  });
+});
+
+describe("CheckoutPage payhere_enabled OFF (payments paused)", () => {
+  function pauseOnlinePayments() {
+    vi.mocked(featureFlags.get).mockResolvedValue({
+      phone_verification_required: true,
+      sms_enabled: true,
+      payhere_enabled: false,
+      events_discovery_state: "enabled",
+      brand_name: "Spots"
+    });
+  }
+
+  it("pre-selects cash with online disabled when payments are paused, and confirms before booking", async () => {
+    pauseOnlinePayments();
+    vi.mocked(venues.detail).mockResolvedValue(cashVenue as never);
+    vi.mocked(bookings.checkout).mockResolvedValue(cashResult as never);
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(bookings.checkout).not.toHaveBeenCalled();
+    });
+    const onlineCard = screen.getByTestId("method-online");
+    expect(onlineCard).toBeDisabled();
+    expect(onlineCard).toHaveTextContent(/Paused/);
+    const cashCard = screen.getByTestId("method-cash");
+    expect(cashCard).toHaveAttribute("aria-checked", "true");
+
+    expect(await screen.findByText("Confirm booking")).toBeInTheDocument();
+    expect(screen.getByText(/Court 1/)).toBeInTheDocument();
+    expect(screen.getByText("Venue")).toBeInTheDocument();
+    expect(screen.getAllByText("Smash Arena").length).toBeGreaterThanOrEqual(1);
+
+    await userEvent.click(screen.getByRole("button", { name: /Confirm booking/i }));
+    await screen.findByText("Pay on arrival");
+    expect(bookings.checkout).toHaveBeenCalledWith(
+      expect.objectContaining({ payment_method: "cash" })
+    );
+  });
+
+  it("shows the paused message and never calls checkout for a venue without cash", async () => {
+    pauseOnlinePayments();
+    vi.mocked(venues.detail).mockResolvedValue(onlineVenue as never);
+
+    renderPage();
+
+    expect(await screen.findByText(/Online payment is paused/i)).toBeInTheDocument();
+    expect(bookings.checkout).not.toHaveBeenCalled();
+  });
+
+  it("back link goes to the venue page by venue id, not the sport slug", async () => {
+    pauseOnlinePayments();
+    vi.mocked(venues.detail).mockResolvedValue(cashVenue as never);
+
+    renderPage();
+
+    const back = await screen.findByRole("link", { name: /Smash Arena/i });
+    expect(back).toHaveAttribute("href", "/venues/v1?date=2026-08-22");
   });
 });
 
@@ -207,8 +269,38 @@ describe("CheckoutPage venue/court display", () => {
     renderPage();
     const cashOption = await screen.findByTestId("method-cash");
     await userEvent.click(cashOption);
+    await userEvent.click(await screen.findByRole("button", { name: /Confirm booking/i }));
     await screen.findByText("Pay on arrival");
     expect(screen.getByText("Smash Arena")).toBeInTheDocument();
+  });
+});
+
+describe("CheckoutPage on insecure contexts", () => {
+  const realCrypto = globalThis.crypto;
+
+  afterEach(() => {
+    vi.stubGlobal("crypto", realCrypto);
+  });
+
+  it("still checkouts when crypto.randomUUID is unavailable (plain-HTTP LAN origin)", async () => {
+    // crypto.randomUUID is a secure-context-only API. Over http://<LAN-IP>:3001
+    // (the mobile workflow) it is undefined — only getRandomValues survives.
+    vi.stubGlobal("crypto", {
+      getRandomValues: (arr: Uint8Array) => {
+        for (let i = 0; i < arr.length; i++) arr[i] = (i * 7 + 3) & 0xff;
+        return arr;
+      }
+    } as Crypto);
+
+    vi.mocked(venues.detail).mockResolvedValue(onlineVenue as never);
+    vi.mocked(bookings.checkout).mockResolvedValue(onlineResult as never);
+
+    renderPage();
+
+    await waitFor(() => expect(bookings.checkout).toHaveBeenCalled());
+    expect(bookings.checkout).toHaveBeenCalledWith(
+      expect.objectContaining({ payment_method: "online" })
+    );
   });
 });
 
