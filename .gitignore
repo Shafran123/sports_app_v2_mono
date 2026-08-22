@@ -28,6 +28,9 @@ sports-app-20029-firebase*.json
 # sp_be manifests are required by Railway's nixpacks build
 !/sp_be/package.json
 !/sp_be/package-lock.json
+# Vercel deployment configs (in each app root)
+!/apps/user/vercel.json
+!/apps/admin/vercel.json
 
 # backend local uploads (persist on the Railway volume, not in git)
 /sp_be/uploads/
