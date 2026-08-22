@@ -17,7 +17,7 @@ import {
   type LucideIcon
 } from "lucide-react";
 import { Badge, Card } from "@spots/ui";
-import { dayName, formatLkr, cn } from "@spots/utils";
+import { cn, dayName, formatLkr, humanizeSlug } from "@spots/utils";
 import type { VenueDetail } from "@spots/types";
 
 const DAYS = [0, 1, 2, 3, 4, 5, 6];
@@ -111,7 +111,7 @@ export function VenueInfo({ venue }: { venue: VenueDetail }) {
             return (
               <Badge key={amenity} variant="neutral" className="px-3 py-1">
                 <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-                {amenity}
+                {humanizeSlug(amenity)}
               </Badge>
             );
           })}

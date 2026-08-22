@@ -51,7 +51,7 @@ export function PlayerNav() {
           })}
         </nav>
 
-        <div className="flex items-center gap-1.5">
+        <div className="ml-auto flex items-center gap-1.5 md:ml-0 md:gap-3">
           <Link
             href="/notifications"
             aria-label={`Notifications${unread > 0 ? `, ${unread} unread` : ""}`}

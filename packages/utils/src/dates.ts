@@ -40,4 +40,19 @@ export function addDaysKey(key: string, n: number): string {
   return dayjs(key, "YYYY-MM-DD").add(n, "day").format("YYYY-MM-DD");
 }
 
+/**
+ * Short human label for a booking datetime: "Today", "Tomorrow", or a
+ * weekday + day-month like "Wed, 22 Aug". Explicit so a front desk can tell
+ * at a glance whether a booking is today or tomorrow.
+ */
+export function dayLabel(iso: string): string {
+  const d = dayjs(iso);
+  const key = d.format("YYYY-MM-DD");
+  const today = dayjs().format("YYYY-MM-DD");
+  if (key === today) return "Today";
+  const tomorrow = dayjs().add(1, "day").format("YYYY-MM-DD");
+  if (key === tomorrow) return "Tomorrow";
+  return d.format("ddd, D MMM");
+}
+
 export { dayjs };

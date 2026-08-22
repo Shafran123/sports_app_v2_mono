@@ -12,7 +12,9 @@ describe("ConsoleBottomNav", () => {
     for (const label of ["Dashboard", "Front desk", "Venues", "Calendar"]) {
       expect(screen.getByRole("link", { name: label })).toHaveAttribute("href", expect.stringContaining("/"));
     }
+    expect(screen.getByRole("link", { name: "Front desk" })).toHaveClass("bg-primary-light");
     expect(screen.getByRole("link", { name: "Front desk" })).toHaveClass("text-primary");
+    expect(screen.getByRole("link", { name: "Dashboard" })).not.toHaveClass("bg-primary-light");
   });
 
   it("shows the admin tabs", () => {

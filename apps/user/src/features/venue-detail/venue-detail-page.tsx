@@ -52,7 +52,7 @@ export function VenueDetailPage({ venueId }: { venueId: string }) {
   const venue = venueQuery.data;
   const slug = firstSportSlug(venue?.sports) ?? venue?.courts[0]?.sport_slug ?? null;
   const summary = summarizeSelection(selected, availabilityQuery.data);
-  const href = buildCtaHref(venueId, date, summary);
+  const href = buildCtaHref({ venueId, venueName: venue?.name, venueSlug: slug, date }, summary);
   const dateLabel = dayjs(date, "YYYY-MM-DD").format("ddd, D MMM");
 
   const pickDate = (key: string) => {

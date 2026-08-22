@@ -186,8 +186,12 @@ export function BookingsPage() {
                 </div>
                 <div className="mt-3 flex items-center justify-between">
                   <span className="font-mono text-xs text-ink-3">#{b.id.slice(0, 8)}</span>
-                  <button onClick={() => openDetail(b.id)} className="text-sm font-semibold text-primary hover:underline">
-                    View →
+                  <button
+                    type="button"
+                    onClick={() => openDetail(b.id)}
+                    className={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
+                  >
+                    View
                   </button>
                 </div>
               </Card>

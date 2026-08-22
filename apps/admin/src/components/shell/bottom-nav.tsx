@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Building2, CalendarDays, LayoutDashboard, ShieldCheck, Store } from "lucide-react";
+import { cn } from "@spots/utils";
 
 const OWNER_TABS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -35,9 +36,12 @@ export function ConsoleBottomNav({ role }: { role: "admin" | "venue_owner" }) {
             <Link
               key={tab.href}
               href={tab.href}
-              className={`relative flex flex-col items-center gap-0.5 py-2.5 text-[10px] font-medium transition-colors ${
-                active ? "text-primary" : "text-ink-3 hover:text-ink-2"
-              }`}
+              className={cn(
+                "relative flex flex-col items-center gap-0.5 px-2 py-2 text-[10px] font-medium transition-colors",
+                active
+                  ? "rounded-2xl bg-primary-light text-primary"
+                  : "text-ink-3 hover:text-ink-2"
+              )}
             >
               <Icon className="h-[22px] w-[22px]" />
               {tab.label}

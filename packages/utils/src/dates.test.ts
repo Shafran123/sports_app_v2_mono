@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dayName, formatTime12, formatDateLong, toDateKey, addDaysKey } from "./dates";
+import { dayName, formatTime12, formatDateLong, toDateKey, addDaysKey, dayLabel } from "./dates";
 
 describe("dayName", () => {
   it("maps 0-6 to English day names", () => {
@@ -44,5 +44,19 @@ describe("addDaysKey", () => {
     expect(addDaysKey("2026-08-20", 1)).toBe("2026-08-21");
     expect(addDaysKey("2026-08-20", -2)).toBe("2026-08-18");
     expect(addDaysKey("2026-12-31", 1)).toBe("2027-01-01");
+  });
+});
+
+describe("dayLabel", () => {
+  const today = toDateKey(new Date());
+  const at = (key: string) => `${key}T10:00:00`;
+
+  it("labels today and tomorrow explicitly", () => {
+    expect(dayLabel(at(today))).toBe("Today");
+    expect(dayLabel(at(addDaysKey(today, 1)))).toBe("Tomorrow");
+  });
+
+  it("falls back to a short weekday+date for other days", () => {
+    expect(dayLabel(at(addDaysKey(today, 3)))).toMatch(/^[A-Z][a-z]{2}, \d{1,2} [A-Z][a-z]{2}$/);
   });
 });

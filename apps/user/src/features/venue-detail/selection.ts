@@ -99,14 +99,26 @@ export function summarizeSelection(selected: SelectedSlots, availability?: Avail
   };
 }
 
-/** Contract with /book/[venueId]: date, court_id, start_at, end_at (ISO strings). */
-export function buildCtaHref(venueId: string, date: string, summary: SelectionSummary): string {
+/**
+ * Contract with /book/[venueId]: date, court_id, start_at, end_at (ISO
+ * strings), plus the display names and pricing the checkout/confirmation
+ * screens render before/after the API round-trip.
+ */
+export function buildCtaHref(
+  { venueId, venueName, venueSlug, date }: { venueId: string; venueName: string | null | undefined; venueSlug: string | null | undefined; date: string },
+  summary: SelectionSummary
+): string {
   if (summary.count === 0 || !summary.courtId || !summary.startAt || !summary.endAt) return "";
   const params = new URLSearchParams({
     date,
     court_id: summary.courtId,
     start_at: summary.startAt,
-    end_at: summary.endAt
+    end_at: summary.endAt,
+    venue: venueName ?? "",
+    venue_slug: venueSlug ?? "",
+    court: summary.courtName ?? "",
+    price_per_slot: String(summary.total / summary.count),
+    slots: String(summary.count)
   });
   return `/book/${venueId}?${params.toString()}`;
 }

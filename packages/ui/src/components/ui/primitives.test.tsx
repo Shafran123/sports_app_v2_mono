@@ -28,6 +28,27 @@ describe("StatusPill", () => {
 });
 
 describe("Tabs", () => {
+  it("highlights the active tab with a filled pill", async () => {
+    render(
+      <Tabs defaultValue="a">
+        <TabsList>
+          <TabsTrigger value="a">Upcoming</TabsTrigger>
+          <TabsTrigger value="b">Completed</TabsTrigger>
+        </TabsList>
+        <TabsContent value="a">Upcoming list</TabsContent>
+        <TabsContent value="b">Completed list</TabsContent>
+      </Tabs>
+    );
+    const upcoming = screen.getByRole("tab", { name: "Upcoming" });
+    const completed = screen.getByRole("tab", { name: "Completed" });
+    expect(upcoming).toHaveAttribute("data-state", "active");
+    expect(upcoming.className).toContain("data-[state=active]:bg-primary");
+    expect(upcoming.className).toContain("data-[state=active]:text-white");
+    await userEvent.click(completed);
+    expect(completed).toHaveAttribute("data-state", "active");
+    expect(upcoming).toHaveAttribute("data-state", "inactive");
+  });
+
   it("switches content on tab click", async () => {
     render(
       <Tabs defaultValue="a">

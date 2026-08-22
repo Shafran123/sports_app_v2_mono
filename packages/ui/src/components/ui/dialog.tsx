@@ -40,25 +40,31 @@ export function DialogContent({
           className
         )}
       >
-        {title && (
-          <DialogPrimitive.Title className="text-lg font-semibold tracking-tight text-ink">
-            {title}
-          </DialogPrimitive.Title>
-        )}
-        {description && (
-          <DialogPrimitive.Description className="mt-1 text-sm text-ink-2">
-            {description}
-          </DialogPrimitive.Description>
-        )}
-        <DialogPrimitive.Close asChild>
-          <button
-            onClick={onClose}
-            className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full text-ink-3 transition-colors hover:bg-surface-2 hover:text-ink"
-            aria-label="Close"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </DialogPrimitive.Close>
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            {title && (
+              <DialogPrimitive.Title className="text-lg font-semibold tracking-tight text-ink">
+                {title}
+              </DialogPrimitive.Title>
+            )}
+            {description && (
+              <DialogPrimitive.Description className="mt-1 text-sm text-ink-2">
+                {description}
+              </DialogPrimitive.Description>
+            )}
+          </div>
+          {(title || description) && (
+            <DialogPrimitive.Close asChild>
+              <button
+                onClick={onClose}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-3 transition-colors hover:bg-surface-2 hover:text-ink"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </DialogPrimitive.Close>
+          )}
+        </div>
         {children}
       </DialogPrimitive.Content>
     </DialogPrimitive.Portal>

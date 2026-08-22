@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatLkr } from "./format";
+import { formatLkr, humanizeSlug } from "./format";
 
 describe("formatLkr", () => {
   it("formats a whole number with en-LK grouping and Rs prefix", () => {
@@ -22,5 +22,21 @@ describe("formatLkr", () => {
 
   it("groups large values with commas (en-LK style)", () => {
     expect(formatLkr(1234567)).toBe("Rs 1,234,567");
+  });
+});
+
+describe("humanizeSlug", () => {
+  it("title-cases a snake_case slug", () => {
+    expect(humanizeSlug("changing_rooms")).toBe("Changing Rooms");
+    expect(humanizeSlug("equipment_rental")).toBe("Equipment Rental");
+  });
+
+  it("handles kebab-case and single words", () => {
+    expect(humanizeSlug("parking")).toBe("Parking");
+    expect(humanizeSlug("indoor-court")).toBe("Indoor Court");
+  });
+
+  it("keeps common acronyms uppercase", () => {
+    expect(humanizeSlug("ac")).toBe("AC");
   });
 });

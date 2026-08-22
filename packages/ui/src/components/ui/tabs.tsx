@@ -28,7 +28,7 @@ export function TabsTrigger({ value, className, children }: { value: string; cla
       value={value}
       className={cn(
         "rounded-full px-4 py-2 text-sm font-medium text-ink-2 transition-colors",
-        "data-[state=active]:bg-surface data-[state=active]:text-ink data-[state=active]:shadow-soft",
+        "data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-soft",
         "focus-visible:outline-2 focus-visible:outline-primary",
         className
       )}

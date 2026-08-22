@@ -4,17 +4,11 @@ import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { CheckoutPage } from "./checkout-page";
 
+const useSearchParams = vi.fn();
+
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
-  useSearchParams: () =>
-    new URLSearchParams({
-      court_id: "court-1",
-      start_at: "2026-08-22T04:30:00.000Z",
-      end_at: "2026-08-22T05:30:00.000Z",
-      venue: "Smash Arena",
-      venue_slug: "smash",
-      court: "Court 1"
-    })
+  useSearchParams: () => useSearchParams()
 }));
 
 vi.mock("@/context/auth", () => ({
@@ -86,6 +80,16 @@ function renderPage() {
 beforeEach(() => {
   vi.resetAllMocks();
   vi.mocked(venues.detail).mockResolvedValue(onlineVenue as never);
+  useSearchParams.mockReturnValue(
+    new URLSearchParams({
+      court_id: "court-1",
+      start_at: "2026-08-22T04:30:00.000Z",
+      end_at: "2026-08-22T05:30:00.000Z",
+      venue: "Smash Arena",
+      venue_slug: "smash",
+      court: "Court 1"
+    })
+  );
 });
 
 describe("CheckoutPage payment method", () => {
@@ -134,5 +138,27 @@ describe("CheckoutPage payment method", () => {
     await userEvent.click(cashOption);
     await waitFor(() => expect(screen.getByText("Pay on arrival")).toBeInTheDocument());
     expect(submitPayHere).not.toHaveBeenCalled();
+  });
+});
+
+describe("CheckoutPage venue/court display", () => {
+  it("falls back to the fetched venue name when the URL param is missing", async () => {
+    vi.mocked(venues.detail).mockResolvedValue(cashVenue as never);
+    vi.mocked(bookings.checkout).mockResolvedValue(cashResult as never);
+
+    // Remove the venue param: only court_id/start_at/end_at arrive (old deep links).
+    vi.mocked(useSearchParams).mockReturnValue(
+      new URLSearchParams({
+        court_id: "court-1",
+        start_at: "2026-08-22T04:30:00.000Z",
+        end_at: "2026-08-22T05:30:00.000Z"
+      })
+    );
+
+    renderPage();
+    const cashOption = await screen.findByTestId("method-cash");
+    await userEvent.click(cashOption);
+    await screen.findByText("Pay on arrival");
+    expect(screen.getByText("Smash Arena")).toBeInTheDocument();
   });
 });

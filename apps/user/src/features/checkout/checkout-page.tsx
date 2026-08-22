@@ -21,9 +21,9 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
   const courtId = searchParams?.get("court_id") ?? "";
   const startAt = searchParams?.get("start_at") ?? "";
   const endAt = searchParams?.get("end_at") ?? "";
-  const venueName = searchParams?.get("venue") ?? "";
+  const venueNameParam = searchParams?.get("venue") ?? "";
   const venueSlug = searchParams?.get("venue_slug") ?? "";
-  const courtName = searchParams?.get("court") ?? "";
+  const courtNameParam = searchParams?.get("court") ?? "";
   const rawPricePerSlot = searchParams?.get("price_per_slot");
   const rawSlots = searchParams?.get("slots");
 
@@ -35,6 +35,14 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
     enabled: !incomplete
   });
   const acceptsCash = !!venueQuery.data?.accepts_cash;
+
+  // Display names come from the query params built at the venue page; fall
+  // back to the venue/court fetch so the confirmation never shows "—".
+  const venueName = venueNameParam || venueQuery.data?.name || "";
+  const courtName =
+    courtNameParam ||
+    venueQuery.data?.courts.find((c) => c.id === courtId)?.name ||
+    "";
 
   const [method, setMethod] = React.useState<PaymentMethod>("online");
   const [chosen, setChosen] = React.useState(false);

@@ -1,10 +1,11 @@
-export { formatLkr } from "./format";
+export { formatLkr, humanizeSlug } from "./format";
 export {
   dayName,
   formatTime12,
   formatDateLong,
   toDateKey,
   addDaysKey,
+  dayLabel,
   dayjs
 } from "./dates";
 export {
