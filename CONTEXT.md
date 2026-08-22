@@ -106,3 +106,19 @@ _Avoid_: confirmed phone, validated phone, trusted number
 **SMS Notification**:
 A transactional SMS about a Booking — sent only on **booking confirmation** and **admin-initiated cancellation** (via SMSGo.lk). Not used for marketing or reminders.
 _Avoid_: broadcast SMS, promo SMS
+
+**Feature Flag**:
+An admin-controlled switch in platform configuration that changes Spots backend behavior — e.g. whether a Verified Phone is required to book, whether SMS sends are enabled, or how Events appear to players. Read server-side; never client-trusted.
+_Avoid_: toggle, setting, switch
+
+**Event Discovery State**:
+The platform-level state controlling how Events appear to players: **Enabled** (listings purchasable), **Coming Soon** (shown as teasers, not purchasable), or **Hidden** (not shown at all). Distinct from an Event's own lifecycle status (active/cancelled).
+_Avoid_: event visibility, event mode
+
+**Tax**:
+A platform-wide percentage rate applied to the price of Bookings and Event Registrations at checkout, added on top of the base price and snapshotted on the Booking or Registration at creation. Admin-configurable; a rate of zero is presented as "Tax not applicable" (no 0.00 line).
+_Avoid_: VAT, GST, service charge
+
+**Booking Bill**:
+A PDF invoice for a Booking or Event Registration, itemizing base price, tax, and total. Emailed on payment and printable on demand. Walk-in Guest bills are printed at the venue, never emailed.
+_Avoid_: receipt, invoice slip, statement

@@ -8,7 +8,7 @@ import { Card } from "../ui/card";
 import { VenueVisual } from "./venue-visual";
 import { Progress } from "../ui/progress";
 
-export function ActivityCard({ event, className, onAction }: { event: Event; className?: string; onAction?: () => void }) {
+export function ActivityCard({ event, className, onAction, overlay }: { event: Event; className?: string; onAction?: () => void; overlay?: React.ReactNode }) {
   const capacity = Number(event.capacity) || 0;
   const registered = Number(event.registrations_count) || 0;
   const full = capacity > 0 && registered >= capacity;
@@ -22,8 +22,9 @@ export function ActivityCard({ event, className, onAction }: { event: Event; cla
           alt={event.title}
           className="h-full w-full"
         />
-        {event.status === "cancelled" && <Badge variant="error" className="absolute left-3 top-3">Cancelled</Badge>}
-        {!event.status.includes("cancelled") && full && <Badge variant="warning" className="absolute left-3 top-3">Full</Badge>}
+        {overlay}
+        {!overlay && event.status === "cancelled" && <Badge variant="error" className="absolute left-3 top-3">Cancelled</Badge>}
+        {!overlay && !event.status.includes("cancelled") && full && <Badge variant="warning" className="absolute left-3 top-3">Full</Badge>}
       </div>
       <div className="p-4">
         <h3 className="truncate font-semibold tracking-tight text-ink">{event.title}</h3>

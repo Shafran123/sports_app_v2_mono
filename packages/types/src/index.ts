@@ -144,6 +144,8 @@ export const BookingSchema = z.object({
   end_at: z.string(),
   price_per_slot: z.number(),
   total_price: z.number(),
+  tax_rate: z.number().optional(),
+  tax_amount: z.number().optional(),
   status: BOOKING_STATUS,
   payment_method: z.string().nullable().optional(),
   player_name: z.string().nullable().optional(),
@@ -285,6 +287,80 @@ export const MyVenueSchema = VenueSchema.extend({
   created_at: z.string().optional()
 });
 export type MyVenue = z.infer<typeof MyVenueSchema>;
+
+/* ---------- Feature flags & platform config ---------- */
+
+export const FeatureFlagDefSchema = z.object({
+  name: z.string(),
+  type: z.enum(["boolean", "enum"]),
+  default: z.unknown(),
+  description: z.string(),
+  values: z.array(z.string()).optional(),
+  value: z.unknown()
+});
+export type FeatureFlagDef = z.infer<typeof FeatureFlagDefSchema>;
+
+export const FeatureFlagsSchema = z.object({
+  phone_verification_required: z.boolean(),
+  sms_enabled: z.boolean(),
+  payhere_enabled: z.boolean(),
+  events_discovery_state: z.enum(["enabled", "coming_soon", "hidden"]),
+  brand_name: z.string().optional()
+});
+export type FeatureFlags = z.infer<typeof FeatureFlagsSchema>;
+
+export const AdminConfigSchema = z.object({
+  flags: z.array(FeatureFlagDefSchema),
+  tax_rate: z.number(),
+  brand_name: z.string()
+});
+export type AdminConfig = z.infer<typeof AdminConfigSchema>;
+
+export const FlagAuditSchema = z.object({
+  id: z.string(),
+  key: z.string(),
+  old_value: z.unknown().nullable(),
+  new_value: z.unknown(),
+  changed_at: z.string(),
+  admin_name: z.string().nullable().optional(),
+  admin_email: z.string().nullable().optional()
+});
+export type FlagAudit = z.infer<typeof FlagAuditSchema>;
+
+export const AdminReportsSchema = z.object({
+  range: z.number(),
+  series: z.array(
+    z.object({
+      day: z.string(),
+      bookings: z.number(),
+      revenue: z.number(),
+      tax: z.number()
+    })
+  ),
+  by_sport: z.array(
+    z.object({
+      slug: z.string(),
+      name: z.string().nullable(),
+      bookings: z.number(),
+      revenue: z.number()
+    })
+  ),
+  by_venue: z.array(
+    z.object({
+      name: z.string(),
+      bookings: z.number(),
+      revenue: z.number()
+    })
+  ),
+  payment_split: z.object({
+    online: z.object({ bookings: z.number(), revenue: z.number() }),
+    cash: z.object({ bookings: z.number(), revenue: z.number() })
+  }),
+  events: z.object({ registrations: z.number(), revenue: z.number() })
+});
+export type AdminReports = z.infer<typeof AdminReportsSchema>;
+
+/* ---------- Overviews ---------- */
 
 export const AdminOverviewSchema = z.object({
   revenue_today: z.number(),

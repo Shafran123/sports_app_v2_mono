@@ -1,12 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AxiosInstance } from "axios";
-import { venues, bookings, events, notifications, auth, business, admin, uploads } from "./index";
+import { venues, bookings, events, notifications, auth, business, admin, uploads, featureFlags } from "./index";
 
 function mockClient(handler: (method: string, url: string, opts?: unknown) => unknown): AxiosInstance {
   return {
     get: vi.fn(async (url, opts) => ({ data: handler("get", url, opts) })),
     post: vi.fn(async (url, body) => ({ data: handler("post", url, body) })),
-    patch: vi.fn(async (url, body) => ({ data: handler("patch", url, body) }))
+    patch: vi.fn(async (url, body) => ({ data: handler("patch", url, body) })),
+    put: vi.fn(async (url, body) => ({ data: handler("put", url, body) }))
   } as unknown as AxiosInstance;
 }
 
@@ -235,8 +236,65 @@ describe("notifications.list", () => {
 
 describe("auth.me", () => {
   it("parses the user", async () => {
-    const client = mockClient(() => ({ id: "u1", email: "dev@spots.app", name: "A", phone: null, city: null, role: "player" }));
+    const client = mockClient(() => ({ id: "u1", email: "dev@spots.app", name: "A", phone: null, city: null, role: "player", phone_verified_at: null }));
     const user = await auth.me(client);
     expect(user.role).toBe("player");
+  });
+});
+
+describe("featureFlags", () => {
+  it("parses public flags", async () => {
+    const client = mockClient(() => ({
+      phone_verification_required: false,
+      sms_enabled: false,
+      payhere_enabled: false,
+      events_discovery_state: "coming_soon",
+      brand_name: "Spots"
+    }));
+    const flags = await featureFlags.get(client);
+    expect(flags.events_discovery_state).toBe("coming_soon");
+    expect(flags.payhere_enabled).toBe(false);
+  });
+});
+
+describe("admin settings & reports", () => {
+  const flagDef = (name: string) => ({ name, type: "boolean", default: false, description: "x", value: false });
+
+  it("parses platform config with flags and tax", async () => {
+    const client = mockClient(() => ({
+      flags: [flagDef("sms_enabled")],
+      tax_rate: 12,
+      brand_name: "Spots"
+    }));
+    const config = await admin.platformConfig(client);
+    expect(config.tax_rate).toBe(12);
+    expect(config.flags[0]?.name).toBe("sms_enabled");
+  });
+
+  it("writes a config key", async () => {
+    const client = mockClient(() => ({ name: "tax_rate", value: 5 }));
+    const result = await admin.setConfigKey("tax_rate", 5, client);
+    expect(result.value).toBe(5);
+  });
+
+  it("parses the audit trail", async () => {
+    const client = mockClient(() => [{ id: "a1", key: "sms_enabled", old_value: false, new_value: true, changed_at: "2026-08-22T10:00:00Z", admin_name: "Demo Admin" }]);
+    const audit = await admin.configAudit(client);
+    expect(audit[0]?.key).toBe("sms_enabled");
+    expect(audit[0]?.admin_name).toBe("Demo Admin");
+  });
+
+  it("parses reports", async () => {
+    const client = mockClient(() => ({
+      range: 7,
+      series: [{ day: "2026-08-22", bookings: 2, revenue: 1200, tax: 144 }],
+      by_sport: [{ slug: "badminton", name: "Badminton", bookings: 2, revenue: 1200 }],
+      by_venue: [{ name: "Smash Arena", bookings: 2, revenue: 1200 }],
+      payment_split: { online: { bookings: 1, revenue: 600 }, cash: { bookings: 1, revenue: 600 } },
+      events: { registrations: 3, revenue: 500 }
+    }));
+    const reports = await admin.reports(7, client);
+    expect(reports.series[0]?.tax).toBe(144);
+    expect(reports.payment_split.cash.bookings).toBe(1);
   });
 });

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { venues, toApiFailure } from "@spots/api";
+import { venues, featureFlags, toApiFailure } from "@spots/api";
 import { Card, ErrorState, Skeleton, SkeletonCard } from "@spots/ui";
 import { dayjs, firstSportSlug, formatLkr, toDateKey } from "@spots/utils";
 import type { CourtAvailability, Slot } from "@spots/types";
@@ -47,6 +47,12 @@ export function VenueDetailPage({ venueId }: { venueId: string }) {
   const [heroIndex, setHeroIndex] = useState(0);
   const [selected, setSelected] = useState<SelectedSlots>({});
   const [verifyOpen, setVerifyOpen] = useState(false);
+
+  const flagsQuery = useQuery({
+    queryKey: ["feature-flags"],
+    queryFn: () => featureFlags.get()
+  });
+  const flags = flagsQuery.data;
 
   const venueQuery = useQuery({
     queryKey: ["venue-detail", venueId],
@@ -93,7 +99,7 @@ export function VenueDetailPage({ venueId }: { venueId: string }) {
         onSelect={setHeroIndex}
       />
 
-      {user && !user.phone_verified_at && (
+      {user && !user.phone_verified_at && flags?.phone_verification_required !== false && (
         <div className="mx-auto mt-4 max-w-3xl">
           <VerifiedPhonePrompt onVerify={() => setVerifyOpen(true)} />
         </div>

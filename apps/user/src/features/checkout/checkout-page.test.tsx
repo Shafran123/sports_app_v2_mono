@@ -51,6 +51,15 @@ vi.mock("@spots/api", () => ({
     cancel: vi.fn(),
     markPaid: vi.fn()
   },
+  featureFlags: {
+    get: vi.fn(async () => ({
+      phone_verification_required: true,
+      sms_enabled: true,
+      payhere_enabled: true,
+      events_discovery_state: "enabled",
+      brand_name: "Spots"
+    }))
+  },
   auth: {
     updateMe: vi.fn(),
     me: vi.fn(),

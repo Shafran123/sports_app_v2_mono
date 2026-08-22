@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  Settings,
   ShieldCheck,
   Ticket,
   Users,
@@ -49,7 +50,8 @@ const ADMIN_NAV = [
       { href: "/admin-venues", label: "Venues", icon: Building2 },
       { href: "/events", label: "Events", icon: Ticket },
       { href: "/sports", label: "Sports", icon: TrophyIcon },
-      { href: "/players", label: "Players", icon: Users }
+      { href: "/players", label: "Players", icon: Users },
+      { href: "/settings", label: "Settings & reports", icon: Settings }
     ]
   }
 ];

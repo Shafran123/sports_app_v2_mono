@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CalendarDays, Clock, MapPin } from "lucide-react";
-import { events } from "@spots/api";
+import { events, featureFlags } from "@spots/api";
 import { Badge, Card, ErrorState, Progress, Skeleton, VenueVisual } from "@spots/ui";
 import { eventVisualSrc, formatDateLong, formatTime12 } from "@spots/utils";
 import { useAuth } from "@/context/auth";
@@ -12,10 +12,16 @@ import { OrganizerTools } from "./organizer-tools";
 
 export function EventDetailPage({ eventId }: { eventId: string }) {
   const { user } = useAuth();
+  const { data: flags } = useQuery({
+    queryKey: ["feature-flags"],
+    queryFn: () => featureFlags.get()
+  });
   const { data: event, isLoading, isError, refetch } = useQuery({
     queryKey: ["event", eventId],
     queryFn: () => events.detail(eventId)
   });
+
+  const discovery = flags?.events_discovery_state ?? "enabled";
 
   if (isLoading || !event) {
     return (
@@ -121,7 +127,17 @@ export function EventDetailPage({ eventId }: { eventId: string }) {
         </div>
 
         <aside className="space-y-6">
-          <RegistrationCard event={event} user={user} />
+          {discovery !== "enabled" ? (
+            <Card className="p-6">
+              <h3 className="font-semibold tracking-tight text-ink">Not available yet</h3>
+              <p className="mt-1 text-sm text-ink-2">
+                Event listings are paused by {flags?.brand_name ?? "Spots"} — registrations open once the event goes
+                live.
+              </p>
+            </Card>
+          ) : (
+            <RegistrationCard event={event} user={user} />
+          )}
           {isOrganizer && <OrganizerTools event={event} />}
         </aside>
       </div>

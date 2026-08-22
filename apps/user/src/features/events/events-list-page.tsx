@@ -5,8 +5,8 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { MapPin, SearchX } from "lucide-react";
-import { events, sports } from "@spots/api";
-import { ActivityCard, Button, EmptyState, ErrorState, Input, SelectSheet, SkeletonCard } from "@spots/ui";
+import { events, sports, featureFlags } from "@spots/api";
+import { ActivityCard, Badge, Button, EmptyState, ErrorState, Input, SelectSheet, SkeletonCard } from "@spots/ui";
 import type { Event } from "@spots/types";
 
 const LIMIT = 9;
@@ -19,6 +19,12 @@ export function EventsListPage() {
 
   const [cityInput, setCityInput] = useState(city);
   const [page, setPage] = useState(1);
+
+  const flagsQuery = useQuery({
+    queryKey: ["feature-flags"],
+    queryFn: () => featureFlags.get()
+  });
+  const discovery = flagsQuery.data?.events_discovery_state ?? "enabled";
 
   useEffect(() => {
     setCityInput(city);
@@ -74,6 +80,25 @@ export function EventsListPage() {
     router.replace(next.size ? `/events?${next}` : "/events", { scroll: false });
   };
 
+  if (discovery === "hidden") {
+    return (
+      <main className="mx-auto max-w-6xl px-4 pb-24 pt-8 md:pb-14">
+        <div>
+          <h1 className="font-display text-2xl font-extrabold tracking-tight text-ink md:text-3xl">Events</h1>
+          <p className="mt-1 text-sm text-ink-2">Tournaments, games and meetups near you.</p>
+        </div>
+        <EmptyState
+          className="mt-8"
+          icon={SearchX}
+          title="Events are paused"
+          message={`${flagsQuery.data?.brand_name ?? "Spots"} is not running events right now. Check back soon.`}
+          actionLabel="Explore venues"
+          onAction={() => router.push("/explore")}
+        />
+      </main>
+    );
+  }
+
   return (
     <main className="mx-auto max-w-6xl px-4 pb-24 pt-8 md:pb-14">
       <div>
@@ -81,25 +106,36 @@ export function EventsListPage() {
         <p className="mt-1 text-sm text-ink-2">Tournaments, games and meetups near you.</p>
       </div>
 
-      <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:items-center">
-        <div className="relative flex-1">
-          <MapPin className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-3" />
-          <Input
-            value={cityInput}
-            onChange={(e) => setCityInput(e.target.value)}
-            placeholder="Filter by city"
-            className="pl-10"
-          />
+      {discovery === "coming_soon" && (
+        <div className="mt-5 flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <Badge variant="warning">Coming soon</Badge>
+          <span>
+            Event listings are paused by {flagsQuery.data?.brand_name ?? "Spots"} — bookings open once events launch.
+          </span>
         </div>
-        <SelectSheet value={sport} onChange={(e) => updateSport(e.target.value)} className="sm:w-56">
-          <option value="">All sports</option>
-          {sportsQuery.data?.map((s) => (
-            <option key={s.id} value={s.slug}>
-              {s.name}
-            </option>
-          ))}
-        </SelectSheet>
-      </div>
+      )}
+
+      {discovery === "enabled" && (
+        <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="relative flex-1">
+            <MapPin className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-3" />
+            <Input
+              value={cityInput}
+              onChange={(e) => setCityInput(e.target.value)}
+              placeholder="Filter by city"
+              className="pl-10"
+            />
+          </div>
+          <SelectSheet value={sport} onChange={(e) => updateSport(e.target.value)} className="sm:w-56">
+            <option value="">All sports</option>
+            {sportsQuery.data?.map((s) => (
+              <option key={s.id} value={s.slug}>
+                {s.name}
+              </option>
+            ))}
+          </SelectSheet>
+        </div>
+      )}
 
       {isError && items.length === 0 ? (
         <ErrorState
@@ -127,7 +163,18 @@ export function EventsListPage() {
         <>
           <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {items.map((event) => (
-              <ActivityCard key={event.id} event={event} onAction={() => router.push(`/events/${event.id}`)} />
+              <ActivityCard
+                key={event.id}
+                event={event}
+                overlay={
+                  discovery === "coming_soon" ? (
+                    <Badge variant="warning" className="absolute left-3 top-3">
+                      Coming soon
+                    </Badge>
+                  ) : undefined
+                }
+                onAction={() => router.push(`/events/${event.id}`)}
+              />
             ))}
           </div>
           {hasMore && (

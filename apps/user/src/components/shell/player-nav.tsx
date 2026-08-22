@@ -3,21 +3,32 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Bell, Search } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { Avatar } from "@spots/ui";
+import { featureFlags } from "@spots/api";
 import { useAuth } from "@/context/auth";
 import { useUnread } from "@/hooks/use-unread";
 
-const links = [
+const STATIC_LINKS = [
   { href: "/", label: "Home" },
   { href: "/explore", label: "Explore" },
-  { href: "/bookings", label: "Bookings" },
-  { href: "/events", label: "Events" }
+  { href: "/bookings", label: "Bookings" }
 ];
 
 export function PlayerNav() {
   const pathname = usePathname();
   const { user } = useAuth();
   const unread = useUnread();
+
+  // The Events section is removed entirely when discovery is hidden.
+  const { data: flags } = useQuery({
+    queryKey: ["feature-flags"],
+    queryFn: () => featureFlags.get()
+  });
+  const links =
+    flags?.events_discovery_state === "hidden"
+      ? STATIC_LINKS
+      : [...STATIC_LINKS, { href: "/events", label: "Events" }];
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-surface/85 backdrop-blur-lg">

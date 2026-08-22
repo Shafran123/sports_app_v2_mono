@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Banknote, ShieldCheck, Wallet } from "lucide-react";
-import { bookings, toApiFailure, venues } from "@spots/api";
+import { bookings, featureFlags, toApiFailure, venues } from "@spots/api";
 import { Badge, Button, Card, CardContent, CountdownPill, ErrorState, Skeleton } from "@spots/ui";
 import { formatDateLong, formatLkr, formatTime12 } from "@spots/utils";
 import { useAuth } from "@/context/auth";
@@ -19,6 +19,18 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
   const searchParams = useSearchParams();
   const { user } = useAuth();
   const [verifyOpen, setVerifyOpen] = React.useState(false);
+
+  const { data: flags } = useQuery({
+    queryKey: ["feature-flags"],
+    queryFn: () => featureFlags.get()
+  });
+  // Platform gates mirror the server (which stays authoritative): when the
+  // payhere_enabled flag is OFF only pay-at-venue is offered, and the phone
+  // gate only applies when the flag is ON. Flag defaults match the server
+  // registry (OFF) so an in-flight fetch never shows a state the server
+  // would reject.
+  const payhereEnabled = flags?.payhere_enabled ?? false;
+  const requiresVerification = flags?.phone_verification_required ?? false;
   const verified = !!user?.phone_verified_at;
 
   const courtId = searchParams?.get("court_id") ?? "";
@@ -51,6 +63,10 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
   const [chosen, setChosen] = React.useState(false);
   const [checkoutKey, setCheckoutKey] = React.useState(() => crypto.randomUUID());
 
+  // With online payments paused (payhere_enabled OFF) cash is the only option.
+  const onlineAvailable = payhereEnabled;
+  const effectiveMethod: PaymentMethod = onlineAvailable ? method : "cash";
+
   const checkout = useMutation({
     mutationFn: () =>
       bookings.checkout({
@@ -58,25 +74,25 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
         start_at: startAt,
         end_at: endAt,
         idempotency_key: checkoutKey,
-        payment_method: method,
+        payment_method: effectiveMethod,
         player_phone: user?.phone ?? undefined
       })
   });
 
   React.useEffect(() => {
     if (incomplete || venueQuery.isLoading) return;
-    if (!verified) {
+    if (requiresVerification && !verified) {
       setVerifyOpen(true);
       return;
     }
-    // For venues that accept cash, wait for the player to pick a method before
-    // creating a hold/booking. Online-only venues auto-checkout as before.
-    if (!chosen && acceptsCash) return;
+    // For venues that accept cash with online still available, wait for the
+    // player to pick a method. Cash-only (payments paused) auto-checkouts.
+    if (!chosen && acceptsCash && onlineAvailable) return;
     if (checkout.isPending) return;
     if (checkout.data || checkout.error) return;
     void checkout.mutate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [incomplete, venueQuery.isLoading, chosen, acceptsCash, method, checkoutKey, verified]);
+  }, [incomplete, venueQuery.isLoading, chosen, acceptsCash, method, checkoutKey, verified, onlineAvailable, requiresVerification]);
 
   const result = checkout.data;
   const isCash = !!result?.booking;
@@ -235,7 +251,7 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
   }
 
   if (!result) {
-    const showSelector = acceptsCash;
+    const cashOnly = !onlineAvailable;
     return (
       <main className="mx-auto max-w-3xl px-4 pb-24 pt-8">
         <Link
@@ -253,7 +269,7 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
           <p className="mt-1 text-sm text-ink-2">Confirm your slot and pay to lock it in.</p>
         </div>
 
-        {!verified && (
+        {requiresVerification && !verified && (
           <div className="mt-5 rounded-3xl border border-warning/40 bg-warning-light px-4 py-3 text-sm font-medium">
             You need a verified phone to book.{" "}
             <button
@@ -266,7 +282,23 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
           </div>
         )}
 
-        {showSelector && (
+        {cashOnly && !acceptsCash ? (
+          <Card className="mt-6 p-6">
+            <h2 className="font-semibold text-ink">Online payment is paused</h2>
+            <p className="mt-1 text-sm text-ink-2">
+              Pay-at-venue is temporarily unavailable at this venue. Choose a venue that offers
+              pay-at-venue, or check back soon.
+            </p>
+            <Button variant="secondary" className="mt-4" onClick={() => router.push(venueHref)}>
+              Pick a different venue
+            </Button>
+          </Card>
+        ) : cashOnly ? (
+          <div className="mt-6 rounded-3xl border border-border bg-surface p-4 text-sm text-ink-2">
+            Online payments are paused — you&apos;ll pay at the venue in cash. Your slot will be
+            confirmed immediately.
+          </div>
+        ) : (
           <div className="mt-6 grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Payment method">
             <MethodCard
               icon={<Wallet className="h-5 w-5" />}
@@ -286,8 +318,6 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
             />
           </div>
         )}
-
-        {!showSelector && <Skeleton className="mt-6 h-6 w-1/2" />}
 
         {renderVerifyModal()}
       </main>

@@ -1,7 +1,9 @@
 import type { AxiosInstance } from "axios";
 import { z } from "zod";
 import {
+  AdminConfigSchema,
   AdminOverviewSchema,
+  AdminReportsSchema,
   AvailabilitySchema,
   BlockSchema,
   BusinessOverviewSchema,
@@ -10,6 +12,8 @@ import {
   CourtSchema,
   EventRegisterResultSchema,
   EventSchema,
+  FeatureFlagsSchema,
+  FlagAuditSchema,
   MyVenueSchema,
   NotificationSchema,
   PaymentSchema,
@@ -217,6 +221,15 @@ export const sports = {
   }
 };
 
+// Public, unauthenticated read of platform feature flags — mirrors the
+// server's gates (which remain the source of truth).
+export const featureFlags = {
+  async get(client: AxiosInstance = getClient()) {
+    const res = await client.get("/public/feature-flags");
+    return parseData(FeatureFlagsSchema, res.data.data ?? res.data);
+  }
+};
+
 export const auth = {
   async me(client: AxiosInstance = getClient()) {
     const res = await client.get("/auth/me");
@@ -381,5 +394,22 @@ export const admin = {
   async venueAudit(id: string, client: AxiosInstance = getClient()) {
     const res = await client.get(`/admin/venues/${id}/audit`);
     return parseList(VenueAuditSchema, res.data.data ?? res.data);
+  },
+  // Platform settings: feature flags, tax rate, audit trail, reports.
+  async platformConfig(client: AxiosInstance = getClient()) {
+    const res = await client.get("/admin/config");
+    return parseData(AdminConfigSchema, res.data.data ?? res.data);
+  },
+  async setConfigKey(key: string, value: unknown, client: AxiosInstance = getClient()) {
+    const res = await client.put(`/admin/config/flags/${key}`, { value });
+    return (res.data.data ?? res.data) as { name: string; value: unknown };
+  },
+  async configAudit(client: AxiosInstance = getClient()) {
+    const res = await client.get("/admin/config/audit");
+    return parseList(FlagAuditSchema, res.data.data ?? res.data);
+  },
+  async reports(range: 7 | 30 | 90 = 7, client: AxiosInstance = getClient()) {
+    const res = await client.get("/admin/reports", { params: { range } });
+    return parseData(AdminReportsSchema, res.data.data ?? res.data);
   }
 };
