@@ -60,4 +60,18 @@ describe("LoginForm — phone OTP tab", () => {
     expect(sendPhoneOtpMock).toHaveBeenCalledWith("+94712345678");
     expect(screen.getByText(/6-digit code/)).toBeInTheDocument();
   });
+
+  it("toggles the password field between hidden and visible", async () => {
+    const user = userEvent.setup();
+    render(<LoginForm />);
+
+    const password = screen.getByLabelText("Password");
+    expect(password).toHaveAttribute("type", "password");
+
+    await user.click(screen.getByRole("button", { name: "Show password" }));
+    expect(password).toHaveAttribute("type", "text");
+
+    await user.click(screen.getByRole("button", { name: "Hide password" }));
+    expect(password).toHaveAttribute("type", "password");
+  });
 });

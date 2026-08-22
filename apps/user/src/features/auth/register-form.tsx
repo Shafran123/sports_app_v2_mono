@@ -4,7 +4,7 @@ import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toApiFailure } from "@spots/api";
-import { Button, Input } from "@spots/ui";
+import { Button, Input, PasswordInput } from "@spots/ui";
 import { loginWithGoogle, registerWithEmail } from "@spots/auth";
 
 const FIREBASE_MESSAGES: Record<string, string> = {
@@ -168,8 +168,7 @@ export function RegisterForm() {
         </div>
         <label className="block">
           <span className="mb-1.5 block text-sm font-medium text-ink-2">Password</span>
-          <Input
-            type="password"
+          <PasswordInput
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"

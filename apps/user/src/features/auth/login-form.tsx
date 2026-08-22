@@ -4,7 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toApiFailure } from "@spots/api";
-import { Button, Input, Tabs, TabsContent, TabsList, TabsTrigger } from "@spots/ui";
+import { Button, Input, PasswordInput, Tabs, TabsContent, TabsList, TabsTrigger } from "@spots/ui";
 import { normalizePhone } from "@spots/utils";
 import type { ConfirmationResult } from "firebase/auth";
 import {
@@ -201,8 +201,7 @@ export function LoginForm() {
             </label>
             <label className="block">
               <span className="mb-1.5 block text-sm font-medium text-ink-2">Password</span>
-              <Input
-                type="password"
+              <PasswordInput
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
