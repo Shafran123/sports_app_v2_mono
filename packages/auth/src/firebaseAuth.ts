@@ -6,10 +6,17 @@ import {
   signOut,
   RecaptchaVerifier,
   signInWithPhoneNumber,
+  type Auth,
   type ConfirmationResult
 } from "firebase/auth";
+import { normalizePhone } from "@spots/utils";
 import { getFirebaseAuth } from "./firebase";
 import { TOKEN_KEY } from "@spots/api";
+
+let phoneVerifier: RecaptchaVerifier | null = null;
+let phoneVerifierNode: HTMLElement | null = null;
+
+const PHONE_RECAPTCHA_CONTAINER = "recaptcha-container";
 
 export async function loginWithEmail(email: string, password: string): Promise<void> {
   const userCred = await signInWithEmailAndPassword(getFirebaseAuth(), email, password);
@@ -28,10 +35,50 @@ export async function loginWithGoogle(): Promise<void> {
 }
 
 export async function sendPhoneOtp(phone: string): Promise<ConfirmationResult> {
+  const normalized = normalizePhone(phone);
+  if (!normalized) {
+    throw Object.assign(new Error("Enter a valid phone number with country code."), {
+      code: "auth/invalid-phone-number"
+    });
+  }
   const auth = getFirebaseAuth();
   await auth.signOut();
-  const verifier = new RecaptchaVerifier(auth, "recaptcha-container", { size: "invisible" });
-  return signInWithPhoneNumber(auth, phone, verifier);
+  const verifier = await getPhoneVerifier(auth);
+  try {
+    return await signInWithPhoneNumber(auth, normalized, verifier);
+  } catch (error) {
+    await resetPhoneVerifier();
+    throw error;
+  }
+}
+
+/**
+ * One ReCAPTCHA verifier per login-page lifecycle, tied to the widget
+ * container's presence in the DOM. ReCAPTCHA cannot render twice into the
+ * same node, so reuse the single verifier and reset its widget (per Firebase
+ * docs) before each new attempt; if the container was unmounted (tab switch,
+ * navigation) and remounted, create a fresh verifier for the new node.
+ */
+async function getPhoneVerifier(auth: Auth): Promise<RecaptchaVerifier> {
+  if (phoneVerifier && phoneVerifierNode?.isConnected) {
+    await resetPhoneVerifier();
+    return phoneVerifier;
+  }
+  if (!auth.languageCode) auth.useDeviceLanguage();
+  phoneVerifierNode = document.getElementById(PHONE_RECAPTCHA_CONTAINER);
+  phoneVerifier = new RecaptchaVerifier(auth, PHONE_RECAPTCHA_CONTAINER, { size: "invisible" });
+  return phoneVerifier;
+}
+
+export async function resetPhoneVerifier(): Promise<void> {
+  if (!phoneVerifier) return;
+  try {
+    const widgetId = await phoneVerifier.render();
+    const grecaptcha = (window as { grecaptcha?: { reset: (id: number) => void } }).grecaptcha;
+    grecaptcha?.reset(widgetId);
+  } catch {
+    // Verifier not rendered yet — nothing to reset.
+  }
 }
 
 export async function confirmPhoneOtp(

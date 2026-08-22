@@ -236,6 +236,9 @@ importers:
       '@spots/types':
         specifier: workspace:*
         version: link:../types
+      '@spots/utils':
+        specifier: workspace:*
+        version: link:../utils
       firebase:
         specifier: ^11.4.0
         version: 11.4.0

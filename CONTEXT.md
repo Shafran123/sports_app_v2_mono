@@ -86,6 +86,11 @@ _Avoid_: reminder booking
 A transactional email about a domain event — signup welcome, booking confirmation, booking reminder, venue approved/rejected. Sent fire-and-forget via Mailgun; never blocks the request.
 _Avoid_: marketing email, newsletter
 
+**Phone Sign-in**:
+Signing in to a Spots account using a one-time code received by SMS to the Player's phone number (Firebase Auth). Opportunistic — any account seeded this way can later be linked to richer sign-in methods.
+_Avoid_: OTP login, SMS login (a code is not the sign-in; the phone number is)
+_Note_: Distinct from **SMS Notification**, which is an outbound transactional SMS about a Booking.
+
 **SMS Notification**:
 A transactional SMS about a Booking — sent only on **booking confirmation** and **admin-initiated cancellation** (via SMSGo.lk). Not used for marketing or reminders.
 _Avoid_: broadcast SMS, promo SMS

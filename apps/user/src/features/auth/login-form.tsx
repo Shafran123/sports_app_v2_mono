@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toApiFailure } from "@spots/api";
 import { Button, Input, Tabs, TabsContent, TabsList, TabsTrigger } from "@spots/ui";
+import { normalizePhone } from "@spots/utils";
 import type { ConfirmationResult } from "firebase/auth";
 import {
   confirmPhoneOtp,
@@ -114,14 +115,16 @@ export function LoginForm() {
 
   async function sendOtp() {
     setError("");
-    if (!phone.trim()) {
-      setError("Enter your phone number with country code.");
+    const normalized = normalizePhone(phone);
+    if (!normalized) {
+      setError("Enter a valid phone number with country code.");
       return;
     }
     setPhoneBusy(true);
     try {
-      const result = await sendPhoneOtp(phone.trim());
+      const result = await sendPhoneOtp(normalized);
       setConfirmation(result);
+      setPhone(normalized);
       setOtp("");
       setCountdown(30);
     } catch (err) {
@@ -264,7 +267,12 @@ export function LoginForm() {
                 >
                   {countdown > 0 ? `Resend in ${countdown}s` : "Resend code"}
                 </Button>
-                <Button variant="link" size="sm" type="button" onClick={() => setConfirmation(null)}>
+                <Button
+                  variant="link"
+                  size="sm"
+                  type="button"
+                  onClick={() => setConfirmation(null)}
+                >
                   Change number
                 </Button>
               </div>
@@ -284,7 +292,8 @@ export function LoginForm() {
                 />
               </label>
               <p className="text-xs text-ink-3">
-                Include your country code. We&apos;ll text you a 6-digit code.
+                Include your country code. We&apos;ll text you a 6-digit code. Standard SMS
+                rates apply.
               </p>
               <Button type="submit" size="lg" className="w-full" loading={phoneBusy}>
                 Send OTP

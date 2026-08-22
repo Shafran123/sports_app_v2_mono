@@ -15,6 +15,7 @@
   "dependencies": {
     "@spots/api": "workspace:*",
     "@spots/types": "workspace:*",
+    "@spots/utils": "workspace:*",
     "firebase": "^11.4.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
