@@ -80,7 +80,7 @@ function TrophyIcon({ className }: { className?: string }) {
   );
 }
 
-export function AdminSidebar({ role, children }: { role: "admin" | "venue_owner"; children?: React.ReactNode }) {
+export function AdminSidebar({ role }: { role: "admin" | "venue_owner" }) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuth();
@@ -190,8 +190,6 @@ export function AdminSidebar({ role, children }: { role: "admin" | "venue_owner"
           Spots<span className="text-primary">.</span>
         </p>
       </header>
-
-      <main className="px-5 pb-24 pt-5 lg:px-8 lg:pt-8">{children}</main>
     </>
   );
 }

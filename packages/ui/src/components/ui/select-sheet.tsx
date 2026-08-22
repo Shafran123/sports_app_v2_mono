@@ -93,7 +93,7 @@ export function SelectSheet({
           description="Choose an option"
           onClose={() => setOpen(false)}
         >
-          <div className="mt-4 space-y-1">
+          <div className="mt-4 max-h-[60vh] space-y-1 overflow-y-auto overscroll-contain">
             {options.map((opt) => (
               <button
                 key={opt.props.value}

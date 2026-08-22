@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Calendar, Compass, Home, User } from "lucide-react";
+import { cn } from "@spots/utils";
 
 const tabs = [
   { href: "/", label: "Home", icon: Home },
@@ -26,9 +27,10 @@ export function BottomTabs() {
             <Link
               key={tab.href}
               href={tab.href}
-              className={`relative flex flex-col items-center gap-0.5 py-2.5 text-[10px] font-medium transition-colors ${
-                active ? "text-primary" : "text-ink-3 hover:text-ink-2"
-              }`}
+              className={cn(
+                "relative flex flex-col items-center gap-0.5 px-2 py-2 text-[10px] font-medium transition-colors",
+                active ? "rounded-2xl bg-primary-light text-primary" : "text-ink-3 hover:text-ink-2"
+              )}
             >
               <Icon className="h-[22px] w-[22px]" />
               {tab.label}

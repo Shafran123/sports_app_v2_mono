@@ -14,7 +14,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
       <RealtimeBridge />
       <div className="min-h-screen bg-paper text-ink lg:pl-64">
         <AdminSidebar role={role} />
-        {children}
+        <main className="px-5 pb-28 pt-5 md:pb-12 lg:px-8 lg:pt-8">{children}</main>
       </div>
       <ConsoleBottomNav role={role} />
     </RequireStaff>

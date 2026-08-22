@@ -56,4 +56,22 @@ describe("SelectSheet", () => {
     const option = await screen.findByRole("button", { name: "Green Turf" });
     expect(option.className).toContain("bg-primary-light");
   });
+
+  it("scrolls long option lists inside the sheet instead of overlapping the page", async () => {
+    const options = Array.from({ length: 40 }, (_, i) => (
+      <option key={i} value={`v${i}`}>
+        Sport {i}
+      </option>
+    ));
+    render(
+      <SelectSheet value="" onChange={() => {}} placeholder="Pick a sport">
+        {options}
+      </SelectSheet>
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Pick a sport" }));
+    const option = await screen.findByRole("button", { name: "Sport 39" });
+    const list = option.parentElement as HTMLElement;
+    expect(list.className).toContain("max-h-");
+    expect(list.className).toContain("overflow-y-auto");
+  });
 });
