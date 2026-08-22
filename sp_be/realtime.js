@@ -1,5 +1,6 @@
 const { Server } = require('socket.io');
 const logger = require('./utils/logger');
+const { getAllowedOrigins } = require('./utils/origins');
 
 // Real-time bridge for the owner console. The HTTP server is shared with
 // Socket.IO so the REST API and push events run on the same port. Without an
@@ -11,7 +12,7 @@ class Realtime {
 
   attach(httpServer) {
     this.io = new Server(httpServer, {
-      cors: { origin: process.env.FRONTEND_URL, credentials: true }
+      cors: { origin: getAllowedOrigins(process.env), credentials: true }
     });
 
     this.io.use((socket, next) => {

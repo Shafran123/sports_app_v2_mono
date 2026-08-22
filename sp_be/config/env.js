@@ -43,6 +43,14 @@ function missingKeys(env = process.env) {
   if (env.API_PUBLIC_URL && !/^https?:\/\//.test(env.API_PUBLIC_URL)) {
     missing.push('API_PUBLIC_URL (must be an absolute http(s) URL)');
   }
+  if (env.SOCKET_ALLOWED_ORIGINS) {
+    const origins = env.SOCKET_ALLOWED_ORIGINS.split(',').map((s) => s.trim()).filter(Boolean);
+    if (origins.length === 0) {
+      missing.push('SOCKET_ALLOWED_ORIGINS (comma-separated http(s) origins, or unset)');
+    } else if (origins.some((o) => !/^https?:\/\//.test(o))) {
+      missing.push('SOCKET_ALLOWED_ORIGINS (every origin must be an absolute http(s) URL)');
+    }
+  }
   return missing;
 }
 
