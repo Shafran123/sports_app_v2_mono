@@ -4,8 +4,10 @@ import { copy } from "@/lib/copy";
 import { Nav } from "./nav";
 import { Hero } from "./hero";
 import { HowItWorks } from "./how-it-works";
+import { PhotoStrip } from "./photo-strip";
 import { FeatureSection } from "./features/section";
 import { TrialBand } from "./trial-band";
+import { SocialProof } from "./social-proof";
 import { InquireForm } from "./inquire-form";
 import { Footer } from "./footer";
 import { TrackSection } from "./track-section";
@@ -16,6 +18,7 @@ export function LandingPage() {
       <Nav />
       <Hero />
       <HowItWorks />
+      <PhotoStrip />
 
       <section id="features" className="py-20">
         <TrackSection name="features" />
@@ -35,6 +38,21 @@ export function LandingPage() {
         <TrackSection name="trial-band" />
         <TrialBand />
       </div>
+
+      <section id="player-features" className="py-20">
+        <TrackSection name="player-features" />
+        <div className="mx-auto max-w-6xl px-4">
+          <p className="text-sm font-semibold uppercase tracking-wide text-primary">{copy.playerFeatures.eyebrow}</p>
+          <h2 className="mt-1 font-display text-3xl font-extrabold tracking-tight text-ink">{copy.playerFeatures.title}</h2>
+          <div className="mt-8 space-y-16">
+            {copy.playerFeatures.items.map((feature, i) => (
+              <FeatureSection key={feature.id} feature={feature} flip={i % 2 === 1} />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <SocialProof />
 
       <section id="inquire" className="py-20">
         <TrackSection name="inquire" />

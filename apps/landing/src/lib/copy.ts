@@ -20,14 +20,15 @@ export const copy = {
   nav: {
     features: "Features",
     howItWorks: "How it works",
+    players: "For players",
     cta: "List your venue"
   },
   hero: {
     eyebrow: "For venue owners",
     // DRAFT
     headline: "Booked-out courts, handled for you.",
-    body: "MySlot.LK puts your venue on a live booking platform — real-time slots, instant check-ins, and payments your way. List your venue free for 3 months.",
-    primaryCta: "Start your 3-month free trial",
+    body: "MySlot.LK puts your venue on a live booking platform — real-time slots, instant bookings, and payments your way. List your venue free for 3 months.",
+    primaryCta: "Book a demo with us",
     secondaryCta: "See how it works"
   },
   howItWorks: {
@@ -107,30 +108,87 @@ id: "payments",
           "Automated reminders go out so players actually show up",
           "Reports you can pull for planning and tax"
         ]
-      },
+      }
+    ]
+  },
+  playerFeatures: {
+    eyebrow: "For players",
+    title: "Find your game",
+    items: [
       {
-        id: "players",
+        id: "player-venue-detail",
         eyebrow: "For players",
-        heading: "For players",
-        body: "Sports players in your area search by sport and venue, see your live availability, and book instantly.",
+        heading: "Pick a court, pick a slot",
+        body: "Players see your live availability and choose exactly the court and time that works for them — no calls, no back-and-forth.",
         bullets: [
-          "Browse by sport — badminton, football, cricket and more",
-          "Instant booking with a QR-ready confirmation",
-          "Repeat players come back through their own app"
+          "Live slot availability per court, updated in real time",
+          "Prices and taxes shown up front, nothing hidden",
+          "Book in seconds from the venue page"
         ],
         cta: { label: "Explore the player app", href: playerAppUrl() }
+      },
+      {
+        id: "player-confirmation",
+        eyebrow: "For players",
+        heading: "Your booking, QR-ready",
+        body: "Confirmation lands instantly with a QR code for the front desk — and a bill is emailed the moment payment clears.",
+        bullets: [
+          "Booking QR ready for a one-tap check-in",
+          "PDF bill emailed on payment",
+          "Reminders before the slot so nobody misses out"
+        ]
       }
     ]
   },
   trialBand: {
     title: "List your venue free for 3 months",
-    sub: "No setup fees. No lock-in. Just your venue, bookable to thousands of players.",
-    cta: "Claim your free trial"
+    sub: "No setup fees. No lock-in. Just your venue, bookable to thousands of players."
+  },
+  photoStrip: {
+    eyebrow: "Real courts, real games",
+    title: "Made for the venues players already love",
+    // DRAFT: swap for partner venue photos when available
+    photos: [
+      {
+        src: "/photos/court-badminton.jpg",
+        alt: "Indoor badminton courts with lined flooring"
+      },
+      {
+        src: "/photos/court-turf.jpg",
+        alt: "Football turf under floodlights at a member venue"
+      },
+      {
+        src: "/photos/court-cricket.jpg",
+        alt: "Cricket nets ready for practice"
+      }
+    ]
+  },
+  socialProof: {
+    // DRAFT: replace with real platform numbers
+    draft: true,
+    stats: [
+      { value: "50+", label: "venues listed" },
+      { value: "10k+", label: "bookings made" },
+      { value: "5k+", label: "players finding their game" }
+    ],
+    // DRAFT: replace with real testimonials
+    testimonials: [
+      {
+        quote: "My courts used to be empty on weekdays. Now they fill up before lunch.",
+        author: "Ashan Fernando",
+        role: "Venue owner, Colombo"
+      },
+      {
+        quote: "Booked a badminton court in under a minute and checked in with the QR at the door.",
+        author: "Nethmi Perera",
+        role: "Player"
+      }
+    ]
   },
   inquire: {
     eyebrow: "Ready when you are",
     title: "List your venue",
-    body: "Tell us about your venue and we'll reach out to set up your listing, your courts, and your 3-month free plan.",
+    body: "Tell us about your venue and we'll reach out to book your demo, set up your listing, and apply your 3-month free plan.",
     fields: {
       name: "Name",
       namePlaceholder: "Your full name",
@@ -145,10 +203,10 @@ id: "payments",
       message: "Message",
       messagePlaceholder: "Anything we should know?"
     },
-    submit: "Start your 3-month free trial",
+    submit: "Book a demo",
     submitting: "Submitting…",
     successTitle: "Thank you — we'll be in touch",
-    successBody: "Your details are with our team. We'll reach out shortly to set up your listing and your free plan.",
+    successBody: "Your details are with our team. We'll reach out shortly to book your demo, set up your listing, and apply your free plan.",
     errorGeneric: "Something went wrong submitting your details. Please try again."
   },
   footer: {

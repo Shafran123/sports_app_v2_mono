@@ -8,11 +8,12 @@ import { DeviceFrame } from "../device-frame";
 import { TrackSection } from "../track-section";
 import {
   MockBookings,
+  MockConfirmation,
   MockDashboard,
   MockEvents,
-  MockExplore,
   MockFrontDesk,
-  MockPayments
+  MockPayments,
+  MockVenueDetail
 } from "./mockups";
 
 const MOCKUPS: Record<string, () => React.ReactNode> = {
@@ -21,7 +22,8 @@ const MOCKUPS: Record<string, () => React.ReactNode> = {
   payments: MockPayments,
   events: MockEvents,
   "owner-dashboard": MockDashboard,
-  players: MockExplore
+  "player-venue-detail": MockVenueDetail,
+  "player-confirmation": MockConfirmation
 };
 
 function mockFor(featureId: string): () => React.ReactNode {

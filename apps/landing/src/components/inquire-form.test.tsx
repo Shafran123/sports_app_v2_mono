@@ -36,10 +36,10 @@ describe("InquireForm", () => {
     const user = userEvent.setup();
     renderForm();
 
-    await user.click(screen.getByRole("button", { name: /3-month free trial/i }));
+    await user.click(screen.getByRole("button", { name: /book a demo/i }));
 
     expect(leadsSubmitMock).not.toHaveBeenCalled();
-    expect(screen.getByText(/Start your 3-month free trial/)).toBeInTheDocument();
+    expect(screen.getByText(/Book a demo/)).toBeInTheDocument();
   });
 
   it("submits a lead and shows the success card", async () => {
@@ -49,7 +49,7 @@ describe("InquireForm", () => {
 
     await user.type(screen.getByLabelText("Name *"), "Dev Shah");
     await user.type(screen.getByLabelText("Email *"), "dev@example.com");
-    await user.click(screen.getByRole("button", { name: /start your 3-month free trial/i }));
+    await user.click(screen.getByRole("button", { name: /book a demo/i }));
 
     expect(leadsSubmitMock).toHaveBeenCalledWith(
       expect.objectContaining({ name: "Dev Shah", email: "dev@example.com" })
@@ -64,7 +64,7 @@ describe("InquireForm", () => {
 
     await user.type(screen.getByLabelText("Name *"), "Dev Shah");
     await user.type(screen.getByLabelText("Email *"), "dev@example.com");
-    await user.click(screen.getByRole("button", { name: /start your 3-month free trial/i }));
+    await user.click(screen.getByRole("button", { name: /book a demo/i }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Venue name is taken");
     expect(leadsSubmitMock).toHaveBeenCalledTimes(1);

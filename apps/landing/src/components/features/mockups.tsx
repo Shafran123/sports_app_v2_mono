@@ -119,3 +119,64 @@ export function MockExplore() {
     </div>
   );
 }
+
+export function MockVenueDetail() {
+  return (
+    <div className="space-y-3 rounded-2xl border border-border bg-surface p-3">
+      <div className="rounded-xl bg-paper p-2.5">
+        <p className="text-[11px] font-semibold text-ink">Smash Arena</p>
+        <p className="text-[10px] text-ink-2">Badminton · 2.1 km</p>
+      </div>
+      <div className="flex gap-1.5">
+        {["Today", "Thu", "Fri"].map((d, i) => (
+          <span
+            key={d}
+            className={`flex-1 rounded-full py-1.5 text-center text-[10px] font-medium ${
+              i === 0 ? "bg-primary text-white" : "bg-paper text-ink-3"
+            }`}
+          >
+            {d}
+          </span>
+        ))}
+      </div>
+      <div className="grid grid-cols-2 gap-1.5">
+        {["09:00", "10:00", "11:00"].map((t, i) => (
+          <span
+            key={t}
+            className={`rounded-xl py-1.5 text-center text-[10px] font-semibold ${
+              i === 2 ? "bg-ink-2 text-ink-3 line-through" : "bg-primary-light text-primary"
+            }`}
+          >
+            {t}
+          </span>
+        ))}
+      </div>
+      <div className="rounded-full bg-primary px-3 py-1.5 text-center text-[11px] font-semibold text-white">
+        Book Court 1 · LKR 1,200/hr
+      </div>
+    </div>
+  );
+}
+
+export function MockConfirmation() {
+  return (
+    <div className="space-y-3 rounded-2xl border border-border bg-surface p-3">
+      <div className="rounded-xl bg-primary-light p-2.5">
+        <p className="text-[11px] font-semibold text-ink">Booking confirmed</p>
+        <p className="text-[10px] text-ink-2">Smash Arena · Court 1 · Today 10:00</p>
+      </div>
+      <div aria-hidden="true" className="mx-auto grid h-16 w-16 grid-cols-5 grid-rows-5 gap-0.5 border border-ink-3">
+        {Array.from({ length: 25 }, (_, i) => (
+          <span key={i} className="bg-ink/70" />
+        ))}
+      </div>
+      <div className="rounded-xl bg-paper p-2.5 text-center">
+        <p className="text-[11px] font-semibold text-ink">BK-1042</p>
+        <p className="text-[10px] text-ink-2">Show this QR at the front desk</p>
+      </div>
+      <div className="rounded-full bg-success-light px-3 py-1.5 text-center text-[11px] font-semibold text-success">
+        Paid · LKR 1,200
+      </div>
+    </div>
+  );
+}

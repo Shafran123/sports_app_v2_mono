@@ -85,7 +85,8 @@ _Avoid_: partner, vendor, host
 
 **Owner Lead**:
 A person who submitted the public "list your place" form, expressing interest in becoming a Venue Owner. Carries name, email, phone, venue name, city, and an optional message. Triaged by an Admin (new → contacted → converted / closed); converting a Lead pre-fills Owner-account creation. Converting always creates a brand-new Owner account — it never reuses or mutates an existing Player account, even on an email match.
-_Avoid_: prospect, partner request, enquiry
+_Note_: The landing page's "Book a demo" CTA submits through the same Owner Lead form and pipeline — a demo request is not a distinct concept.
+_Avoid_: prospect, partner request, enquiry, demo request
 
 **Owner Plan**:
 The commercial term attached to a Venue Owner, drawn from an Admin-maintained catalog of plan templates (name, term, price) and applied to an Owner with a start and an end date. Expiring and expired Plans surface to the Admin so renewal can be chased.

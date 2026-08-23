@@ -2,8 +2,21 @@ import { describe, expect, it } from "vitest";
 import { getScreenshot, resolveScreenshot, screenshots } from "./screenshots";
 
 describe("screenshot config", () => {
-  it("declares one screenshot per feature section", () => {
-    expect(screenshots).toHaveLength(6);
+  it("declares one screenshot per feature slot (hero + 5 owner + 2 player)", () => {
+    expect(screenshots).toHaveLength(8);
+  });
+
+  it("includes the hero slot and both player slots", () => {
+    const ids = screenshots.map((shot) => shot.id);
+    expect(ids).toContain("hero-player");
+    expect(ids).toContain("player-venue-detail");
+    expect(ids).toContain("player-confirmation");
+    expect(ids).not.toContain("players");
+  });
+
+  it("ids are unique", () => {
+    const ids = screenshots.map((shot) => shot.id);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 
   it("every entry carries an id, label, and frame kind", () => {

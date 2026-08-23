@@ -18,12 +18,14 @@ export interface Screenshot {
  *   3. `DeviceFrame` renders the image instead of the mockup — nothing else changes.
  */
 export const screenshots: Screenshot[] = [
+  { id: "hero-player", label: "Player app — find your game", frame: "phone" },
   { id: "real-time-bookings", label: "Courts bookable in real time", frame: "browser" },
   { id: "front-desk", label: "Front-desk & walk-in check-ins", frame: "phone" },
   { id: "payments", label: "Payments your way", frame: "browser" },
   { id: "events", label: "Events & registrations", frame: "phone" },
   { id: "owner-dashboard", label: "Know what's happening", frame: "browser" },
-  { id: "players", label: "Players find the game", frame: "phone" }
+  { id: "player-venue-detail", label: "Pick a court, pick a slot", frame: "phone" },
+  { id: "player-confirmation", label: "Your booking, QR-ready", frame: "phone" }
 ];
 
 export function getScreenshot(id: string): Screenshot | undefined {

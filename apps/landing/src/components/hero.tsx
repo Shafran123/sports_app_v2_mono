@@ -32,7 +32,7 @@ export function Hero() {
           </div>
         </div>
         <div className="min-w-0">
-          <DeviceFrame shotId="players" className="animate-fade-in">
+          <DeviceFrame shotId="hero-player" className="animate-fade-in">
             <MockExplore />
           </DeviceFrame>
         </div>
