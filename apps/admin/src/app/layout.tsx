@@ -18,7 +18,7 @@ const sora = Sora({
 async function getBrandName(): Promise<string> {
   try {
     const backend = process.env.NEXT_PUBLIC_API_URL || "http://localhost:2400";
-    const res = await fetch(`${backend}/api/v1/public/feature-flags`, { next: { revalidate: 300 } });
+    const res = await fetch(`${backend}/api/v1/public/feature-flags`, { cache: "no-store" });
     if (!res.ok) return DEFAULT_BRAND_NAME;
     const body: { data?: { brand_name?: string } } = await res.json();
     return body?.data?.brand_name || DEFAULT_BRAND_NAME;
@@ -26,6 +26,8 @@ async function getBrandName(): Promise<string> {
     return DEFAULT_BRAND_NAME;
   }
 }
+
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
   const brand = await getBrandName();
