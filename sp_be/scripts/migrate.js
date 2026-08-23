@@ -6,11 +6,15 @@ const { Pool } = require('pg');
 
 const MIGRATIONS_DIR = path.join(__dirname, '..', 'migrations');
 
-async function migrate() {
+/**
+ * Apply any pending SQL migrations (in filename order). Safe to re-run —
+ * applied files are skipped. Throws on failure so callers can fail fast.
+ * Exported so the backend can run migrations at boot (rollout = auto-apply).
+ */
+async function runMigrations() {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
-    console.error('DATABASE_URL env var is required (e.g. postgres://localhost:5432/sports_dev).');
-    process.exit(1);
+    throw new Error('DATABASE_URL env var is required (e.g. postgres://localhost:5432/sports_dev).');
   }
 
   const pool = new Pool({ connectionString: databaseUrl });
@@ -52,7 +56,11 @@ async function migrate() {
   }
 }
 
-migrate().catch(err => {
-  console.error('Migration failed:', err.message);
-  process.exit(1);
-});
+module.exports = { runMigrations };
+
+if (require.main === module) {
+  runMigrations().catch(err => {
+    console.error('Migration failed:', err.message);
+    process.exit(1);
+  });
+}

@@ -3,6 +3,15 @@ require('dotenv').config();
 const { validate } = require('./config/env');
 validate();
 
+// Apply pending migrations at boot so deploys/restarts roll out schema + seed
+// changes automatically (no manual db:setup). Fails fast — a backend that
+// can't migrate must not serve against a stale schema.
+const { runMigrations } = require('./scripts/migrate');
+runMigrations().catch(err => {
+  console.error('Boot migration failed:', err.message);
+  process.exit(1);
+});
+
 const app = require('./app');
 const logger = require('./utils/logger');
 const { ensureBucket } = require('./utils/storage');
