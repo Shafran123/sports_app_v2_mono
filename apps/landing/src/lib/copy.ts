@@ -27,7 +27,7 @@ export const copy = {
   hero: {
     // DRAFT: single one-word USP, the headline rotates through these
     headline: "Booked-out",
-    headlineLead: "Put your venue on",
+    headlineLead: "Book digitally,",
     usps: ["Booked-out", "Real-time", "Cashless", "Players-first"],
     body: "MySlot.LK puts your venue live — real-time slot booking, one-tap QR check-ins, and payments your way. List your venue free for 3 months.",
     primaryCta: "Book a demo with us",

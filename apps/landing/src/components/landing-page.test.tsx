@@ -80,7 +80,7 @@ describe("LandingPage", () => {
   it("rotates the one-word headline as the only USP, lead-in + fine print", () => {
     renderPage();
     const h1 = screen.getByRole("heading", { level: 1 });
-    expect(h1).toHaveTextContent(/put your venue on/i);
+    expect(h1).toHaveTextContent(/book digitally,/i);
     const rotating = h1.querySelector('[aria-hidden="true"]');
     expect(rotating).toHaveTextContent(/^booked-out$/i);
     expect(rotating.className).toContain("text-primary");
