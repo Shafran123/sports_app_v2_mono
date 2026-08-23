@@ -52,9 +52,7 @@ describe("LandingPage", () => {
     renderPage();
     expect(screen.getByText(/pick a court, pick a slot/i)).toBeInTheDocument();
     expect(screen.getByText(/your booking, qr-ready/i)).toBeInTheDocument();
-    for (const link of screen.getAllByRole("link", { name: /explore the player app/i })) {
-      expect(link).toHaveAttribute("href", "http://localhost:3000");
-    }
+    expect(screen.queryByRole("link", { name: /explore the player app/i })).not.toBeInTheDocument();
   });
 
   it("renders the real product screenshots in the phone-framed slots", () => {

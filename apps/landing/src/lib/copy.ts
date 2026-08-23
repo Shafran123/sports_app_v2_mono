@@ -130,7 +130,6 @@ id: "payments",
           "Prices and taxes shown up front, nothing hidden",
           "Book in seconds from the venue page"
         ],
-        cta: { label: "Explore the player app", href: playerAppUrl() }
       },
       {
         id: "player-confirmation",

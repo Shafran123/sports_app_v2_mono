@@ -32,7 +32,7 @@ describe("landing copy", () => {
     expect(copy.playerFeatures.items).toHaveLength(2);
     const ids = copy.playerFeatures.items.map((f) => f.id);
     expect(ids).toEqual(["player-venue-detail", "player-confirmation"]);
-    expect(copy.playerFeatures.items[0].cta?.label).toBe("Explore the player app");
+    expect(copy.playerFeatures.items[0].cta).toBeUndefined();
   });
 
   it("has no photo strip and no fabricated social proof", () => {
