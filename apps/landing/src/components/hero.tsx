@@ -4,7 +4,6 @@ import { buttonVariants } from "@myslot/ui";
 import { copy } from "@/lib/copy";
 import { trackCta } from "@/lib/analytics";
 import { RotatingHeadline } from "./rotating-headline";
-import { RotatingUsps } from "./rotating-usps";
 import { ScrollCue } from "./scroll-cue";
 import { TrackSection } from "./track-section";
 
@@ -12,12 +11,9 @@ export function Hero() {
   return (
     <section className="relative flex min-h-[100svh] flex-col items-center justify-center overflow-hidden border-b border-border bg-paper">
       <TrackSection name="hero" />
-      <div className="mx-auto w-full max-w-3xl px-4 pb-24 pt-20 text-center">
-        <div className="animate-fade-up">
-          <RotatingUsps />
-        </div>
+      <div className="mx-auto w-full max-w-4xl px-4 pb-24 pt-20 text-center">
         <h1
-          className="animate-word-roll mt-2 font-display text-4xl font-extrabold leading-tight tracking-tight text-ink md:text-6xl"
+          className="animate-word-roll font-display text-5xl font-extrabold leading-tight tracking-tight text-ink md:text-7xl"
           style={{ animationDelay: "0.05s" }}
         >
           {copy.hero.headlinePrefix} <RotatingHeadline />

@@ -107,12 +107,13 @@ describe("LandingPage", () => {
     expect(desktopCta).toHaveClass("bg-primary");
   });
 
-  it("renders the rotating one-word USP line and no venue-owners eyebrow", () => {
+  it("renders the rotating headline, big, with no eyebrow or switching USP line", () => {
     renderPage();
     expect(screen.queryByText(/for venue owners/i)).not.toBeInTheDocument();
-    const matches = screen.getAllByText(/real-time/i);
-    const visible = matches.find((el) => el.closest("p")?.getAttribute("aria-hidden") === "true");
-    expect(visible).toBeTruthy();
+    const h1 = screen.getByRole("heading", { level: 1 });
+    expect(h1).toHaveTextContent(/booked-out courts,/i);
+    expect(h1.querySelector('[aria-hidden="true"]')).toHaveTextContent(/handled for you\./i);
+    expect(h1.className).toContain("md:text-7xl");
   });
 
   it("footer lists Contact as a mailto and no player-app link or About link", () => {

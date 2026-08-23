@@ -55,20 +55,12 @@ describe("landing copy", () => {
     expect(flat.some((l) => l.label === "Contact")).toBe(true);
   });
 
-  it("declares rotating hero USPs, distinct and non-empty", () => {
-    expect(copy.hero.usps.length).toBeGreaterThanOrEqual(3);
-    const set = new Set(copy.hero.usps);
-    expect(set.size).toBe(copy.hero.usps.length);
-    for (const u of copy.hero.usps) {
-      expect(u.length).toBeGreaterThan(0);
-    }
-  });
-
   it("declares a rotating headline with a prefix and multiple phrases", () => {
     expect(copy.hero.headlinePrefix.length).toBeGreaterThan(0);
     expect(copy.hero.headlineRotations.length).toBeGreaterThanOrEqual(2);
     const set = new Set(copy.hero.headlineRotations);
     expect(set.size).toBe(copy.hero.headlineRotations.length);
     expect(copy.hero.headline).toBe(`${copy.hero.headlinePrefix} ${copy.hero.headlineRotations[0]}`);
+    expect("usps" in copy.hero).toBe(false);
   });
 });
