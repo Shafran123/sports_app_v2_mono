@@ -25,16 +25,9 @@ export const copy = {
     cta: "List your venue"
   },
   hero: {
-    // DRAFT
-    headline: "Booked-out courts, handled for you.",
-    headlinePrefix: "Booked-out courts,",
-    // DRAFT: rotate the headline value prop like ClassPass
-    headlineRotations: [
-      "handled for you.",
-      "ready for your players.",
-      "filling themselves up.",
-      "payments handled too."
-    ],
+    // DRAFT: single one-word USP, the headline rotates through these
+    headline: "Booked-out",
+    usps: ["Booked-out", "Real-time", "Cashless", "Effortless"],
     body: "MySlot.LK puts your venue on a live booking platform — real-time slots, instant bookings, and payments your way. List your venue free for 3 months.",
     primaryCta: "Book a demo with us",
     secondaryCta: "See how it works",

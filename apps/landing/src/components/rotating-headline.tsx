@@ -11,12 +11,12 @@ function prefersReducedMotion(): boolean {
 }
 
 /**
- * Rotates the headline's value-prop word, like ClassPass. Reduced-motion
- * users see the first phrase statically; screen readers get the full list
- * via sr-only text (the visible word is aria-hidden).
+ * Rotates a single one-word USP in the hero headline, like ClassPass.
+ * Reduced-motion users see the first word statically; screen readers get
+ * the full list via sr-only text (the visible word is aria-hidden).
  */
 export function RotatingHeadline() {
-  const list = copy.hero.headlineRotations;
+  const list = copy.hero.usps;
   const count = list.length;
   const [index, setIndex] = React.useState(0);
 

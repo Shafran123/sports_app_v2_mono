@@ -82,15 +82,15 @@ describe("LandingPage", () => {
     renderPage();
     const header = screen.getByRole("banner");
     expect(within(header).getByRole("link", { name: "List your venue" })).toHaveAttribute("href", "#inquire");
-    expect(screen.getByRole("heading", { name: /booked-out courts, handled for you/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(/booked-out/i);
   });
 
-  it("rotates the headline word like classpass", () => {
+  it("rotates the one-word headline as the only USP", () => {
     renderPage();
     const h1 = screen.getByRole("heading", { level: 1 });
-    expect(h1).toHaveTextContent(/booked-out courts,/i);
-    expect(h1).toHaveTextContent(/handled for you\./i);
-    expect(h1.querySelector('[aria-hidden="true"]')).toHaveTextContent(/handled for you\./i);
+    expect(h1).not.toHaveTextContent(/booked-out courts/i);
+    expect(h1).not.toHaveTextContent(/handled for you/i);
+    expect(h1.querySelector('[aria-hidden="true"]')).toHaveTextContent(/^booked-out$/i);
   });
 
   it("renders the scroll cue linking to how it works", () => {
@@ -107,13 +107,13 @@ describe("LandingPage", () => {
     expect(desktopCta).toHaveClass("bg-primary");
   });
 
-  it("renders the rotating headline, big, with no eyebrow or switching USP line", () => {
+  it("renders the one-word rotating USP as the headline, no phrase prefix", () => {
     renderPage();
     expect(screen.queryByText(/for venue owners/i)).not.toBeInTheDocument();
     const h1 = screen.getByRole("heading", { level: 1 });
-    expect(h1).toHaveTextContent(/booked-out courts,/i);
-    expect(h1.querySelector('[aria-hidden="true"]')).toHaveTextContent(/handled for you\./i);
-    expect(h1.className).toContain("md:text-7xl");
+    expect(h1).not.toHaveTextContent(/booked-out courts,/i);
+    expect(h1.querySelector('[aria-hidden="true"]')).toHaveTextContent(/booked-out/i);
+    expect(h1.className).toContain("md:text-8xl");
   });
 
   it("footer lists Contact as a mailto and no player-app link or About link", () => {
