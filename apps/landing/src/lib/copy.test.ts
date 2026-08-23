@@ -44,4 +44,14 @@ describe("landing copy", () => {
     expect(copy.trialBand.sub).not.toContain("thousands");
     expect(copy.trialBand.sub).toContain("first");
   });
+
+  it("has a working contact email and no dead footer links or player column", () => {
+    expect(copy.footer.contactEmail).toBe("info@myslot.lk");
+    const titles = copy.footer.columns.map((c) => c.title);
+    expect(titles).not.toContain("Players");
+    const flat = copy.footer.columns.flatMap((c) => c.links);
+    expect(flat.some((l) => l.label === "About")).toBe(false);
+    expect(flat.some((l) => l.label === "Explore the player app")).toBe(false);
+    expect(flat.some((l) => l.label === "Contact")).toBe(true);
+  });
 });

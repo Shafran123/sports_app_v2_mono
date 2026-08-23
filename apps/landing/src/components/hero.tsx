@@ -5,20 +5,28 @@ import { copy } from "@/lib/copy";
 import { trackCta } from "@/lib/analytics";
 import { DeviceFrame } from "./device-frame";
 import { MockExplore } from "./features/mockups";
+import { ScrollCue } from "./scroll-cue";
 import { TrackSection } from "./track-section";
 
 export function Hero() {
   return (
-    <section className="overflow-hidden border-b border-border bg-paper">
+    <section className="relative flex min-h-[100svh] flex-col items-center justify-center overflow-hidden border-b border-border bg-paper">
       <TrackSection name="hero" />
-      <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 pb-16 pt-16 lg:grid-cols-2">
-        <div className="min-w-0 space-y-6">
-          <p className="text-sm font-semibold uppercase tracking-wide text-primary">{copy.hero.eyebrow}</p>
-          <h1 className="animate-fade-up font-display text-4xl font-extrabold leading-tight tracking-tight text-ink md:text-5xl">
+      <div className="mx-auto grid w-full max-w-6xl items-center gap-10 px-4 pb-28 pt-20 lg:grid-cols-2">
+        <div className="min-w-0 space-y-6 text-center lg:text-left">
+          <p className="animate-fade-up text-sm font-semibold uppercase tracking-wide text-primary">
+            {copy.hero.eyebrow}
+          </p>
+          <h1
+            className="animate-word-roll font-display text-4xl font-extrabold leading-tight tracking-tight text-ink md:text-5xl"
+            style={{ animationDelay: "0.05s" }}
+          >
             {copy.hero.headline}
           </h1>
-          <p className="mt-3 text-lg text-ink-2">{copy.hero.body}</p>
-          <div className="flex flex-wrap items-center gap-3">
+          <p className="animate-fade-up mt-3 text-lg text-ink-2" style={{ animationDelay: "0.12s" }}>
+            {copy.hero.body}
+          </p>
+          <div className="animate-pop-in flex flex-wrap items-center justify-center gap-3 lg:justify-start" style={{ animationDelay: "0.2s" }}>
             <a
               href="#inquire"
               className={buttonVariants({ variant: "primary", size: "lg" })}
@@ -31,12 +39,14 @@ export function Hero() {
             </a>
           </div>
         </div>
-        <div className="min-w-0">
-          <DeviceFrame shotId="hero-player" className="animate-fade-in">
+        <div className="animate-fade-up min-w-0" style={{ animationDelay: "0.28s" }}>
+          <DeviceFrame shotId="hero-player" className="animate-float">
             <MockExplore />
           </DeviceFrame>
         </div>
       </div>
+
+      <ScrollCue />
     </section>
   );
 }

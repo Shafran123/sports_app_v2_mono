@@ -30,7 +30,8 @@ export const copy = {
     headline: "Booked-out courts, handled for you.",
     body: "MySlot.LK puts your venue on a live booking platform — real-time slots, instant bookings, and payments your way. List your venue free for 3 months.",
     primaryCta: "Book a demo with us",
-    secondaryCta: "See how it works"
+    secondaryCta: "See how it works",
+    scrollCue: "See how it works"
   },
   howItWorks: {
     eyebrow: "How it works",
@@ -171,6 +172,7 @@ id: "payments",
   },
   footer: {
     tagline: "Book courts, join games, find your game.",
+    contactEmail: "info@myslot.lk",
     columns: [
       {
         title: "Product",
@@ -182,15 +184,7 @@ id: "payments",
       },
       {
         title: "Company",
-        // DRAFT: point these at real pages when they exist
-        links: [
-          { label: "About", href: "#" },
-          { label: "Contact", href: "#" }
-        ]
-      },
-      {
-        title: "Players",
-        links: [{ label: "Explore the player app", href: playerAppUrl() }]
+        links: [{ label: "Contact", mailto: "info@myslot.lk" }]
       }
     ]
   }

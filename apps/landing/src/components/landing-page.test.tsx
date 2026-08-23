@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 const { featureFlagsGetMock, leadsSubmitMock } = vi.hoisted(() => ({
@@ -76,5 +76,26 @@ describe("LandingPage", () => {
     renderPage();
     expect(screen.queryByText(/thousands of players/i)).not.toBeInTheDocument();
     expect(screen.getByText(/be one of the first venues on it/i)).toBeInTheDocument();
+  });
+
+  it("shows the nav only after the hero (nav renders below the hero)", () => {
+    renderPage();
+    const header = screen.getByRole("banner");
+    expect(within(header).getByRole("link", { name: "List your venue" })).toHaveAttribute("href", "#inquire");
+    expect(screen.getByRole("heading", { name: /booked-out courts, handled for you/i })).toBeInTheDocument();
+  });
+
+  it("renders the scroll cue linking to how it works", () => {
+    renderPage();
+    const cue = screen.getByRole("link", { name: /scroll to see how it works/i });
+    expect(cue).toHaveAttribute("href", "#how-it-works");
+  });
+
+  it("footer lists Contact as a mailto and no player-app link or About link", () => {
+    renderPage();
+    const footer = screen.getByRole("contentinfo");
+    expect(within(footer).getByRole("link", { name: "Contact" })).toHaveAttribute("href", "mailto:info@myslot.lk");
+    expect(within(footer).queryByRole("link", { name: "Explore the player app" })).not.toBeInTheDocument();
+    expect(within(footer).queryByRole("link", { name: "About" })).not.toBeInTheDocument();
   });
 });

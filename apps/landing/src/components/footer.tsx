@@ -17,16 +17,22 @@ export function Footer() {
           </p>
           <p className="mt-1 text-sm text-ink-2">{copy.footer.tagline}</p>
         </div>
-        <div className="grid gap-6 sm:grid-cols-3">
+        <div className="grid gap-6 sm:grid-cols-2">
           {copy.footer.columns.map((column) => (
             <div key={column.title}>
               <p className="text-xs font-semibold uppercase tracking-wide text-ink-3">{column.title}</p>
               <nav className="mt-2 flex flex-col gap-2 text-sm text-ink-2">
-                {column.links.map((link) => (
-                  <Link key={link.label} href={link.href} className="transition-colors hover:text-ink">
-                    {link.label}
-                  </Link>
-                ))}
+                {column.links.map((link) =>
+                  "mailto" in link ? (
+                    <a key={link.label} href={`mailto:${copy.footer.contactEmail}`} className="transition-colors hover:text-ink">
+                      {link.label}
+                    </a>
+                  ) : (
+                    <Link key={link.label} href={link.href} className="transition-colors hover:text-ink">
+                      {link.label}
+                    </Link>
+                  )
+                )}
               </nav>
             </div>
           ))}
