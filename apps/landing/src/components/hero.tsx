@@ -13,9 +13,10 @@ export function Hero() {
       <TrackSection name="hero" />
       <div className="mx-auto w-full max-w-5xl px-4 pb-24 pt-20 text-center">
         <h1
-          className="animate-word-roll font-display text-6xl font-extrabold leading-none tracking-tight text-ink md:text-8xl"
+          className="animate-word-roll font-display text-5xl font-extrabold leading-tight tracking-tight text-ink md:text-8xl"
           style={{ animationDelay: "0.05s" }}
         >
+          {copy.hero.headlineLead}{" "}
           <RotatingHeadline />
         </h1>
         <p className="animate-fade-up mt-4 text-lg text-ink-2" style={{ animationDelay: "0.12s" }}>
@@ -36,6 +37,12 @@ export function Hero() {
             {copy.hero.secondaryCta}
           </a>
         </div>
+        <p
+          className="animate-fade-up mt-4 text-xs text-ink-3"
+          style={{ animationDelay: "0.3s" }}
+        >
+          {copy.hero.finePrint}
+        </p>
       </div>
 
       <ScrollCue />

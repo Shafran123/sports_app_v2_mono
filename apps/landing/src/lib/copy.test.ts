@@ -64,6 +64,8 @@ describe("landing copy", () => {
       expect(word.length).toBeGreaterThan(0);
     }
     expect(copy.hero.headline).toBe(copy.hero.usps[0]);
+    expect(copy.hero.headlineLead.length).toBeGreaterThan(0);
+    expect(copy.hero.finePrint.length).toBeGreaterThan(0);
     expect("headlinePrefix" in copy.hero).toBe(false);
     expect("headlineRotations" in copy.hero).toBe(false);
   });

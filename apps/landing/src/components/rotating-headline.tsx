@@ -29,7 +29,7 @@ export function RotatingHeadline() {
   return (
     <>
       <span className="sr-only">{list.join(". ")}.</span>
-      <span key={index} aria-hidden="true" className="animate-word-roll inline-block">
+      <span key={index} aria-hidden="true" className="animate-word-roll inline-block text-primary">
         {list[index]}
       </span>
     </>

@@ -27,11 +27,14 @@ export const copy = {
   hero: {
     // DRAFT: single one-word USP, the headline rotates through these
     headline: "Booked-out",
+    headlineLead: "One platform for",
     usps: ["Booked-out", "Real-time", "Cashless", "Effortless"],
     body: "MySlot.LK puts your venue on a live booking platform — real-time slots, instant bookings, and payments your way. List your venue free for 3 months.",
     primaryCta: "Book a demo with us",
     secondaryCta: "See how it works",
-    scrollCue: "See how it works"
+    scrollCue: "See how it works",
+    // DRAFT: fine print under the CTAs
+    finePrint: "3-month free trial for listed venues. No setup fees, no lock-in."
   },
   howItWorks: {
     eyebrow: "How it works",

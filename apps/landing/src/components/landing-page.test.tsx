@@ -85,12 +85,14 @@ describe("LandingPage", () => {
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(/booked-out/i);
   });
 
-  it("rotates the one-word headline as the only USP", () => {
+  it("rotates the one-word headline as the only USP, lead-in + fine print", () => {
     renderPage();
     const h1 = screen.getByRole("heading", { level: 1 });
-    expect(h1).not.toHaveTextContent(/booked-out courts/i);
-    expect(h1).not.toHaveTextContent(/handled for you/i);
-    expect(h1.querySelector('[aria-hidden="true"]')).toHaveTextContent(/^booked-out$/i);
+    expect(h1).toHaveTextContent(/one platform for/i);
+    const rotating = h1.querySelector('[aria-hidden="true"]');
+    expect(rotating).toHaveTextContent(/^booked-out$/i);
+    expect(rotating.className).toContain("text-primary");
+    expect(screen.getByText(/3-month free trial for listed venues/i)).toBeInTheDocument();
   });
 
   it("renders the scroll cue linking to how it works", () => {
