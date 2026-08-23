@@ -119,10 +119,10 @@ exports.handleNotify = async (req, res) => {
       try {
         await client.query('savepoint booking_insert');
         const inserted = await client.query(
-          `insert into bookings (court_id, user_id, start_at, end_at, price_per_slot, total_price, tax_rate, tax_amount, status, payment_method, player_name, player_phone, qr_token, idempotency_key)
-           values ($1, $2, $3, $4, $5, $6, $7, $8, 'confirmed', 'online', $9, $10, $11, $12)
+          `insert into bookings (court_id, user_id, start_at, end_at, price_per_slot, total_price, tax_rate, tax_amount, venue_tax_rate, venue_tax_amount, status, payment_method, player_name, player_phone, qr_token, idempotency_key)
+           values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'confirmed', 'online', $11, $12, $13, $14)
            returning *`,
-          [hold.court_id, hold.user_id, hold.start_at, hold.end_at, pricePerSlot, payment.amount, payment.tax_rate, payment.tax_amount, playerName, playerPhone, mintQrToken(), hold.idempotency_key]
+          [hold.court_id, hold.user_id, hold.start_at, hold.end_at, pricePerSlot, payment.amount, payment.tax_rate, payment.tax_amount, payment.venue_tax_rate, payment.venue_tax_amount, playerName, playerPhone, mintQrToken(), hold.idempotency_key]
         );
         booking = inserted.rows[0];
       } catch (error) {

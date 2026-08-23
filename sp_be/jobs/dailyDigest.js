@@ -42,10 +42,11 @@ async function buildDigest(day) {
 
   const { rows: summary } = await pool.query(
     `select
-       coalesce(sum(p.amount - p.tax_amount) filter (where p.booking_id is not null), 0)::int as revenue,
+       coalesce(sum(p.amount - p.tax_amount - p.venue_tax_amount) filter (where p.booking_id is not null), 0)::int as revenue,
        coalesce(sum(p.tax_amount) filter (where p.booking_id is not null), 0)::int as tax_collected,
+       coalesce(sum(p.venue_tax_amount) filter (where p.booking_id is not null), 0)::int as venue_tax_collected,
        count(distinct p.booking_id) filter (where p.booking_id is not null)::int as bookings,
-       coalesce(sum(p.amount - p.tax_amount) filter (where p.event_registration_id is not null and p.status = 'paid'), 0)::int as event_revenue
+       coalesce(sum(p.amount - p.tax_amount - p.venue_tax_amount) filter (where p.event_registration_id is not null and p.status = 'paid'), 0)::int as event_revenue
      from payments p
      where p.status = 'paid' and p.paid_at >= $1 and p.paid_at < $2`,
     [start, end]
@@ -54,7 +55,7 @@ async function buildDigest(day) {
   const { rows: bySport } = await pool.query(
     `select s.name,
             count(distinct b.id)::int as bookings,
-            coalesce(sum(p.amount - p.tax_amount), 0)::int as revenue
+            coalesce(sum(p.amount - p.tax_amount - p.venue_tax_amount), 0)::int as revenue
      from payments p
      join bookings b on b.id = p.booking_id
      join courts c on c.id = b.court_id
@@ -68,7 +69,7 @@ async function buildDigest(day) {
   const { rows: byVenue } = await pool.query(
     `select v.name,
             count(distinct b.id)::int as bookings,
-            coalesce(sum(p.amount - p.tax_amount), 0)::int as revenue
+            coalesce(sum(p.amount - p.tax_amount - p.venue_tax_amount), 0)::int as revenue
      from payments p
      join bookings b on b.id = p.booking_id
      join courts c on c.id = b.court_id
@@ -101,7 +102,8 @@ async function buildDigest(day) {
 
   const rows = [
     ['Net revenue (excl. tax)', fmtLkr(s.revenue)],
-    ['Tax collected', fmtLkr(s.tax_collected)],
+    ['Platform tax collected', fmtLkr(s.tax_collected)],
+    ['Venue tax collected', fmtLkr(s.venue_tax_collected)],
     ['Bookings paid', s.bookings],
     ['Event revenue', fmtLkr(s.event_revenue)],
     ['Online bookings', online.bookings],

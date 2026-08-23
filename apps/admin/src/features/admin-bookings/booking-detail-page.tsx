@@ -130,6 +130,12 @@ export function BookingDetailPage({ bookingId }: { bookingId: string }) {
 
         <DetailCard title="Payment">
           <InfoRow label="Total">{formatLkr(booking.total_price)}</InfoRow>
+          {Number(booking.tax_amount || 0) > 0 && (
+            <InfoRow label="Platform tax">{formatLkr(booking.tax_amount)}</InfoRow>
+          )}
+          {Number(booking.venue_tax_amount || 0) > 0 && (
+            <InfoRow label="Venue tax">{formatLkr(booking.venue_tax_amount)}</InfoRow>
+          )}
           <InfoRow label="Per slot">{formatLkr(booking.price_per_slot)}</InfoRow>
           <InfoRow label="Method">
             {booking.payment_method ? booking.payment_method.replace("_", " ") : "—"}

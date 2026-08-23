@@ -205,11 +205,11 @@ describe('tax snapshots', () => {
     await setTax(0);
   });
 
-  it('charges base + half-up tax and snapshots the rate on cash bookings', async () => {
+  it('carves half-up tax out of the listed price and snapshots the rate on cash bookings', async () => {
     const res = await checkout(PLAYER_TOKEN, CASH_COURT_ID, 'cash');
     expect(res.status).toBe(201);
     const booking = res.body.data.booking;
-    expect(booking.total_price).toBe(1120); // 1000 + 12%
+    expect(booking.total_price).toBe(1000); // listed price IS the total
     expect(booking.tax_rate).toBe(12);
     expect(booking.tax_amount).toBe(120);
 
@@ -217,11 +217,11 @@ describe('tax snapshots', () => {
       `select total_price, tax_rate, tax_amount, price_per_slot from bookings where id = $1`,
       [booking.id]
     );
-    expect(rows[0].total_price).toBe(1120);
+    expect(rows[0].total_price).toBe(1000);
     expect(rows[0].price_per_slot).toBe(1000);
   });
 
-  it('serves events with tax-inclusive totals at registration', async () => {
+  it('serves events with inclusive totals at registration', async () => {
     const { rows: eventRows } = await pool.query(
       `select * from events where id = 'bbbbbbbb-0000-0000-0000-000000000002'::uuid`
     );
@@ -231,8 +231,8 @@ describe('tax snapshots', () => {
       .post(`/api/v1/events/${event.id}/register`)
       .set('Authorization', `Bearer ${PLAYER_TOKEN}`);
     expect(res.status).toBe(201);
-    expect(res.body.data.amount).toBe(2800); // 2500 + 12%
-    expect(res.body.data.payment_params.amount).toBe('2800');
+    expect(res.body.data.amount).toBe(2500); // listed price IS the total
+    expect(res.body.data.payment_params.amount).toBe('2500');
 
     const { rows: regRows } = await pool.query(
       `select tax_rate, tax_amount from event_registrations where id = $1`,

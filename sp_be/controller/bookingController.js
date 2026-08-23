@@ -7,7 +7,7 @@ const { stripBookingSecrets, stripBookingSecretsList } = require('../utils/scrub
 const cancellationService = require('../services/cancellation');
 const { publishBookingEvent } = require('../utils/publish');
 const { notifyBookingConfirmed } = require('../utils/notify');
-const { getFlag, getTaxRate, applyTax } = require('../utils/featureFlags');
+const { getFlag, getTaxRate, applyInclusiveTax } = require('../utils/featureFlags');
 const billService = require('../utils/billService');
 
 const ACTIVE_BOOKING_STATES = ['confirmed', 'checked_in', 'completed', 'no_show'];
@@ -43,6 +43,22 @@ async function getAdvanceDays() {
     `select value from platform_config where key = 'advance_days'`
   );
   return rows.length ? Number(rows[0].value) : 14;
+}
+
+// The venue-entered price is the inclusive total the player pays; this
+// splits out the platform + venue taxes the same way at checkout.
+async function venueTaxRateForCourt(client, courtId) {
+  const { rows } = await client.query(
+    `select v.venue_tax_rate from courts c join venues v on v.id = c.venue_id where c.id = $1`,
+    [courtId]
+  );
+  return rows.length ? Number(rows[0].venue_tax_rate) || 0 : 0;
+}
+
+// Split a listed (inclusive) court total into base + platform tax + venue tax.
+async function splitCourtTotal(client, courtId, listedTotal, platformTaxRate) {
+  const venueRate = await venueTaxRateForCourt(client, courtId);
+  return applyInclusiveTax(listedTotal, platformTaxRate, venueRate);
 }
 
 exports.checkout = async (req, res) => {
@@ -81,18 +97,18 @@ exports.checkout = async (req, res) => {
     );
     if (existingHoldRows.length > 0) {
       const hold = existingHoldRows[0];
-      const base = await computeAmount(client, court_id, start, end);
-      const taxed = applyTax(base, taxRate);
+      const listedTotal = await computeAmount(client, court_id, start, end);
+      const split = await splitCourtTotal(client, court_id, listedTotal, taxRate);
       const user = req.user;
       return ok(res, 201, {
         hold_id: hold.id,
         idempotency_key,
-        amount: taxed.total,
+        amount: split.total,
         currency: 'LKR',
         expires_at: hold.expires_at,
         payment_params: buildCheckoutParams({
           orderId: hold.id,
-          amount: taxed.total,
+          amount: split.total,
           firstName: user.name,
           email: user.email,
           phone: user.phone,
@@ -103,7 +119,7 @@ exports.checkout = async (req, res) => {
     }
 
     const { rows: courtRows } = await client.query(
-      `select c.*, v.status as venue_status, v.accepts_cash
+      `select c.*, v.status as venue_status, v.accepts_cash, v.venue_tax_rate
        from courts c join venues v on v.id = c.venue_id
        where c.id = $1`,
       [court_id]
@@ -177,9 +193,11 @@ const dayOfWeek = dayOfWeekOfColombo(start_at);
       return fail(res, 409, 'BOOKING_SLOT_UNAVAILABLE', 'This slot is currently on hold');
     }
 
-    const baseAmount = Math.round((durationMin / court.slot_duration_min) * court.price_per_slot);
-    const taxOnAmount = applyTax(baseAmount, taxRate);
-    const amount = taxOnAmount.total;
+    const listedTotal = Math.round((durationMin / court.slot_duration_min) * court.price_per_slot);
+    // Inclusive pricing (ADR-0021): the listed court price is the total the
+    // player pays; platform + venue taxes are carved out of it and snapshotted.
+    const split = applyInclusiveTax(listedTotal, taxRate, court.venue_tax_rate || 0);
+    const amount = split.total;
 
     if (paymentMethod === 'cash') {
       if (!court.accepts_cash) {
@@ -189,10 +207,10 @@ const dayOfWeek = dayOfWeekOfColombo(start_at);
       await client.query('begin');
       try {
         const { rows: bookingRows } = await client.query(
-          `insert into bookings (court_id, user_id, start_at, end_at, price_per_slot, total_price, tax_rate, tax_amount, status, payment_method, player_name, player_phone, qr_token, idempotency_key)
-           values ($1, $2, $3, $4, $5, $6, $7, $8, 'confirmed', 'cash', $9, $10, $11, $12)
+          `insert into bookings (court_id, user_id, start_at, end_at, price_per_slot, total_price, tax_rate, tax_amount, venue_tax_rate, venue_tax_amount, status, payment_method, player_name, player_phone, qr_token, idempotency_key)
+           values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'confirmed', 'cash', $11, $12, $13, $14)
            returning *`,
-          [court_id, req.user.id, start, end, court.price_per_slot, amount, taxOnAmount.rate, taxOnAmount.tax, req.user.name, req.user.phone, mintQrToken(), idempotency_key]
+          [court_id, req.user.id, start, end, court.price_per_slot, amount, split.platformRate, split.platformTax, split.venueRate, split.venueTax, req.user.name, req.user.phone, mintQrToken(), idempotency_key]
         );
         await client.query('commit');
         await publishBookingEvent('booking.created', bookingRows[0].id);
@@ -239,10 +257,10 @@ const dayOfWeek = dayOfWeekOfColombo(start_at);
     // the subquery re-checks both limits inside the same statement that
     // writes the hold, so two racing requests cannot both succeed.
     const { rows: holdRows } = await client.query(
-      `insert into holds (court_id, user_id, start_at, end_at, expires_at, idempotency_key, player_phone, tax_rate, tax_amount)
-       select $1, $2, $3, $4, now() + ($5 || ' minutes')::interval, $6, $7, $8, $9
+      `insert into holds (court_id, user_id, start_at, end_at, expires_at, idempotency_key, player_phone, tax_rate, tax_amount, venue_tax_rate, venue_tax_amount)
+       select $1, $2, $3, $4, now() + ($5 || ' minutes')::interval, $6, $7, $8, $9, $10, $11
        where (
-         (select count(*) from holds h where h.user_id = $2 and h.expires_at > now()) < $10
+         (select count(*) from holds h where h.user_id = $2 and h.expires_at > now()) < $12
          and not exists (
            select 1 from holds h
            where h.court_id = $1 and h.expires_at > now() and h.user_id = $2
@@ -250,7 +268,7 @@ const dayOfWeek = dayOfWeekOfColombo(start_at);
          )
        )
        returning id, expires_at`,
-      [court_id, req.user.id, start, end, String(holdMinutes), idempotency_key, req.user.phone, taxOnAmount.rate, taxOnAmount.tax, HOLD_LIMIT()]
+      [court_id, req.user.id, start, end, String(holdMinutes), idempotency_key, req.user.phone, split.platformRate, split.platformTax, split.venueRate, split.venueTax, HOLD_LIMIT()]
     );
 
     if (holdRows.length === 0) {
@@ -260,9 +278,9 @@ const dayOfWeek = dayOfWeekOfColombo(start_at);
     const hold = holdRows[0];
 
     await client.query(
-      `insert into payments (user_id, payhere_payment_id, amount, tax_rate, tax_amount, currency, status)
-       values ($1, $2, $3, $4, $5, 'LKR', 'pending')`,
-      [req.user.id, hold.id, amount, taxOnAmount.rate, taxOnAmount.tax]
+      `insert into payments (user_id, payhere_payment_id, amount, tax_rate, tax_amount, venue_tax_rate, venue_tax_amount, currency, status)
+       values ($1, $2, $3, $4, $5, $6, $7, 'LKR', 'pending')`,
+      [req.user.id, hold.id, amount, split.platformRate, split.platformTax, split.venueRate, split.venueTax]
     );
 
     await client.query('commit');

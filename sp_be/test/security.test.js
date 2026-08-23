@@ -113,7 +113,7 @@ describe('booking read authorization & QR token disclosure', () => {
     playerToken = await tokenFor('demo-player-uid');
     const ownerB = `sec-owner-b-${Date.now()}`;
     await pool.query(
-      `insert into users (firebase_uid, email, name, role) values ($1, $2, $3, 'venue_owner') on conflict (firebase_uid) do nothing`,
+      `insert into users (firebase_uid, email, name, role, onboarding_state) values ($1, $2, $3, 'venue_owner', 'accepted') on conflict (firebase_uid) do nothing`,
       [ownerB, `${ownerB}@spots.lk`, 'Owner B']
     );
     ownerBToken = await tokenFor(ownerB);

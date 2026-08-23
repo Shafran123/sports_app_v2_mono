@@ -26,6 +26,7 @@ export function SettingsPage() {
           <TabsTrigger value="flags">Feature flags</TabsTrigger>
           <TabsTrigger value="brand">Brand</TabsTrigger>
           <TabsTrigger value="tax">Tax</TabsTrigger>
+          <TabsTrigger value="bank">Bank details</TabsTrigger>
           <TabsTrigger value="reports">Reports</TabsTrigger>
           <TabsTrigger value="audit">Audit log</TabsTrigger>
         </TabsList>
@@ -58,6 +59,10 @@ export function SettingsPage() {
           ) : (
             <TaxPanel config={data} />
           )}
+        </TabsContent>
+
+        <TabsContent value="bank" className="mt-5">
+          <BankDetailsPanel />
         </TabsContent>
 
         <TabsContent value="reports" className="mt-5">
@@ -203,14 +208,14 @@ function TaxPanel({ config }: { config: AdminConfig }) {
 
   return (
     <Card className="p-6">
-      <h2 className="font-semibold text-ink">Tax configuration</h2>
+      <h2 className="font-semibold text-ink">Platform tax</h2>
       <p className="mt-1 text-sm text-ink-2">
-        A single platform-wide rate added on top of booking &amp; event prices at checkout. Revenue is reported net of
-        tax; a zero rate shows &ldquo;Tax not applicable&rdquo;.
+        The platform-wide rate. Prices are inclusive (ADR-0021): the listed price is the total the player pays,
+        and this tax is carved out of it. Venue owners set their own Venue Tax per venue.
       </p>
       <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
         <input
-          aria-label="Tax rate percentage"
+          aria-label="Platform tax rate percentage"
           type="number"
           min={0}
           max={100}
@@ -223,6 +228,72 @@ function TaxPanel({ config }: { config: AdminConfig }) {
           {save.isPending ? "Saving…" : "Save rate"}
         </Button>
         {saved && <span className="text-sm text-success">Saved — new bookings will use this rate.</span>}
+      </div>
+      {error && <p className="mt-3 rounded-xl bg-red-50 p-3 text-sm text-error">{error}</p>}
+    </Card>
+  );
+}
+
+function BankDetailsPanel() {
+  const qc = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ["admin-config"],
+    queryFn: () => admin.platformConfig()
+  });
+  const [bank, setBank] = React.useState<Record<string, string>>({});
+  const [error, setError] = React.useState<string | null>(null);
+  const [saved, setSaved] = React.useState(false);
+
+  React.useEffect(() => {
+    if (data?.bank_details) setBank(data.bank_details);
+  }, [data]);
+
+  const save = useMutation({
+    mutationFn: () => admin.setConfigKey("bank_details", bank),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-config"] });
+      setError(null);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    },
+    onError: (e) => setError(toApiFailure(e)?.message ?? "Could not save the bank details.")
+  });
+
+  const fields: Array<[keyof typeof bank, string]> = [
+    ["bank", "Bank"],
+    ["account_name", "Account name"],
+    ["account_number", "Account number"],
+    ["branch", "Branch"]
+  ];
+
+  return (
+    <Card className="p-6">
+      <h2 className="font-semibold text-ink">Bank details</h2>
+      <p className="mt-1 text-sm text-ink-2">
+        The platform bank account shown in owner onboarding and renewal emails. Plan fees are settled off-platform.
+      </p>
+      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        {fields.map(([key, label]) => (
+          <div key={key} className="space-y-1.5">
+            <label htmlFor={`bank-${key}`} className="text-xs font-semibold uppercase tracking-wide text-ink-3">
+              {label}
+            </label>
+            <input
+              id={`bank-${key}`}
+              type="text"
+              maxLength={120}
+              value={bank[key] ?? ""}
+              onChange={(e) => setBank((b) => ({ ...b, [key]: e.target.value }))}
+              className="w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm text-ink"
+            />
+          </div>
+        ))}
+      </div>
+      <div className="mt-5 flex items-center gap-3">
+        <Button variant="primary" size="sm" onClick={() => save.mutate()} disabled={save.isPending}>
+          {save.isPending ? "Saving…" : "Save bank details"}
+        </Button>
+        {saved && <span className="text-sm text-success">Saved — new owner emails will use these details.</span>}
       </div>
       {error && <p className="mt-3 rounded-xl bg-red-50 p-3 text-sm text-error">{error}</p>}
     </Card>

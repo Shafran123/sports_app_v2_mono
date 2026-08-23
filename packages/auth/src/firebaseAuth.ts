@@ -4,6 +4,7 @@ import {
   signInWithPopup,
   GoogleAuthProvider,
   signOut,
+  updatePassword,
   RecaptchaVerifier,
   signInWithPhoneNumber,
   type Auth,
@@ -26,6 +27,12 @@ export async function loginWithEmail(email: string, password: string): Promise<v
 export async function registerWithEmail(email: string, password: string): Promise<void> {
   const userCred = await createUserWithEmailAndPassword(getFirebaseAuth(), email, password);
   await persistToken(userCred.user);
+}
+
+export async function changePassword(newPassword: string): Promise<void> {
+  const auth = getFirebaseAuth();
+  if (!auth.currentUser) throw new Error("You must be signed in to change your password.");
+  await updatePassword(auth.currentUser, newPassword);
 }
 
 export async function loginWithGoogle(): Promise<void> {

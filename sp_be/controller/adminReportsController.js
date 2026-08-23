@@ -22,8 +22,9 @@ exports.getReports = async (req, res) => {
     const { rows: series } = await pool.query(
       `select to_char((p.paid_at at time zone 'Asia/Colombo')::date, 'YYYY-MM-DD') as day,
               count(distinct p.booking_id)::int as bookings,
-              coalesce(sum(p.amount - p.tax_amount) filter (where p.booking_id is not null), 0)::int as revenue,
-              coalesce(sum(p.tax_amount) filter (where p.booking_id is not null), 0)::int as tax
+              coalesce(sum(p.amount - p.tax_amount - p.venue_tax_amount) filter (where p.booking_id is not null), 0)::int as revenue,
+              coalesce(sum(p.tax_amount) filter (where p.booking_id is not null), 0)::int as tax,
+              coalesce(sum(p.venue_tax_amount) filter (where p.booking_id is not null), 0)::int as venue_tax
        from payments p
        where p.status = 'paid' and p.paid_at >= $1 and p.booking_id is not null
        group by day
@@ -33,7 +34,7 @@ exports.getReports = async (req, res) => {
 
     const { rows: bySport } = await pool.query(
       `select s.slug, s.name, count(distinct b.id)::int as bookings,
-              coalesce(sum(p.amount - p.tax_amount), 0)::int as revenue
+              coalesce(sum(p.amount - p.tax_amount - p.venue_tax_amount), 0)::int as revenue
        from payments p
        join bookings b on b.id = p.booking_id
        join courts c on c.id = b.court_id
@@ -46,7 +47,7 @@ exports.getReports = async (req, res) => {
 
     const { rows: byVenue } = await pool.query(
       `select v.name, count(distinct b.id)::int as bookings,
-              coalesce(sum(p.amount - p.tax_amount), 0)::int as revenue
+              coalesce(sum(p.amount - p.tax_amount - p.venue_tax_amount), 0)::int as revenue
        from payments p
        join bookings b on b.id = p.booking_id
        join courts c on c.id = b.court_id
@@ -60,7 +61,7 @@ exports.getReports = async (req, res) => {
     const { rows: split } = await pool.query(
       `select p.payment_method,
               count(distinct b.id)::int as bookings,
-              coalesce(sum(p.amount - p.tax_amount), 0)::int as revenue
+              coalesce(sum(p.amount - p.tax_amount - p.venue_tax_amount), 0)::int as revenue
        from payments p
        join bookings b on b.id = p.booking_id
        where p.status = 'paid' and p.paid_at >= $1
@@ -70,7 +71,7 @@ exports.getReports = async (req, res) => {
 
     const { rows: events } = await pool.query(
       `select count(*) filter (where r.status in ('paid', 'pending'))::int as registrations,
-              coalesce(sum(p.amount - p.tax_amount) filter (where p.status = 'paid'), 0)::int as revenue
+              coalesce(sum(p.amount - p.tax_amount - p.venue_tax_amount) filter (where p.status = 'paid'), 0)::int as revenue
        from event_registrations r
        left join payments p on p.event_registration_id = r.id
        where r.created_at >= $1`,

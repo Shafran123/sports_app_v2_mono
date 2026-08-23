@@ -2,21 +2,22 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Building2, CalendarDays, LayoutDashboard, ShieldCheck, Store } from "lucide-react";
+import { Building2, CalendarDays, FileText, Inbox, LayoutDashboard, Store } from "lucide-react";
 import { cn } from "@myslot/utils";
 
 const OWNER_TABS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/front-desk", label: "Front desk", icon: Store },
   { href: "/venues", label: "Venues", icon: Building2 },
-  { href: "/calendar", label: "Calendar", icon: CalendarDays }
+  { href: "/calendar", label: "Calendar", icon: CalendarDays },
+  { href: "/plan", label: "Plan", icon: FileText }
 ];
 
 const ADMIN_TABS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/bookings", label: "Bookings", icon: CalendarDays },
   { href: "/admin-venues", label: "Venues", icon: Building2 },
-  { href: "/approvals", label: "Approvals", icon: ShieldCheck }
+  { href: "/leads", label: "Leads", icon: Inbox }
 ];
 
 export function ConsoleBottomNav({ role }: { role: "admin" | "venue_owner" }) {
@@ -28,7 +29,7 @@ export function ConsoleBottomNav({ role }: { role: "admin" | "venue_owner" }) {
       className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] md:hidden"
       aria-label="Primary"
     >
-      <div className="grid grid-cols-4">
+      <div className="grid grid-cols-5">
         {tabs.map((tab) => {
           const active = tab.href === "/" ? pathname === "/" : pathname.startsWith(tab.href);
           const Icon = tab.icon;

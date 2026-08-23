@@ -15,6 +15,7 @@ router.get('/courts/:id/blocks', businessController.listBlocks);
 router.delete('/courts/:id/blocks/:blockId', businessController.deleteBlock);
 router.get('/bookings', businessController.listBookings);
 router.get('/overview', businessController.overview);
+router.get('/reports', businessController.reports);
 router.post('/bookings/manual', writeLimiter, businessController.createManualBooking);
 router.post('/bookings/:id/mark-paid', writeLimiter, businessController.markPaid);
 router.post('/bookings/:id/cancel', writeLimiter, businessController.cancelBooking);

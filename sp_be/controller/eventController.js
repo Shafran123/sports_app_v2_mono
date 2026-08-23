@@ -3,7 +3,7 @@ const { ok, fail } = require('../utils/response');
 const logger = require('../utils/logger');
 const { buildCheckoutParams } = require('../utils/payhere');
 const { requestBaseUrl } = require('../utils/tokens');
-const { getFlag, getTaxRate, applyTax } = require('../utils/featureFlags');
+const { getFlag, getTaxRate, getVenueTaxRate, applyInclusiveTax } = require('../utils/featureFlags');
 const billService = require('../utils/billService');
 
 // Players only ever see Events when discovery state is 'enabled' — or the
@@ -203,20 +203,23 @@ exports.registerForEvent = async (req, res) => {
       return fail(res, 409, 'ALREADY_REGISTERED', 'You are already registered for this event');
     }
 
-    const taxed = applyTax(event.price, taxRate);
+    // Inclusive pricing (ADR-0021): the event price is the total the player
+    // pays; platform + venue taxes are carved out and snapshotted.
+    const venueTaxRate = await getVenueTaxRate(event.venue_id);
+    const taxed = applyInclusiveTax(event.price, taxRate, venueTaxRate);
 
     const { rows: regRows } = await client.query(
-      `insert into event_registrations (event_id, user_id, tax_rate, tax_amount, status)
-       values ($1, $2, $3, $4, 'pending')
+      `insert into event_registrations (event_id, user_id, tax_rate, tax_amount, venue_tax_rate, venue_tax_amount, status)
+       values ($1, $2, $3, $4, $5, $6, 'pending')
        returning *`,
-      [id, req.user.id, taxed.rate, taxed.tax]
+      [id, req.user.id, taxed.platformRate, taxed.platformTax, taxed.venueRate, taxed.venueTax]
     );
     const registration = regRows[0];
 
     await client.query(
-      `insert into payments (user_id, event_registration_id, payhere_payment_id, amount, tax_rate, tax_amount, currency, status)
-       values ($1, $2, $3, $4, $5, $6, 'LKR', 'pending')`,
-      [req.user.id, registration.id, registration.id, taxed.total, taxed.rate, taxed.tax]
+      `insert into payments (user_id, event_registration_id, payhere_payment_id, amount, tax_rate, tax_amount, venue_tax_rate, venue_tax_amount, currency, status)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, 'LKR', 'pending')`,
+      [req.user.id, registration.id, registration.id, taxed.total, taxed.platformRate, taxed.platformTax, taxed.venueRate, taxed.venueTax]
     );
 
     await client.query('commit');

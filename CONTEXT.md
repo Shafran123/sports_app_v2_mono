@@ -80,8 +80,20 @@ A permanent admin action that revokes the Player's sign-in entirely. Distinct fr
 _Avoid_: delete account, deactivate
 
 **Venue Owner**:
-An operator account that manages one or more Venues.
+An operator account that manages one or more Venues, created through the Owner Onboarding flow (an Admin provisions it, attaches an Owner Plan, and drafts an Owner Agreement). Console access and venue creation are gated on accepting the current Owner Agreement.
 _Avoid_: partner, vendor, host
+
+**Owner Lead**:
+A person who submitted the public "list your place" form, expressing interest in becoming a Venue Owner. Carries name, email, phone, venue name, city, and an optional message. Triaged by an Admin (new → contacted → converted / closed); converting a Lead pre-fills Owner-account creation. Converting always creates a brand-new Owner account — it never reuses or mutates an existing Player account, even on an email match.
+_Avoid_: prospect, partner request, enquiry
+
+**Owner Plan**:
+The commercial term attached to a Venue Owner, drawn from an Admin-maintained catalog of plan templates (name, term, price — a price of zero covers "6 months free") and applied to an Owner with a start and an end date. Expiring and expired Plans surface to the Admin so renewal can be chased.
+_Avoid_: subscription, contract, pricing tier
+
+**Owner Agreement**:
+A sales-agreement document of terms drafted by an Admin for a Venue Owner — generated from a reusable template with per-Owner placeholders (parties, venue, Plan, dates, bank details) and editable per Owner. It is emailed to the Owner and must be accepted before the Owner may use the console; a renewal creates a fresh agreement requiring a fresh acceptance.
+_Avoid_: contract, terms of service, sales contract
 
 **Walk-in Guest**:
 A player without a Spots account who books via the venue's quick-book POS. The booking carries name and phone instead of a user_id.
@@ -119,12 +131,16 @@ _Avoid_: toggle, setting, switch
 The platform-level state controlling how Events appear to players: **Enabled** (listings purchasable), **Coming Soon** (shown as teasers, not purchasable), or **Hidden** (not shown at all). Distinct from an Event's own lifecycle status (active/cancelled).
 _Avoid_: event visibility, event mode
 
-**Tax**:
-A platform-wide percentage rate applied to the price of Bookings and Event Registrations at checkout, added on top of the base price and snapshotted on the Booking or Registration at creation. Admin-configurable; a rate of zero is presented as "Tax not applicable" (no 0.00 line).
-_Avoid_: VAT, GST, service charge
+**Platform Tax**:
+A platform-wide percentage rate, Admin-configurable, applied to Bookings and Event Registrations. All prices are tax-inclusive: the listed price is the total the player pays, and the Platform Tax is split out of it at checkout and snapshotted on the Booking or Registration at creation. A rate of zero is presented as "Tax not applicable" (no 0.00 line).
+_Avoid_: VAT, GST, service charge, tax (bare)
+
+**Venue Tax**:
+A percentage rate set by a Venue Owner for a specific Venue. Like Platform Tax, it is inclusive: the Owner sets the listed price knowing the split, and the Platform Tax and the Venue Tax are both carved out of that price at checkout and snapshotted separately. The Owner manages their own rate (with a live "what you keep vs tax" readout while setting it); the Admin may view Venue Tax but not edit it.
+_Avoid_: owner tax, venue tax rate
 
 **Booking Bill**:
-A PDF invoice for a Booking or Event Registration, itemizing base price, tax, and total. Emailed on payment and printable on demand. Walk-in Guest bills are printed at the venue, never emailed.
+A PDF invoice for a Booking or Event Registration, itemizing base price, Platform Tax, Venue Tax, and total. Emailed on payment and printable on demand. Walk-in Guest bills are printed at the venue, never emailed.
 _Avoid_: receipt, invoice slip, statement
 
 **Venue Photo**:

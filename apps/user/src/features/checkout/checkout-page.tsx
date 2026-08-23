@@ -57,6 +57,7 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
     courtNameParam ||
     venueQuery.data?.courts.find((c) => c.id === courtId)?.name ||
     "";
+  const venueTaxRate = venueQuery.data?.venue_tax_rate ?? 0;
 
   const [method, setMethod] = React.useState<PaymentMethod>("online");
   const [chosen, setChosen] = React.useState(false);
@@ -363,6 +364,11 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
                         {formatLkr(rateTotal)}
                       </span>
                     </div>
+                    {venueTaxRate > 0 && (
+                      <p className="mt-1 text-xs text-ink-3">
+                        Total includes {venueTaxRate}% Venue Tax and the platform tax.
+                      </p>
+                    )}
                     <Button
                       size="lg"
                       loading={checkout.isPending}

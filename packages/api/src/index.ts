@@ -16,6 +16,16 @@ import {
   FlagAuditSchema,
   MyVenueSchema,
   NotificationSchema,
+  NudgeResultSchema,
+  OwnerAgreementSchema,
+  OwnerCreateResultSchema,
+  OwnerLeadSchema,
+  OwnerListItemSchema,
+  OwnerPlanEnvelopeSchema,
+  OwnerPlanSchema,
+  OwnerPlanTemplateSchema,
+  OwnerRenewResultSchema,
+  OwnerReportsSchema,
   PaymentSchema,
   SportSchema,
   UserSchema,
@@ -23,6 +33,7 @@ import {
   VenueDetailSchema,
   VenueSchema
 } from "@myslot/types";
+import type { OwnerAgreement, OwnerPlan } from "@myslot/types";
 export { TOKEN_KEY } from "./client";
 export { toApiFailure, getClient, setClient, createClient, type ApiFailure } from "./client";
 export { parseData, parseList, parsePaginated } from "./parse";
@@ -87,6 +98,7 @@ export const venues = {
       photos: string[];
       amenities: string[];
       accepts_cash: boolean;
+      venue_tax_rate: number;
     }>,
     client: AxiosInstance = getClient()
   ) {
@@ -274,9 +286,13 @@ export const business = {
     const res = await client.get("/business/overview", { params: date ? { date } : {} });
     return BusinessOverviewSchema.parse(res.data.data ?? res.data);
   },
-  async listBookings(params: { date?: string } = {}, client: AxiosInstance = getClient()) {
+  async reports(query: { range?: 7 | 30 | 90; venue_id?: string } = {}, client: AxiosInstance = getClient()) {
+    const res = await client.get("/business/reports", { params: query });
+    return OwnerReportsSchema.parse(res.data.data ?? res.data);
+  },
+  async listBookings(params: { date?: string; date_from?: string; date_to?: string; status?: string; venue_id?: string; sport?: string; page?: number; limit?: number } = {}, client: AxiosInstance = getClient()) {
     const res = await client.get("/business/bookings", { params });
-    return parseList(BookingSchema, res.data.data ?? res.data);
+    return parsePaginated(BookingSchema, res.data);
   },
   async manualBooking(
     input: { court_id: string; start_at: string; end_at: string; player_name?: string; player_phone?: string; amount?: number },
@@ -411,5 +427,99 @@ export const admin = {
   async reports(range: 7 | 30 | 90 = 7, client: AxiosInstance = getClient()) {
     const res = await client.get("/admin/reports", { params: { range } });
     return parseData(AdminReportsSchema, res.data.data ?? res.data);
+  },
+  // Owner onboarding — leads, plans, owners.
+  async listLeads(status?: string, client: AxiosInstance = getClient()) {
+    const res = await client.get("/admin/leads", { params: status ? { status } : {} });
+    return parseList(OwnerLeadSchema, res.data.data ?? res.data);
+  },
+  async updateLead(id: string, input: { status?: string; admin_notes?: string }, client: AxiosInstance = getClient()) {
+    const res = await client.patch(`/admin/leads/${id}`, input);
+    return parseData(OwnerLeadSchema, res.data.data ?? res.data);
+  },
+  async listPlanTemplates(includeArchived = false, client: AxiosInstance = getClient()) {
+    const res = await client.get("/admin/owners/plan-templates", { params: includeArchived ? { include_archived: 1 } : {} });
+    return parseList(OwnerPlanTemplateSchema, res.data.data ?? res.data);
+  },
+  async createPlanTemplate(input: { name: string; term_days: number; price_lkr?: number }, client: AxiosInstance = getClient()) {
+    const res = await client.post("/admin/owners/plan-templates", input);
+    return parseData(OwnerPlanTemplateSchema, res.data.data ?? res.data);
+  },
+  async updatePlanTemplate(id: string, input: { name?: string; term_days?: number; price_lkr?: number }, client: AxiosInstance = getClient()) {
+    const res = await client.patch(`/admin/owners/plan-templates/${id}`, input);
+    return parseData(OwnerPlanTemplateSchema, res.data.data ?? res.data);
+  },
+  async archivePlanTemplate(id: string, client: AxiosInstance = getClient()) {
+    const res = await client.post(`/admin/owners/plan-templates/${id}/archive`);
+    return parseData(OwnerPlanTemplateSchema, res.data.data ?? res.data);
+  },
+  async listOwners(expiringWithin?: number, client: AxiosInstance = getClient()) {
+    const res = await client.get("/admin/owners", { params: expiringWithin !== undefined ? { expiring_within: expiringWithin } : {} });
+    return parseList(OwnerListItemSchema, res.data.data ?? res.data);
+  },
+  async createOwner(
+    input: {
+      name: string;
+      email: string;
+      phone?: string;
+      temporary_password: string;
+      plan_template_id?: string;
+      plan?: { name: string; term_days: number; price_lkr?: number };
+      start_date?: string;
+      agreement: { title: string; body: string };
+      lead_id?: string;
+    },
+    client: AxiosInstance = getClient()
+  ) {
+    const res = await client.post("/admin/owners", input);
+    return parseData(OwnerCreateResultSchema, res.data.data ?? res.data);
+  },
+  async renewOwner(
+    id: string,
+    input: {
+      plan_template_id?: string;
+      plan?: { name: string; term_days: number; price_lkr?: number };
+      start_date?: string;
+      agreement: { title: string; body: string };
+    },
+    client: AxiosInstance = getClient()
+  ) {
+    const res = await client.post(`/admin/owners/${id}/renew`, input);
+    return parseData(OwnerRenewResultSchema, res.data.data ?? res.data);
+  },
+  async nudgeOwner(id: string, client: AxiosInstance = getClient()) {
+    const res = await client.post(`/admin/owners/${id}/nudge`);
+    return parseData(NudgeResultSchema, res.data.data ?? res.data);
+  }
+};
+
+// Public + owner-side onboarding surfaces.
+export const leads = {
+  async submit(input: { name: string; email: string; phone?: string; venue_name?: string; city?: string; message?: string }, client: AxiosInstance = getClient()) {
+    const res = await client.post("/public/leads", input);
+    return parseData(OwnerLeadSchema, res.data.data ?? res.data);
+  }
+};
+
+export const ownerOnboarding = {
+  async myPlan(client: AxiosInstance = getClient()) {
+    const res = await client.get("/owner-onboarding/plan");
+    return parseData(OwnerPlanEnvelopeSchema, res.data.data ?? res.data);
+  },
+  async currentAgreement(client: AxiosInstance = getClient()) {
+    const res = await client.get("/owner-onboarding/agreement/current");
+    return parseData(OwnerAgreementSchema, res.data.data ?? res.data);
+  },
+  async acceptAgreement(id: string, client: AxiosInstance = getClient()) {
+    const res = await client.post(`/owner-onboarding/agreements/${id}/accept`);
+    return parseData(OwnerAgreementSchema, res.data.data ?? res.data);
+  },
+  async declineAgreement(id: string, client: AxiosInstance = getClient()) {
+    const res = await client.post(`/owner-onboarding/agreements/${id}/decline`);
+    return parseData(OwnerAgreementSchema, res.data.data ?? res.data);
+  },
+  async passwordChanged(client: AxiosInstance = getClient()) {
+    const res = await client.post("/owner-onboarding/password-changed");
+    return res.data.data as Record<string, unknown>;
   }
 };

@@ -9,7 +9,7 @@ vi.mock("next/navigation", () => ({
 describe("ConsoleBottomNav", () => {
   it("shows the owner tabs", () => {
     render(<ConsoleBottomNav role="venue_owner" />);
-    for (const label of ["Dashboard", "Front desk", "Venues", "Calendar"]) {
+    for (const label of ["Dashboard", "Front desk", "Venues", "Calendar", "Plan"]) {
       expect(screen.getByRole("link", { name: label })).toHaveAttribute("href", expect.stringContaining("/"));
     }
     expect(screen.getByRole("link", { name: "Front desk" })).toHaveClass("bg-primary-light");
@@ -19,7 +19,7 @@ describe("ConsoleBottomNav", () => {
 
   it("shows the admin tabs", () => {
     render(<ConsoleBottomNav role="admin" />);
-    for (const label of ["Dashboard", "Bookings", "Venues", "Approvals"]) {
+    for (const label of ["Dashboard", "Bookings", "Venues", "Leads"]) {
       expect(screen.getByRole("link", { name: label })).toBeInTheDocument();
     }
   });

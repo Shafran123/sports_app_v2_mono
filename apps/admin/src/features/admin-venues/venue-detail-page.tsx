@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/context/auth";
 import { ArrowLeft, Clock, Info, Lock, MapPin, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { courts, sports, venues, business, getClient, toApiFailure } from "@myslot/api";
 import {
@@ -77,6 +78,9 @@ export function VenueDetailPage({ venueId }: { venueId: string }) {
   });
   const venue = mineQuery.data?.find((v) => v.id === venueId);
 
+  const { user } = useAuth();
+  const isOwnerRole = user?.role === "venue_owner";
+
   const courtsQuery = useQuery({
     queryKey: ["owner-courts"],
     queryFn: () => fetchOwnerCourts()
@@ -143,6 +147,7 @@ export function VenueDetailPage({ venueId }: { venueId: string }) {
 
   const [photos, setPhotos] = useState<string[]>(venue?.photos ?? []);
   const [acceptsCash, setAcceptsCash] = useState(Boolean(venue?.accepts_cash));
+  const [venueTaxRate, setVenueTaxRate] = useState(String(venue?.venue_tax_rate ?? ""));
   const [savingSettings, setSavingSettings] = useState(false);
   const [settingsNotice, setSettingsNotice] = useState("");
   const [settingsError, setSettingsError] = useState("");
@@ -151,6 +156,7 @@ export function VenueDetailPage({ venueId }: { venueId: string }) {
     if (venue) {
       setPhotos(venue.photos ?? []);
       setAcceptsCash(Boolean(venue.accepts_cash));
+      setVenueTaxRate(venue.venue_tax_rate != null ? String(venue.venue_tax_rate) : "");
     }
   }, [venue]);
 
@@ -159,7 +165,12 @@ export function VenueDetailPage({ venueId }: { venueId: string }) {
     setSettingsError("");
     setSavingSettings(true);
     try {
-      await venues.update(venueId, { photos, accepts_cash: acceptsCash });
+      const taxRate = venueTaxRate === "" ? 0 : Number(venueTaxRate);
+      if (!Number.isFinite(taxRate) || taxRate < 0 || taxRate > 100) {
+        setSettingsError("Venue tax must be between 0 and 100.");
+        return;
+      }
+      await venues.update(venueId, { photos, accepts_cash: acceptsCash, venue_tax_rate: taxRate });
       setSettingsNotice("Venue settings saved.");
       void queryClient.invalidateQueries({ queryKey: ["my-venues"] });
     } catch (err) {
@@ -739,6 +750,34 @@ export function VenueDetailPage({ venueId }: { venueId: string }) {
                   </span>
                 </span>
               </label>
+            </Card>
+
+            <Card className="p-5 md:p-6">
+              <h2 className="font-display text-lg font-extrabold tracking-tight text-ink">Venue tax</h2>
+              <p className="mt-0.5 text-sm text-ink-2">
+                The owner&apos;s tax rate on this venue. Prices are inclusive: the Venue Tax is carved out of
+                the listed price (alongside the platform tax) and reported to the owner separately.
+              </p>
+              {isOwnerRole ? (
+                <div className="mt-4 flex items-center gap-2">
+                  <Input
+                    aria-label="Venue tax rate percentage"
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={venueTaxRate}
+                    onChange={(e) => setVenueTaxRate(e.target.value)}
+                    className="w-32"
+                  />
+                  <span className="text-sm text-ink-2">
+                    % — of every LKR 100 a player pays, {venueTaxRate ? `LKR ${venueTaxRate} is Venue Tax` : "no Venue Tax is charged"}
+                  </span>
+                </div>
+              ) : (
+                <p className="mt-3 rounded-xl bg-surface-2 px-3 py-2 text-sm text-ink-2">
+                  {venue?.venue_tax_rate ? `${venue.venue_tax_rate}% (read-only for admins — the owner manages it)` : "0% (read-only for admins — the owner manages it)"}
+                </p>
+              )}
             </Card>
 
             <Card className="p-5 md:p-6">

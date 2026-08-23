@@ -22,13 +22,24 @@ async function resolveSportIds(client, sports) {
 exports.createVenue = async (req, res) => {
   const client = await pool.connect();
   try {
-    const { name, description, address, city, phone, lat, lng, photos, amenities, sports, courts, hours, accepts_cash } = req.body;
+    // ADR-0022: only onboarded (accepted-terms) owners may create venues.
+    // Self-submit by players is deprecated; admins pass through.
+    if (req.user.role !== 'admin' && req.user.onboarding_state === 'pending') {
+      return fail(res, 403, 'ONBOARDING_REQUIRED', 'Accept your owner agreement before creating venues');
+    }
+
+    const { name, description, address, city, phone, lat, lng, photos, amenities, sports, courts, hours, accepts_cash, venue_tax_rate } = req.body;
 
     if (!name || !city || !address) {
       return fail(res, 400, 'VENUE_VALIDATION', 'name, city, and address are required');
     }
     if (!Array.isArray(courts) || courts.length === 0) {
       return fail(res, 400, 'VENUE_VALIDATION', 'At least one court is required');
+    }
+
+    const venueTax = venue_tax_rate === undefined ? 0 : Number(venue_tax_rate);
+    if (!Number.isFinite(venueTax) || venueTax < 0 || venueTax > 100) {
+      return fail(res, 400, 'VENUE_VALIDATION', 'venue_tax_rate must be a number between 0 and 100');
     }
 
     const sportIds = await resolveSportIds(client, sports || []);
@@ -45,14 +56,14 @@ exports.createVenue = async (req, res) => {
     await client.query('begin');
 
     const { rows: venueRows } = await client.query(
-      `insert into venues (owner_id, name, description, address, city, phone, lat, lng, photos, amenities, status, accepts_cash)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending', $11)
+      `insert into venues (owner_id, name, description, address, city, phone, lat, lng, photos, amenities, status, accepts_cash, venue_tax_rate)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending', $11, $12)
        returning *`,
       [
         req.user.id, name, description || null, address, city, phone || null,
         lat || null, lng || null,
         JSON.stringify(photos || []), JSON.stringify(amenities || []),
-        !!accepts_cash
+        !!accepts_cash, venueTax
       ]
     );
     const venue = venueRows[0];
@@ -243,7 +254,7 @@ exports.getVenue = async (req, res) => {
 exports.updateVenue = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, address, city, phone, photos, amenities, accepts_cash } = req.body;
+    const { name, description, address, city, phone, photos, amenities, accepts_cash, venue_tax_rate } = req.body;
 
     const { rows: venueRows } = await pool.query(
       `select * from venues where id = $1`,
@@ -257,6 +268,18 @@ exports.updateVenue = async (req, res) => {
       return fail(res, 403, 'FORBIDDEN', 'You do not manage this venue');
     }
 
+    // Venue Tax is owner-owned (ADR-0021): the admin may view it but not edit.
+    if (venue_tax_rate !== undefined && req.user.role === 'admin' && venue.owner_id !== req.user.id) {
+      return fail(res, 403, 'VENUE_TAX_OWNER_ONLY', 'Only the venue owner can change the Venue Tax rate');
+    }
+    let venueTax = null;
+    if (venue_tax_rate !== undefined) {
+      venueTax = Number(venue_tax_rate);
+      if (!Number.isFinite(venueTax) || venueTax < 0 || venueTax > 100) {
+        return fail(res, 400, 'VENUE_VALIDATION', 'venue_tax_rate must be a number between 0 and 100');
+      }
+    }
+
     const { rows: updated } = await pool.query(
       `update venues set
          name = coalesce($2, name),
@@ -267,6 +290,7 @@ exports.updateVenue = async (req, res) => {
          photos = coalesce($7::jsonb, photos),
          amenities = coalesce($8::jsonb, amenities),
          accepts_cash = coalesce($9, accepts_cash),
+         venue_tax_rate = coalesce($10, venue_tax_rate),
          updated_at = now()
        where id = $1
        returning *`,
@@ -279,7 +303,8 @@ exports.updateVenue = async (req, res) => {
         phone ?? null,
         photos !== undefined ? JSON.stringify(photos) : null,
         amenities !== undefined ? JSON.stringify(amenities) : null,
-        accepts_cash !== undefined ? !!accepts_cash : null
+        accepts_cash !== undefined ? !!accepts_cash : null,
+        venueTax
       ]
     );
 

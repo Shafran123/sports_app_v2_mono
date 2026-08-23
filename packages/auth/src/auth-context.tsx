@@ -127,6 +127,24 @@ export function RequireAdmin({ children, redirectTo = "/" }: { children: ReactNo
   return <>{children}</>;
 }
 
+/**
+ * Onboarding gate (ADR-0022): a provisioned venue owner who has not accepted
+ * their agreement is redirected to the Plan & agreement page until they do.
+ */
+export function RequireOnboarded({ children, redirectTo = "/plan" }: { children: ReactNode; redirectTo?: string }) {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+  const pending = user?.role === "venue_owner" && user.onboarding_state === "pending";
+
+  useEffect(() => {
+    if (!loading && pending) router.replace(redirectTo);
+  }, [loading, pending, router, redirectTo]);
+
+  if (loading) return null;
+  if (pending) return null;
+  return <>{children}</>;
+}
+
 export function isStaffRole(role: Role | undefined | null): boolean {
   return role === "admin" || role === "venue_owner";
 }

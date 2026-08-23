@@ -6,12 +6,15 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   Building2,
   CalendarDays,
+  FileText,
+  Inbox,
   LayoutDashboard,
   LogOut,
   Menu,
   Settings,
   ShieldCheck,
   Ticket,
+  Trophy,
   Users,
   X
 } from "lucide-react";
@@ -30,9 +33,11 @@ const OWNER_NAV = [
     items: [
       { href: "/", label: "Dashboard", icon: LayoutDashboard },
       { href: "/front-desk", label: "Front desk", icon: StoreIcon },
+      { href: "/bookings", label: "Bookings", icon: CalendarDays },
       { href: "/venues", label: "Venues", icon: Building2 },
       { href: "/calendar", label: "Calendar", icon: CalendarDays },
-      { href: "/events", label: "Events", icon: Ticket }
+{ href: "/events", label: "Events", icon: Ticket },
+      { href: "/plan", label: "Plan & agreement", icon: FileText }
     ]
   }
 ];
@@ -48,24 +53,17 @@ const ADMIN_NAV = [
   {
     section: "Platform",
     items: [
-      { href: "/approvals", label: "Venue approvals", icon: ShieldCheckIcon },
+      { href: "/approvals", label: "Venue approvals", icon: ShieldCheck },
       { href: "/admin-venues", label: "Venues", icon: Building2 },
+      { href: "/leads", label: "Leads", icon: Inbox },
+      { href: "/owners", label: "Owners", icon: StoreIcon },
       { href: "/events", label: "Events", icon: Ticket },
-      { href: "/sports", label: "Sports", icon: TrophyIcon },
+      { href: "/sports", label: "Sports", icon: Trophy },
       { href: "/players", label: "Players", icon: Users },
       { href: "/settings", label: "Settings & reports", icon: Settings }
     ]
   }
 ];
-
-function ShieldCheckIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <path d="M12 22s8-3.5 8-10V5l-8-3-8 3v7c0 6.5 8 10 8 10z" />
-      <path d="m9 12 2 2 4-4" />
-    </svg>
-  );
-}
 
 function StoreIcon({ className }: { className?: string }) {
   return (
@@ -73,15 +71,6 @@ function StoreIcon({ className }: { className?: string }) {
       <path d="M3 9l1.5-5h15L21 9" />
       <path d="M3 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0" />
       <path d="M4 12v8h16v-8M9 20v-5h6v5" />
-    </svg>
-  );
-}
-
-function TrophyIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <path d="M8 21h8M12 17v4M7 4h10v6a5 5 0 0 1-10 0z" />
-      <path d="M7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3" />
     </svg>
   );
 }

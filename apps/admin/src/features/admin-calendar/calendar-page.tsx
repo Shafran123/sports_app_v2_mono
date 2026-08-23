@@ -45,7 +45,7 @@ export function CalendarPage() {
 
   const pickedBooking = useMemo(() => {
     if (!pickedBooked || !dayQuery.data) return undefined;
-    return dayQuery.data.find(
+    return dayQuery.data.data.find(
       (b) =>
         b.court_id === pickedBooked.court.court_id &&
         sameInstant(b.start_at, pickedBooked.slot.start_at)

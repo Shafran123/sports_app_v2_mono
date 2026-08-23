@@ -73,6 +73,29 @@ async function getTaxRate() {
   return coerce('number', await readConfig('tax_rate', 0));
 }
 
+// Owner-set Venue Tax rate for a venue (inclusive, like the platform rate).
+async function getVenueTaxRate(venueId) {
+  if (!venueId) return 0;
+  const { rows } = await pool.query(
+    `select venue_tax_rate from venues where id = $1`,
+    [venueId]
+  );
+  return rows.length ? Math.max(0, Number(rows[0].venue_tax_rate) || 0) : 0;
+}
+
+const DEFAULT_BANK_DETAILS = { bank: '', account_name: '', account_number: '', branch: '' };
+
+// Platform bank account details shown in owner onboarding/renewal emails.
+async function getBankDetails() {
+  const value = await readConfig('bank_details', DEFAULT_BANK_DETAILS);
+  if (value && typeof value === 'object') return value;
+  try {
+    return JSON.parse(String(value)) || DEFAULT_BANK_DETAILS;
+  } catch {
+    return DEFAULT_BANK_DETAILS;
+  }
+}
+
 async function getBrandName() {
   return String(await readConfig('brand_name', 'MySlot.LK'));
 }
@@ -90,8 +113,30 @@ function applyTax(base, rate) {
   return { base, rate, tax, total: base + tax };
 }
 
+// Inclusive tax split (ADR-0021): the listed price is the total the player
+// pays, and the Platform Tax and Venue Tax are carved out of it. Half-up
+// rounding; base + platformTax + venueTax always exactly equals total. When
+// the combined rates would exceed 100% they are scaled down together so the
+// split never taxes more than the price itself.
+function applyInclusiveTax(total, platformRate, venueRate) {
+  const pRate = Math.max(0, Math.min(100, Number(platformRate) || 0));
+  const vRate = Math.max(0, Math.min(100, Number(venueRate) || 0));
+  const combined = pRate + vRate;
+  const scale = combined > 100 ? 100 / combined : 1;
+  const platformTax = halfUp(total * pRate * scale / 100);
+  const venueTax = Math.min(halfUp(total * vRate * scale / 100), total - platformTax);
+  return {
+    total,
+    base: total - platformTax - venueTax,
+    platformRate: pRate,
+    platformTax,
+    venueRate: vRate,
+    venueTax
+  };
+}
+
 // Persist a new value with validation + audit trail. Admin only.
-const EXTRA_CONFIG_KEYS = ['tax_rate', 'brand_name'];
+const EXTRA_CONFIG_KEYS = ['tax_rate', 'brand_name', 'bank_details'];
 
 async function setConfig(key, value, adminId) {
   const def = FLAG_DEFS[key];
@@ -121,6 +166,22 @@ async function setConfig(key, value, adminId) {
       throw Object.assign(new Error('brand_name must be 40 characters or fewer'), { code: 'INVALID_VALUE' });
     }
     parsed = trimmed;
+  } else if (key === 'bank_details') {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      throw Object.assign(new Error('bank_details must be an object'), { code: 'INVALID_VALUE' });
+    }
+    const allowed = ['bank', 'account_name', 'account_number', 'branch'];
+    parsed = {};
+    for (const field of allowed) {
+      const raw = value[field];
+      if (raw === undefined || raw === null) {
+        parsed[field] = '';
+      } else if (typeof raw !== 'string' || raw.length > 120) {
+        throw Object.assign(new Error(`bank_details.${field} must be a string of 120 characters or fewer`), { code: 'INVALID_VALUE' });
+      } else {
+        parsed[field] = raw;
+      }
+    }
   } else if (def.type === 'boolean') {
     if (value === true || value === 'true') parsed = true;
     else if (value === false || value === 'false') parsed = false;
@@ -160,7 +221,10 @@ module.exports = {
   getFlag,
   getFlags,
   getTaxRate,
+  getVenueTaxRate,
+  getBankDetails,
   getBrandName,
   applyTax,
+  applyInclusiveTax,
   setConfig
 };

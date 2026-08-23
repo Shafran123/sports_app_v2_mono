@@ -1,6 +1,6 @@
 # 0018 — Tax: configurable exclusive rate, snapshotted server-side, excluded from revenue
 
-- **Status:** accepted
+- **Status:** superseded by 0021 (inclusive pricing + per-venue rate)
 - **Date:** 2026-08-22
 
 ## Context

@@ -21,7 +21,7 @@ const BOOKING_BILL_SELECT = `
   where b.id = $1`;
 
 const REGISTRATION_BILL_SELECT = `
-  select r.id, r.tax_rate, r.tax_amount, r.status, e.name as event_name,
+  select r.id, r.tax_rate, r.tax_amount, r.venue_tax_rate, r.venue_tax_amount, r.status, e.name as event_name,
          e.start_at as event_start, e.end_at as event_end, e.city as event_city,
          u.name as player_name, u.email as player_email, u.phone as player_phone,
          (select p.amount from payments p where p.event_registration_id = r.id order by p.created_at desc limit 1) as amount
@@ -55,10 +55,13 @@ function collectPdf(doc) {
   });
 }
 
-function taxLine(rate, tax) {
-  return rate > 0
-    ? { label: 'Tax', value: fmtLkr(tax) }
-    : { label: 'Tax', value: 'Not applicable' };
+function taxLines(rate, tax, venueRate, venueTax) {
+  const lines = [];
+  if (rate > 0) lines.push({ label: 'Platform tax', value: fmtLkr(tax) });
+  else lines.push({ label: 'Platform tax', value: 'Not applicable' });
+  if (venueRate > 0) lines.push({ label: 'Venue tax', value: fmtLkr(venueTax) });
+  else lines.push({ label: 'Venue tax', value: 'Not applicable' });
+  return lines;
 }
 
 function tableRow(doc, left, right, bold = false, width = null) {
@@ -107,10 +110,11 @@ async function renderBookingPdf(booking) {
 
   doc.moveDown(1.5);
 
-  const base = Number(booking.total_price || 0) - Number(booking.tax_amount || 0);
-  const line = taxLine(booking.tax_rate || 0, booking.tax_amount || 0);
+  const base = Number(booking.total_price || 0) - Number(booking.tax_amount || 0) - Number(booking.venue_tax_amount || 0);
   tableRow(doc, 'Base', fmtLkr(base));
-  tableRow(doc, line.label, line.value);
+  for (const line of taxLines(booking.tax_rate || 0, booking.tax_amount || 0, booking.venue_tax_rate || 0, booking.venue_tax_amount || 0)) {
+    tableRow(doc, line.label, line.value);
+  }
   tableRow(doc, 'Total', fmtLkr(booking.total_price), true);
   doc.moveDown(2);
 
@@ -136,10 +140,11 @@ async function renderRegistrationPdf(reg) {
   doc.moveDown(1.5);
 
   const amount = Number(reg.amount || 0);
-  const base = amount - Number(reg.tax_amount || 0);
-  const line = taxLine(reg.tax_rate || 0, reg.tax_amount || 0);
+  const base = amount - Number(reg.tax_amount || 0) - Number(reg.venue_tax_amount || 0);
   tableRow(doc, 'Base', fmtLkr(base));
-  tableRow(doc, line.label, line.value);
+  for (const line of taxLines(reg.tax_rate || 0, reg.tax_amount || 0, reg.venue_tax_rate || 0, reg.venue_tax_amount || 0)) {
+    tableRow(doc, line.label, line.value);
+  }
   tableRow(doc, 'Total', fmtLkr(amount), true);
   doc.moveDown(1);
 

@@ -7,7 +7,7 @@ const { stripBookingSecrets, stripBookingSecretsList } = require('../utils/scrub
 const cancellationService = require('../services/cancellation');
 const { mintQrToken } = require('../utils/tokens');
 const billService = require('../utils/billService');
-const { getTaxRate } = require('../utils/featureFlags');
+const { getTaxRate, applyInclusiveTax } = require('../utils/featureFlags');
 
 async function verifyOwnership(client, venueId, userId) {
   const { rows } = await client.query(
@@ -265,34 +265,72 @@ exports.deleteBlock = async (req, res) => {
 
 exports.listBookings = async (req, res) => {
   try {
-    const { date } = req.query;
+    const { date, date_from, date_to, status, venue_id, sport, page = 1, limit = 20 } = req.query;
 
-    let rangeCondition = '';
+    const conditions = [`v.owner_id = $1`];
     const values = [req.user.id];
+    let index = 2;
 
     if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
-      rangeCondition = `and b.start_at >= $2 and b.start_at < $3`;
+      conditions.push(`b.start_at >= $${index++} and b.start_at < $${index++}`);
       values.push(`${date}T00:00:00+05:30`, `${date}T23:59:59+05:30`);
+    } else {
+      if (date_from && /^\d{4}-\d{2}-\d{2}$/.test(date_from)) {
+        conditions.push(`b.start_at >= $${index++}`);
+        values.push(`${date_from}T00:00:00+05:30`);
+      }
+      if (date_to && /^\d{4}-\d{2}-\d{2}$/.test(date_to)) {
+        conditions.push(`b.start_at < $${index++}`);
+        values.push(`${date_to}T23:59:59+05:30`);
+      }
+    }
+    if (status && /^[a-z_]+$/.test(status)) {
+      conditions.push(`b.status = $${index++}`);
+      values.push(status);
+    }
+    if (venue_id && /^[0-9a-f-]{36}$/.test(venue_id)) {
+      conditions.push(`v.id = $${index++}`);
+      values.push(venue_id);
+    }
+    if (sport && /^[a-z0-9-]+$/.test(sport)) {
+      conditions.push(`exists (select 1 from sports sp where sp.id = c.sport_id and sp.slug = $${index++})`);
+      values.push(sport);
     }
 
-    const { rows } = await pool.query(
-      `select b.*, c.name as court_name, v.name as venue_name, u.name as player_name, u.phone as player_phone,
-              (select p.status from payments p where p.booking_id = b.id and p.payment_method = 'cash' order by p.created_at desc limit 1) as cash_payment_status,
-              (select p.paid_at from payments p where p.booking_id = b.id and p.payment_method = 'cash' order by p.created_at desc limit 1) as paid_at
-       from bookings b
-       join courts c on c.id = b.court_id
-       join venues v on v.id = c.venue_id
-       join users u on u.id = b.user_id
-       where v.owner_id = $1 ${rangeCondition}
-       order by b.start_at`,
-      values
-    );
+    const where = conditions.join(' and ');
+    const offset = (Number(page) - 1) * Number(limit);
+
+    const [{ rows }, { rows: countRows }] = await Promise.all([
+      pool.query(
+        `select b.*, c.name as court_name, v.name as venue_name, s.name as sport,
+                u.name as player_name, u.phone as player_phone,
+                (select p.status from payments p where p.booking_id = b.id and p.payment_method = 'cash' order by p.created_at desc limit 1) as cash_payment_status,
+                (select p.paid_at from payments p where p.booking_id = b.id and p.payment_method = 'cash' order by p.created_at desc limit 1) as paid_at
+         from bookings b
+         join courts c on c.id = b.court_id
+         join venues v on v.id = c.venue_id
+         left join sports s on s.id = c.sport_id
+         left join users u on u.id = b.user_id
+         where ${where}
+         order by b.start_at desc
+         limit $${index++} offset $${index}`,
+        [...values, Number(limit), offset]
+      ),
+      pool.query(
+        `select count(*)::int as total
+         from bookings b
+         join courts c on c.id = b.court_id
+         join venues v on v.id = c.venue_id
+         where ${where}`,
+        values
+      )
+    ]);
 
     // The QR token is disclosed only through the scan flow (where the venue
     // presents the token it just scanned) — never through list/read APIs.
     stripBookingSecretsList(rows);
 
-    ok(res, 200, rows);
+    ok(res, 200, rows, { page: Number(page), limit: Number(limit), total: countRows[0].total });
   } catch (error) {
     logger.error(`Error listing business bookings: ${error.message}`);
     fail(res, 500, 'INTERNAL_SERVER_ERROR', 'Something went wrong');
@@ -418,10 +456,10 @@ exports.markPaid = async (req, res) => {
     }
 
     const { rows: inserted } = await pool.query(
-      `insert into payments (user_id, booking_id, amount, tax_rate, tax_amount, currency, status, payment_method, paid_at)
-       values ($1, $2, $3, $4, $5, 'LKR', 'paid', 'cash', now())
+      `insert into payments (user_id, booking_id, amount, tax_rate, tax_amount, venue_tax_rate, venue_tax_amount, currency, status, payment_method, paid_at)
+       values ($1, $2, $3, $4, $5, $6, $7, 'LKR', 'paid', 'cash', now())
        returning *`,
-      [booking.user_id, booking.id, booking.total_price, booking.tax_rate, booking.tax_amount]
+      [booking.user_id, booking.id, booking.total_price, booking.tax_rate, booking.tax_amount, booking.venue_tax_rate, booking.venue_tax_amount]
     );
 
     await publishBookingEvent('booking.marked_paid', booking.id);
@@ -430,6 +468,110 @@ exports.markPaid = async (req, res) => {
     ok(res, 200, inserted[0]);
   } catch (error) {
     logger.error(`Error marking booking paid: ${error.message}`);
+    fail(res, 500, 'INTERNAL_SERVER_ERROR', 'Something went wrong');
+  }
+};
+
+const OWNER_RANGES = { 7: 7, 30: 30, 90: 90 };
+
+// Same window definition as the admin reports: paid payments from `days`
+// days ago (Asia/Colombo boundaries, no DST) forward.
+function ownerWindowStart(days) {
+  const d = new Date(Date.now() + (5 * 60 + 30) * 60 * 1000);
+  const iso = d.toISOString().slice(0, 10);
+  const start = new Date(`${iso}T00:00:00+05:30`);
+  start.setUTCDate(start.getUTCDate() - (days - 1));
+  return start.toISOString();
+}
+
+// Owner-scoped reports for the dashboard charts: time series, by-sport,
+// by-venue and payment split for the owner's venues (optionally one venue).
+exports.reports = async (req, res) => {
+  try {
+    const range = OWNER_RANGES[String(req.query.range || '7')] || 7;
+    const since = ownerWindowStart(range);
+    const venueId = req.query.venue_id && /^[0-9a-f-]{36}$/.test(req.query.venue_id) ? req.query.venue_id : null;
+
+    const params = [since, req.user.id];
+    const venueCond = venueId ? `and v.id = $3` : '';
+    if (venueId) params.push(venueId);
+
+    const { rows: series } = await pool.query(
+      `select to_char((p.paid_at at time zone 'Asia/Colombo')::date, 'YYYY-MM-DD') as day,
+              count(distinct p.booking_id)::int as bookings,
+              coalesce(sum(p.amount - p.tax_amount - p.venue_tax_amount), 0)::int as revenue,
+              coalesce(sum(p.tax_amount), 0)::int as tax,
+              coalesce(sum(p.venue_tax_amount), 0)::int as venue_tax
+       from payments p
+       join bookings b on b.id = p.booking_id
+       join courts c on c.id = b.court_id
+       join venues v on v.id = c.venue_id
+       where p.status = 'paid' and p.paid_at >= $1 and v.owner_id = $2 ${venueCond}
+       group by day
+       order by day`,
+      params
+    );
+
+    const { rows: bySport } = await pool.query(
+      `select s.slug, s.name, count(distinct b.id)::int as bookings,
+              coalesce(sum(p.amount - p.tax_amount - p.venue_tax_amount), 0)::int as revenue
+       from payments p
+       join bookings b on b.id = p.booking_id
+       join courts c on c.id = b.court_id
+       join venues v on v.id = c.venue_id
+       left join sports s on s.id = c.sport_id
+       where p.status = 'paid' and p.paid_at >= $1 and v.owner_id = $2 ${venueCond}
+       group by s.slug, s.name
+       order by revenue desc`,
+      params
+    );
+
+    const { rows: byVenue } = await pool.query(
+      `select v.id, v.name, count(distinct b.id)::int as bookings,
+              coalesce(sum(p.amount - p.tax_amount - p.venue_tax_amount), 0)::int as revenue
+       from payments p
+       join bookings b on b.id = p.booking_id
+       join courts c on c.id = b.court_id
+       join venues v on v.id = c.venue_id
+       where p.status = 'paid' and p.paid_at >= $1 and v.owner_id = $2 ${venueCond}
+       group by v.id, v.name
+       order by revenue desc`,
+      params
+    );
+
+    const { rows: split } = await pool.query(
+      `select p.payment_method,
+              count(distinct b.id)::int as bookings,
+              coalesce(sum(p.amount - p.tax_amount - p.venue_tax_amount), 0)::int as revenue
+       from payments p
+       join bookings b on b.id = p.booking_id
+       join courts c on c.id = b.court_id
+       join venues v on v.id = c.venue_id
+       where p.status = 'paid' and p.paid_at >= $1 and v.owner_id = $2 ${venueCond}
+       group by p.payment_method`,
+      params
+    );
+
+    const { rows: events } = await pool.query(
+      `select count(*) filter (where r.status in ('paid', 'pending'))::int as registrations,
+              coalesce(sum(p.amount - p.tax_amount - p.venue_tax_amount) filter (where p.status = 'paid'), 0)::int as revenue
+       from event_registrations r
+       left join payments p on p.event_registration_id = r.id
+       join events e on e.id = r.event_id
+       where e.organizer_id = $1 and r.created_at >= $2`,
+      [req.user.id, since]
+    );
+
+    ok(res, 200, {
+      range,
+      series,
+      by_sport: bySport,
+      by_venue: byVenue,
+      payment_split: { online: split.find((s) => s.payment_method === 'online') || { bookings: 0, revenue: 0 }, cash: split.find((s) => s.payment_method === 'cash') || { bookings: 0, revenue: 0 } },
+      events: events[0] ? { registrations: events[0].registrations, revenue: events[0].revenue } : { registrations: 0, revenue: 0 }
+    });
+  } catch (error) {
+    logger.error(`Error fetching owner reports: ${error.message}`);
     fail(res, 500, 'INTERNAL_SERVER_ERROR', 'Something went wrong');
   }
 };
@@ -597,7 +739,7 @@ exports.createManualBooking = async (req, res) => {
     }
 
     const { rows: courtRows } = await client.query(
-      `select c.*, v.owner_id from courts c join venues v on v.id = c.venue_id where c.id = $1`,
+      `select c.*, v.owner_id, v.venue_tax_rate from courts c join venues v on v.id = c.venue_id where c.id = $1`,
       [court_id]
     );
     if (courtRows.length === 0) {
@@ -611,18 +753,18 @@ exports.createManualBooking = async (req, res) => {
     await client.query('begin');
     await client.query('savepoint manual_insert');
     try {
-      // The venue-entered amount is the total the walk-in pays; tax is derived
-      // server-side from it (inclusive math) and snapshotted like any booking.
-      const rate = await getTaxRate();
-      const base = rate > 0 ? Math.ceil((amount * 100) / (100 + rate)) : amount;
-      const tax = amount - base;
+      // The venue-entered amount is the total the walk-in pays; the platform
+      // and venue taxes are derived server-side from it (inclusive math,
+      // ADR-0021) and snapshotted like any booking.
+      const platformRate = await getTaxRate();
+      const split = applyInclusiveTax(amount, platformRate, court.venue_tax_rate || 0);
       const { rows } = await client.query(
-        `insert into bookings (court_id, user_id, start_at, end_at, price_per_slot, total_price, tax_rate, tax_amount, status, payment_method, player_name, player_phone, qr_token, idempotency_key)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, 'confirmed', 'cash', $9, $10, $11, $12)
+        `insert into bookings (court_id, user_id, start_at, end_at, price_per_slot, total_price, tax_rate, tax_amount, venue_tax_rate, venue_tax_amount, status, payment_method, player_name, player_phone, qr_token, idempotency_key)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'confirmed', 'cash', $11, $12, $13, $14)
          returning *`,
         [
           court_id, req.user.id, start_at, end_at,
-          court.price_per_slot, amount, rate, tax, player_name || null, player_phone || null,
+          court.price_per_slot, amount, split.platformRate, split.platformTax, split.venueRate, split.venueTax, player_name || null, player_phone || null,
           mintQrToken(),
           `manual-${Math.random().toString(36).slice(2)}`
         ]

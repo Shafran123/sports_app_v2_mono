@@ -26,7 +26,7 @@ export function FrontDeskPage() {
   });
 
   const todayBookings = useMemo(() => {
-    const list = bookingsQuery.data ?? [];
+    const list = bookingsQuery.data?.data ?? [];
     return [...list].sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime());
   }, [bookingsQuery.data]);
 

@@ -1,6 +1,7 @@
 const request = require('supertest');
 const { SignJWT } = require('jose');
 const app = require('../app');
+const pool = require('../db');
 
 const secret = new TextEncoder().encode('test-secret');
 const tokenFor = (uid, email) =>
@@ -27,6 +28,14 @@ describe('venue onboarding', () => {
     newOwnerToken = await tokenFor('fresh-owner-uid', 'fresh@spots.lk');
     adminToken = await tokenFor('demo-admin-uid');
     playerToken = await tokenFor('demo-player-uid');
+
+    // 'fresh-owner-uid' is a provisioned owner (ADR-0022) — role venue_owner
+    // from account creation, onboarding accepted before venue creation.
+    await pool.query(
+      `insert into users (firebase_uid, email, name, role, status, onboarding_state)
+       values ('fresh-owner-uid', 'fresh@spots.lk', 'Fresh Owner', 'venue_owner', 'active', 'accepted')
+       on conflict (firebase_uid) do update set onboarding_state = 'accepted'`
+    );
   });
 
   it('owner can submit a venue and it starts pending', async () => {
@@ -47,13 +56,13 @@ describe('venue onboarding', () => {
     expect(res.body.data).toEqual([]);
   });
 
-  it('a player can submit a venue (that is how one becomes an owner)', async () => {
+  it('a player can no longer submit a venue (self-submit is deprecated, ADR-0022)', async () => {
     const res = await request(app)
       .post('/api/v1/venues')
       .set('Authorization', `Bearer ${playerToken}`)
       .send({ ...validVenue, name: 'Player To Owner Club' });
-    expect(res.status).toBe(201);
-    expect(res.body.data.status).toBe('pending');
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('ONBOARDING_REQUIRED');
   });
 
   it('rejects a venue submission without courts', async () => {
@@ -82,7 +91,7 @@ describe('venue onboarding', () => {
     expect(res.body.data.map((v) => v.name)).toContain('Test Racket Club');
   });
 
-  it('admin approves a venue and the owner becomes venue_owner', async () => {
+  it('admin approves a provisioned owner venue and it becomes visible', async () => {
     const submitted = await request(app)
       .post('/api/v1/venues')
       .set('Authorization', `Bearer ${newOwnerToken}`)

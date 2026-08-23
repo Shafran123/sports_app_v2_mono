@@ -72,6 +72,12 @@ describe('admin venue lifecycle', () => {
   it('banning an owner revokes console access and unbookables their venues', async () => {
     // Use a dedicated owner so the ban doesn't poison demo-owner for other files.
     const BAN_OWNER_TOKEN = await tokenFor('ban-owner-uid');
+    // The ban target is a provisioned owner (ADR-0022) — already onboarded.
+    await pool.query(
+      `insert into users (firebase_uid, email, name, role, status, onboarding_state)
+       values ('ban-owner-uid', 'ban-owner@example.com', 'Ban Owner', 'venue_owner', 'active', 'accepted')
+       on conflict (firebase_uid) do update set onboarding_state = 'accepted'`
+    );
     const id = await createVenue('Ban Venue', BAN_OWNER_TOKEN);
     const secondId = await createVenue('Ban Venue 2', BAN_OWNER_TOKEN);
     await request(app).post(`/api/v1/admin/venues/${id}/approve`).set('Authorization', `Bearer ${ADMIN_TOKEN}`);

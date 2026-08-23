@@ -46,7 +46,9 @@ export const UserSchema = z.object({
   phone: z.string().nullable(),
   city: z.string().nullable(),
   role: ROLE,
-  phone_verified_at: z.string().nullable()
+  phone_verified_at: z.string().nullable(),
+  onboarding_state: z.enum(["pending", "accepted", "grandfathered"]).optional(),
+  must_change_password: z.boolean().optional()
 });
 export type User = z.infer<typeof UserSchema>;
 
@@ -77,6 +79,7 @@ export const VenueSchema = z.object({
   min_price: z.number().nullable().optional(),
   max_price: z.number().nullable().optional(),
   accepts_cash: z.boolean().optional(),
+  venue_tax_rate: z.number().optional(),
   sports: z.array(z.string()).optional()
 });
 export type Venue = z.infer<typeof VenueSchema>;
@@ -146,6 +149,8 @@ export const BookingSchema = z.object({
   total_price: z.number(),
   tax_rate: z.number().optional(),
   tax_amount: z.number().optional(),
+  venue_tax_rate: z.number().optional(),
+  venue_tax_amount: z.number().optional(),
   status: BOOKING_STATUS,
   payment_method: z.string().nullable().optional(),
   player_name: z.string().nullable().optional(),
@@ -312,7 +317,8 @@ export type FeatureFlags = z.infer<typeof FeatureFlagsSchema>;
 export const AdminConfigSchema = z.object({
   flags: z.array(FeatureFlagDefSchema),
   tax_rate: z.number(),
-  brand_name: z.string()
+  brand_name: z.string(),
+  bank_details: z.record(z.string(), z.string()).optional()
 });
 export type AdminConfig = z.infer<typeof AdminConfigSchema>;
 
@@ -334,7 +340,8 @@ export const AdminReportsSchema = z.object({
       day: z.string(),
       bookings: z.number(),
       revenue: z.number(),
-      tax: z.number()
+      tax: z.number(),
+      venue_tax: z.number().optional()
     })
   ),
   by_sport: z.array(
@@ -359,6 +366,123 @@ export const AdminReportsSchema = z.object({
   events: z.object({ registrations: z.number(), revenue: z.number() })
 });
 export type AdminReports = z.infer<typeof AdminReportsSchema>;
+
+export const OwnerReportsSchema = AdminReportsSchema.extend({
+  by_venue: z.array(
+    z.object({
+      id: z.string().optional(),
+      name: z.string(),
+      bookings: z.number(),
+      revenue: z.number()
+    })
+  )
+});
+export type OwnerReports = z.infer<typeof OwnerReportsSchema>;
+
+/* ---------- Owner onboarding ---------- */
+
+export const OwnerLeadSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  email: z.string(),
+  phone: z.string().nullable(),
+  venue_name: z.string().nullable(),
+  city: z.string().nullable(),
+  message: z.string().nullable(),
+  status: z.enum(["new", "contacted", "converted", "closed"]),
+  admin_notes: z.string().nullable().optional(),
+  created_at: z.string(),
+  is_duplicate: z.boolean().optional()
+});
+export type OwnerLead = z.infer<typeof OwnerLeadSchema>;
+
+export const OwnerPlanTemplateSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  term_days: z.number(),
+  price_lkr: z.number(),
+  is_archived: z.boolean(),
+  created_at: z.string().optional()
+});
+export type OwnerPlanTemplate = z.infer<typeof OwnerPlanTemplateSchema>;
+
+export const OwnerPlanSchema = z.object({
+  id: z.string(),
+  owner_id: z.string().optional(),
+  name: z.string(),
+  term_days: z.number(),
+  price_lkr: z.number(),
+  start_date: z.string(),
+  end_date: z.string(),
+  created_at: z.string().optional()
+});
+export type OwnerPlan = z.infer<typeof OwnerPlanSchema>;
+
+export const OwnerAgreementSchema = z.object({
+  id: z.string(),
+  owner_id: z.string().optional(),
+  plan_id: z.string().nullable().optional(),
+  title: z.string(),
+  body: z.string(),
+  status: z.enum(["pending", "accepted", "declined"]),
+  accepted_at: z.string().nullable().optional(),
+  created_at: z.string().optional(),
+  plan_name: z.string().nullable().optional(),
+  plan_term_days: z.number().nullable().optional(),
+  plan_price_lkr: z.number().nullable().optional(),
+  plan_start: z.string().nullable().optional(),
+  plan_end: z.string().nullable().optional()
+});
+export type OwnerAgreement = z.infer<typeof OwnerAgreementSchema>;
+
+export const OwnerListItemSchema = z.object({
+  id: z.string(),
+  name: z.string().nullable(),
+  email: z.string().nullable(),
+  phone: z.string().nullable(),
+  onboarding_state: z.enum(["pending", "accepted", "grandfathered"]),
+  created_at: z.string(),
+  plan_id: z.string().nullable().optional(),
+  plan_name: z.string().nullable().optional(),
+  plan_term_days: z.number().nullable().optional(),
+  plan_price_lkr: z.number().nullable().optional(),
+  plan_start: z.string().nullable().optional(),
+  plan_end: z.string().nullable().optional(),
+  agreement_id: z.string().nullable().optional(),
+  agreement_status: z.string().nullable().optional(),
+  agreement_accepted_at: z.string().nullable().optional(),
+  venue_count: z.number().optional()
+});
+export type OwnerListItem = z.infer<typeof OwnerListItemSchema>;
+
+export const OwnerPlanEnvelopeSchema = z.object({
+  plans: z.array(OwnerPlanSchema),
+  agreements: z.array(OwnerAgreementSchema),
+  bank_details: z.record(z.string(), z.string()).optional()
+});
+export type OwnerPlanEnvelope = z.infer<typeof OwnerPlanEnvelopeSchema>;
+
+export const OwnerCreateResultSchema = z.object({
+  owner: z.object({
+    id: z.string(),
+    name: z.string().nullable(),
+    email: z.string(),
+    role: ROLE,
+    onboarding_state: z.string()
+  }),
+  plan: OwnerPlanSchema,
+  agreement: OwnerAgreementSchema
+});
+export type OwnerCreateResult = z.infer<typeof OwnerCreateResultSchema>;
+
+export const OwnerRenewResultSchema = z.object({
+  plan: OwnerPlanSchema,
+  agreement: OwnerAgreementSchema
+});
+export type OwnerRenewResult = z.infer<typeof OwnerRenewResultSchema>;
+
+export const NudgeResultSchema = z.object({ nudged: z.boolean() });
+export type NudgeResult = z.infer<typeof NudgeResultSchema>;
 
 /* ---------- Overviews ---------- */
 

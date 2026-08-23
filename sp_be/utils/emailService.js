@@ -137,17 +137,23 @@ async function notifyBookingConfirmed(booking, userEmail) {
   return sendEmail({ to: userEmail, subject: `Booking confirmed — ${booking.venue_name || 'your slot'}`, html: buildBookingHtml(booking) });
 }
 
+function taxLine(rate, tax, venueRate, venueTax) {
+  const lines = [];
+  lines.push(Number(rate || 0) > 0 ? `Platform tax: ${fmtLkr(tax || 0)}` : 'Platform tax: Not applicable');
+  lines.push(Number(venueRate || 0) > 0 ? `Venue tax: ${fmtLkr(venueTax || 0)}` : 'Venue tax: Not applicable');
+  return lines.join('<br>');
+}
+
 function buildBillHtml(booking) {
   const venueName = escapeHtml(booking.venue_name || '');
   const courtName = escapeHtml(booking.court_name || '');
-  const line = Number(booking.tax_rate || 0) > 0 ? `Tax: ${fmtLkr(booking.tax_amount || 0)}` : 'Tax: Not applicable';
   return shell(`
     <h2 style="color:#176036;">Your bill — ${venueName}</h2>
     <div style="background:#f0fdf4;padding:16px;border-radius:12px;border:1px solid #22c55e;">
       <p><strong>${venueName || 'Venue'}</strong> — ${courtName}</p>
       <p><strong>Time:</strong> ${fmtWhen(booking.start_at)} — ${fmtWhen(booking.end_at)}</p>
-      <p><strong>Base:</strong> ${fmtLkr(Number(booking.total_price || 0) - Number(booking.tax_amount || 0))}</p>
-      <p><strong>${line}</strong></p>
+      <p><strong>Base:</strong> ${fmtLkr(Number(booking.total_price || 0) - Number(booking.tax_amount || 0) - Number(booking.venue_tax_amount || 0))}</p>
+      <p><strong>${taxLine(booking.tax_rate, booking.tax_amount, booking.venue_tax_rate, booking.venue_tax_amount)}</strong></p>
       <p><strong>Total:</strong> ${fmtLkr(booking.total_price)}</p>
       <p><strong>Payment:</strong> ${booking.payment_method === 'cash' ? 'Pay at venue' : 'Paid online'} — ${escapeHtml(booking.status || '')}</p>
     </div>
@@ -156,15 +162,14 @@ function buildBillHtml(booking) {
 
 function buildRegistrationBillHtml(reg) {
   const eventName = escapeHtml(reg.event_name || '');
-  const line = Number(reg.tax_rate || 0) > 0 ? `Tax: ${fmtLkr(reg.tax_amount || 0)}` : 'Tax: Not applicable';
   const amount = Number(reg.amount || 0);
   return shell(`
     <h2 style="color:#176036;">Your bill — ${eventName}</h2>
     <div style="background:#f0fdf4;padding:16px;border-radius:12px;border:1px solid #22c55e;">
       <p><strong>Event:</strong> ${eventName}</p>
       <p><strong>When:</strong> ${fmtWhen(reg.event_start)}</p>
-      <p><strong>Base:</strong> ${fmtLkr(amount - Number(reg.tax_amount || 0))}</p>
-      <p><strong>${line}</strong></p>
+      <p><strong>Base:</strong> ${fmtLkr(amount - Number(reg.tax_amount || 0) - Number(reg.venue_tax_amount || 0))}</p>
+      <p><strong>${taxLine(reg.tax_rate, reg.tax_amount, reg.venue_tax_rate, reg.venue_tax_amount)}</strong></p>
       <p><strong>Total:</strong> ${fmtLkr(amount)}</p>
       <p><strong>Status:</strong> ${escapeHtml(reg.status || '')}</p>
     </div>
@@ -189,6 +194,104 @@ async function notifyVenueRejected(venue, ownerEmail, reason) {
   return sendEmail({ to: ownerEmail, subject: `Update on your venue "${venue.name}"`, html: buildVenueRejectedHtml(venue, reason) });
 }
 
+function bankDetailsHtml(details) {
+  const d = details || {};
+  const parts = [
+    d.bank ? `Bank: ${escapeHtml(d.bank)}` : null,
+    d.account_name ? `Account name: ${escapeHtml(d.account_name)}` : null,
+    d.account_number ? `Account number: ${escapeHtml(d.account_number)}` : null,
+    d.branch ? `Branch: ${escapeHtml(d.branch)}` : null
+  ].filter(Boolean);
+  return parts.length
+    ? `<p style="color:#666;">Payments: ${parts.join(' • ')}</p>`
+    : '';
+}
+
+function buildOwnerWelcomeHtml(owner, temporaryPassword, plan, bankDetails) {
+  const planLine = plan ? `${escapeHtml(plan.name)} — ${plan.price_lkr > 0 ? `LKR ${plan.price_lkr}` : 'Free'} (${plan.start_date} to ${plan.end_date})` : 'No plan attached';
+  return shell(`
+    <h2 style="color:#176036;">Your venue-owner account is ready</h2>
+    <p>Hi ${escapeHtml(owner.name || '')}, your MySlot.LK venue-owner account has been created.</p>
+    <div style="background:#f0fdf4;padding:16px;border-radius:12px;border:1px solid #22c55e;">
+      <p><strong>Sign-in email:</strong> ${escapeHtml(owner.email)}</p>
+      <p><strong>Temporary password:</strong> ${escapeHtml(temporaryPassword)}</p>
+      <p style="color:#666;">You will be asked to change this password on your first sign-in.</p>
+    </div>
+    <p><strong>Plan:</strong> ${planLine}</p>
+    <p style="color:#666;">The Owner Agreement is attached to this email and is also waiting for you in the console — please review it and accept before you start managing venues.</p>
+    ${bankDetailsHtml(bankDetails)}
+    <p style="color:#666;">Sign in at the console to accept your agreement and list your first venue.</p>`);
+}
+
+function buildOwnerRenewalHtml(owner, plan, bankDetails) {
+  return shell(`
+    <h2 style="color:#176036;">Your plan has been renewed</h2>
+    <p>Hi ${escapeHtml(owner.name || '')}, a new plan term has been set up for your account.</p>
+    <div style="background:#f0fdf4;padding:16px;border-radius:12px;border:1px solid #22c55e;">
+      <p><strong>Plan:</strong> ${escapeHtml(plan.name)} — ${plan.price_lkr > 0 ? `LKR ${plan.price_lkr}` : 'Free'} (${plan.start_date} to ${plan.end_date})</p>
+    </div>
+    <p style="color:#666;">A new Owner Agreement is attached and waiting for your acceptance in the console.</p>
+    ${bankDetailsHtml(bankDetails)}
+    <p style="color:#666;">Renewal payment is handled off-platform — see the payment details above.</p>`);
+}
+
+function buildOwnerNudgeHtml(owner, plan, bankDetails) {
+  const daysLeft = plan && plan.end_date
+    ? Math.max(0, Math.ceil((new Date(`${plan.end_date}T23:59:59+05:30`) - new Date()) / (24 * 3600 * 1000)))
+    : null;
+  return shell(`
+    <h2 style="color:#b45309;">Your plan is ending soon</h2>
+    <p>Hi ${escapeHtml(owner.name || '')}, your current plan${plan ? ` (${escapeHtml(plan.name)})` : ''}${daysLeft !== null ? ` ends on ${escapeHtml(plan.end_date)} (${daysLeft} day${daysLeft === 1 ? '' : 's'})` : ' is ending'}. Reach out to the platform team to renew.</p>
+    ${bankDetailsHtml(bankDetails)}
+    <p style="color:#666;">Your venue stays live while you sort out the renewal.</p>`);
+}
+
+async function notifyOwnerWelcome(owner, temporaryPassword, plan, agreement, bankDetails) {
+  let attachment;
+  if (agreement) {
+    try {
+      const { renderAgreementPdf } = require('./agreementService');
+      const pdf = await renderAgreementPdf(agreement, plan);
+      attachment = { filename: `owner-agreement-${owner.email.split('@')[0]}.pdf`, content: pdf, contentType: 'application/pdf' };
+    } catch (err) {
+      logger.error(`Agreement PDF failed: ${err.message}`);
+    }
+  }
+  return sendEmail({
+    to: owner.email,
+    subject: 'Your venue-owner account is ready',
+    html: buildOwnerWelcomeHtml(owner, temporaryPassword, plan, bankDetails),
+    attachment
+  });
+}
+
+async function notifyOwnerRenewal(owner, plan, agreement, bankDetails) {
+  let attachment;
+  if (agreement) {
+    try {
+      const { renderAgreementPdf } = require('./agreementService');
+      const pdf = await renderAgreementPdf(agreement, plan);
+      attachment = { filename: `owner-agreement-${owner.email.split('@')[0]}.pdf`, content: pdf, contentType: 'application/pdf' };
+    } catch (err) {
+      logger.error(`Agreement PDF failed: ${err.message}`);
+    }
+  }
+  return sendEmail({
+    to: owner.email,
+    subject: 'Your plan has been renewed',
+    html: buildOwnerRenewalHtml(owner, plan, bankDetails),
+    attachment
+  });
+}
+
+async function notifyOwnerNudge(owner, plan, bankDetails) {
+  return sendEmail({
+    to: owner.email,
+    subject: 'Your plan is ending soon',
+    html: buildOwnerNudgeHtml(owner, plan, bankDetails)
+  });
+}
+
 module.exports = {
   sendEmail,
   notifyBookingConfirmed,
@@ -196,6 +299,9 @@ module.exports = {
   notifySignupWelcome,
   notifyVenueApproved,
   notifyVenueRejected,
+  notifyOwnerWelcome,
+  notifyOwnerRenewal,
+  notifyOwnerNudge,
   escapeHtml,
   buildBookingHtml,
   buildBillHtml,

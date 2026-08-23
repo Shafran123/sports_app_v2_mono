@@ -1,12 +1,12 @@
 const pool = require('../db');
 const { ok, fail } = require('../utils/response');
 const logger = require('../utils/logger');
-const { listFlagStates, getTaxRate, getBrandName, setConfig } = require('../utils/featureFlags');
+const { listFlagStates, getTaxRate, getBrandName, getBankDetails, setConfig } = require('../utils/featureFlags');
 
 exports.getConfigForAdmin = async (req, res) => {
   try {
-    const [flags, taxRate, brandName] = await Promise.all([listFlagStates(), getTaxRate(), getBrandName()]);
-    ok(res, 200, { flags, tax_rate: taxRate, brand_name: brandName });
+    const [flags, taxRate, brandName, bankDetails] = await Promise.all([listFlagStates(), getTaxRate(), getBrandName(), getBankDetails()]);
+    ok(res, 200, { flags, tax_rate: taxRate, brand_name: brandName, bank_details: bankDetails });
   } catch (error) {
     logger.error(`Error fetching platform config: ${error.message}`);
     fail(res, 500, 'INTERNAL_SERVER_ERROR', 'Something went wrong');
