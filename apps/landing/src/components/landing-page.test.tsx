@@ -60,9 +60,9 @@ describe("LandingPage", () => {
 
   it("renders the real product screenshots in the phone-framed slots", () => {
     renderPage();
-    expect(screen.getByRole("img", { name: /screenshot: player app — find your game/i })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: /screenshot: pick a court, pick a slot/i })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: /screenshot: your booking, qr-ready/i })).toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: /screenshot: player app — find your game/i })).not.toBeInTheDocument();
   });
 
   it("has no photo strip and no social proof sections", () => {
@@ -91,10 +91,10 @@ describe("LandingPage", () => {
     expect(cue).toHaveAttribute("href", "#how-it-works");
   });
 
-  it("renders a transparent desktop header with a filled demo CTA", () => {
+  it("renders a transparent non-sticky header with a filled demo CTA", () => {
     renderPage();
     const header = screen.getByRole("banner");
-    expect(header).not.toHaveClass("bg-surface");
+    expect(header).not.toHaveClass("sticky");
     const desktopCta = within(header).getByRole("link", { name: "List your venue" });
     expect(desktopCta).toHaveClass("bg-primary");
   });

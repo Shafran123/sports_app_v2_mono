@@ -23,7 +23,7 @@ export function Nav() {
   const brand = useBrandName();
 
   return (
-    <header className="sticky top-0 z-40">
+    <header className="z-40">
       <div className="md:hidden bg-primary px-5 py-4">
         <div className="flex items-center justify-between gap-3">
           <Link href="#" className="shrink-0 font-display text-3xl font-extrabold tracking-tight">
