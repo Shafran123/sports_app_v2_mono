@@ -88,7 +88,7 @@ describe("LandingPage", () => {
   it("rotates the one-word headline as the only USP, lead-in + fine print", () => {
     renderPage();
     const h1 = screen.getByRole("heading", { level: 1 });
-    expect(h1).toHaveTextContent(/one platform for/i);
+    expect(h1).toHaveTextContent(/put your venue on/i);
     const rotating = h1.querySelector('[aria-hidden="true"]');
     expect(rotating).toHaveTextContent(/^booked-out$/i);
     expect(rotating.className).toContain("text-primary");
@@ -114,8 +114,10 @@ describe("LandingPage", () => {
     expect(screen.queryByText(/for venue owners/i)).not.toBeInTheDocument();
     const h1 = screen.getByRole("heading", { level: 1 });
     expect(h1).not.toHaveTextContent(/booked-out courts,/i);
-    expect(h1.querySelector('[aria-hidden="true"]')).toHaveTextContent(/booked-out/i);
-    expect(h1.className).toContain("md:text-8xl");
+    const rotating = h1.querySelector('[aria-hidden="true"]');
+    expect(rotating).toHaveTextContent(/booked-out/i);
+    const wordBlock = rotating?.parentElement;
+    expect(wordBlock?.className).toContain("text-5xl");
   });
 
   it("footer lists Contact as a mailto and no player-app link or About link", () => {

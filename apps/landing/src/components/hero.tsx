@@ -11,13 +11,17 @@ export function Hero() {
   return (
     <section className="relative flex min-h-[100svh] flex-col items-center justify-center overflow-hidden border-b border-border bg-paper">
       <TrackSection name="hero" />
-      <div className="mx-auto w-full max-w-5xl px-4 pb-24 pt-20 text-center">
-        <h1
-          className="animate-word-roll font-display text-5xl font-extrabold leading-tight tracking-tight text-ink md:text-8xl"
-          style={{ animationDelay: "0.05s" }}
-        >
-          {copy.hero.headlineLead}{" "}
-          <RotatingHeadline />
+      <div className="mx-auto w-full max-w-5xl px-4 pb-24 pt-0 text-center sm:pt-6">
+        <h1 className="font-display text-ink">
+          <span className="block animate-fade-up text-2xl font-extrabold tracking-tight sm:text-3xl">
+            {copy.hero.headlineLead}
+          </span>
+          <span
+            className="animate-word-roll mt-2 block font-extrabold leading-tight tracking-tight text-5xl sm:text-8xl"
+            style={{ animationDelay: "0.05s" }}
+          >
+            <RotatingHeadline />
+          </span>
         </h1>
         <p className="animate-fade-up mt-4 text-lg text-ink-2" style={{ animationDelay: "0.12s" }}>
           {copy.hero.body}
