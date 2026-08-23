@@ -3,6 +3,7 @@
 import { buttonVariants } from "@myslot/ui";
 import { copy } from "@/lib/copy";
 import { trackCta } from "@/lib/analytics";
+import { RotatingHeadline } from "./rotating-headline";
 import { RotatingUsps } from "./rotating-usps";
 import { ScrollCue } from "./scroll-cue";
 import { TrackSection } from "./track-section";
@@ -19,7 +20,7 @@ export function Hero() {
           className="animate-word-roll mt-2 font-display text-4xl font-extrabold leading-tight tracking-tight text-ink md:text-6xl"
           style={{ animationDelay: "0.05s" }}
         >
-          {copy.hero.headline}
+          {copy.hero.headlinePrefix} <RotatingHeadline />
         </h1>
         <p className="animate-fade-up mt-4 text-lg text-ink-2" style={{ animationDelay: "0.12s" }}>
           {copy.hero.body}

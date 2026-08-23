@@ -63,4 +63,12 @@ describe("landing copy", () => {
       expect(u.length).toBeGreaterThan(0);
     }
   });
+
+  it("declares a rotating headline with a prefix and multiple phrases", () => {
+    expect(copy.hero.headlinePrefix.length).toBeGreaterThan(0);
+    expect(copy.hero.headlineRotations.length).toBeGreaterThanOrEqual(2);
+    const set = new Set(copy.hero.headlineRotations);
+    expect(set.size).toBe(copy.hero.headlineRotations.length);
+    expect(copy.hero.headline).toBe(`${copy.hero.headlinePrefix} ${copy.hero.headlineRotations[0]}`);
+  });
 });

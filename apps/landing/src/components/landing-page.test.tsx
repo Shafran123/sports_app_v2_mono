@@ -78,11 +78,19 @@ describe("LandingPage", () => {
     expect(screen.getByText(/be one of the first venues on it/i)).toBeInTheDocument();
   });
 
-  it("shows the nav only after the hero (nav renders below the hero)", () => {
+  it("renders the nav at the top with the hero headline", () => {
     renderPage();
     const header = screen.getByRole("banner");
     expect(within(header).getByRole("link", { name: "List your venue" })).toHaveAttribute("href", "#inquire");
     expect(screen.getByRole("heading", { name: /booked-out courts, handled for you/i })).toBeInTheDocument();
+  });
+
+  it("rotates the headline word like classpass", () => {
+    renderPage();
+    const h1 = screen.getByRole("heading", { level: 1 });
+    expect(h1).toHaveTextContent(/booked-out courts,/i);
+    expect(h1).toHaveTextContent(/handled for you\./i);
+    expect(h1.querySelector('[aria-hidden="true"]')).toHaveTextContent(/handled for you\./i);
   });
 
   it("renders the scroll cue linking to how it works", () => {

@@ -14,9 +14,8 @@ import { Reveal } from "./reveal";
 export function LandingPage() {
   return (
     <main className="min-h-screen bg-paper text-ink">
-      <Hero />
-
       <Nav />
+      <Hero />
 
       <Reveal>
         <HowItWorks />
