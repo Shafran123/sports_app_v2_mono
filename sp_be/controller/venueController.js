@@ -160,7 +160,12 @@ exports.listVenues = async (req, res) => {
         `select v.id, v.name, v.status, v.description, v.address, v.city, v.lat, v.lng, v.phone,
                 v.photos, v.amenities, v.rules, v.cancellation_policy,
                 coalesce(court_stats.min_price, null) as min_price,
-                coalesce(court_stats.max_price, null) as max_price
+                coalesce(court_stats.max_price, null) as max_price,
+                coalesce((
+                  select jsonb_agg(s.slug order by vs.sport_id)
+                  from venue_sports vs join sports s on s.id = vs.sport_id
+                  where vs.venue_id = v.id
+                ), '[]'::jsonb) as sports
          from venues v
          left join (
            select venue_id, min(price_per_slot) as min_price, max(price_per_slot) as max_price

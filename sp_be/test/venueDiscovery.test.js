@@ -13,6 +13,19 @@ describe('venue discovery', () => {
     expect(res.body.data.every((v) => v.status === 'approved')).toBe(true);
   });
 
+  it('returns sport slugs on every venue for imagery fallback', async () => {
+    const res = await request(app).get('/api/v1/venues?limit=100');
+    expect(res.status).toBe(200);
+    expect(res.body.data.length).toBeGreaterThan(0);
+    for (const venue of res.body.data) {
+      expect(Array.isArray(venue.sports)).toBe(true);
+      expect(venue.sports.every((s) => typeof s === 'string')).toBe(true);
+    }
+    const smash = res.body.data.find((v) => v.name === 'Smash Arena');
+    expect(smash.sports).toContain('badminton');
+    expect(smash.sports).toContain('futsal');
+  });
+
   it('filters by sport slug', async () => {
     const res = await request(app).get('/api/v1/venues?sport=football');
     expect(res.status).toBe(200);
