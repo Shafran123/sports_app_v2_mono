@@ -9,12 +9,12 @@ import { useBrandName } from "@/hooks/use-brand-name";
 function MobileWordmark({ brand }: { brand: string }) {
   const dotIndex = brand.lastIndexOf(".");
   if (dotIndex === -1) {
-    return <span className="text-white">{brand}</span>;
+    return <span className="text-ink">{brand}</span>;
   }
   return (
     <span>
-      <span className="text-white">{brand.slice(0, dotIndex)}</span>
-      <span className="text-white/70">{brand.slice(dotIndex)}</span>
+      <span className="text-ink">{brand.slice(0, dotIndex)}</span>
+      <span className="text-primary">{brand.slice(dotIndex)}</span>
     </span>
   );
 }
@@ -24,7 +24,7 @@ export function Nav() {
 
   return (
     <header className="z-40">
-      <div className="md:hidden bg-primary px-5 py-4">
+      <div className="md:hidden px-5 py-4">
         <div className="flex items-center justify-between gap-3">
           <Link href="#" className="shrink-0 font-display text-3xl font-extrabold tracking-tight">
             <MobileWordmark brand={brand} />

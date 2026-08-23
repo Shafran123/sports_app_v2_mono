@@ -107,9 +107,10 @@ describe("LandingPage", () => {
     expect(desktopCta).toHaveClass("bg-primary");
   });
 
-  it("renders the rotating hero USP line", () => {
+  it("renders the rotating one-word USP line and no venue-owners eyebrow", () => {
     renderPage();
-    const matches = screen.getAllByText(/real-time slot availability for every court/i);
+    expect(screen.queryByText(/for venue owners/i)).not.toBeInTheDocument();
+    const matches = screen.getAllByText(/real-time/i);
     const visible = matches.find((el) => el.closest("p")?.getAttribute("aria-hidden") === "true");
     expect(visible).toBeTruthy();
   });

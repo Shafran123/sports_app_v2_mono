@@ -45,10 +45,10 @@ export function RotatingUsps() {
       <p
         key={index}
         aria-hidden="true"
-        className="animate-fade-up flex items-center justify-center gap-2 text-ink-2 lg:justify-start"
+        className="animate-fade-up flex items-center justify-center gap-2 text-sm font-semibold uppercase tracking-wide text-primary"
       >
-        <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
-        <span className="font-medium">{list[index]}</span>
+        <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-primary" />
+        <span>{list[index]}</span>
       </p>
     </div>
   );

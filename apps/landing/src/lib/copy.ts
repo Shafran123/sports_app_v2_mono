@@ -25,7 +25,6 @@ export const copy = {
     cta: "List your venue"
   },
   hero: {
-    eyebrow: "For venue owners",
     // DRAFT
     headline: "Booked-out courts, handled for you.",
     headlinePrefix: "Booked-out courts,",
@@ -40,14 +39,8 @@ export const copy = {
     primaryCta: "Book a demo with us",
     secondaryCta: "See how it works",
     scrollCue: "See how it works",
-    // DRAFT: rotate the featured USPs; pulled from the feature set
-    usps: [
-      "Real-time slot availability for every court",
-      "One-tap QR check-ins at your front desk",
-      "Payments your way — online or cash",
-      "Events, leagues & clinics that sell out",
-      "Your first 3 months free"
-    ]
+    // DRAFT: one-word USPs that rotate in the hero
+    usps: ["Real-time", "Effortless", "Cashless", "Profitable", "Booked-out"]
   },
   howItWorks: {
     eyebrow: "How it works",
