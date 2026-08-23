@@ -88,7 +88,8 @@ A person who submitted the public "list your place" form, expressing interest in
 _Avoid_: prospect, partner request, enquiry
 
 **Owner Plan**:
-The commercial term attached to a Venue Owner, drawn from an Admin-maintained catalog of plan templates (name, term, price — a price of zero covers "6 months free") and applied to an Owner with a start and an end date. Expiring and expired Plans surface to the Admin so renewal can be chased.
+The commercial term attached to a Venue Owner, drawn from an Admin-maintained catalog of plan templates (name, term, price) and applied to an Owner with a start and an end date. Expiring and expired Plans surface to the Admin so renewal can be chased.
+_Note_: The launch offer is a **3-month free trial** — an Owner Plan template with a zero price and a 3-month term, marketed on the landing page.
 _Avoid_: subscription, contract, pricing tier
 
 **Owner Agreement**:
