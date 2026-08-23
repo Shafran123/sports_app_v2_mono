@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Calendar, Compass, Home, User } from "lucide-react";
-import { cn } from "@spots/utils";
+import { cn } from "@myslot/utils";
 
 const tabs = [
   { href: "/", label: "Home", icon: Home },

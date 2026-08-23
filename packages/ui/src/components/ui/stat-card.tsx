@@ -1,6 +1,6 @@
 import * as React from "react";
 import { TrendingDown, TrendingUp } from "lucide-react";
-import { cn } from "@spots/utils";
+import { cn } from "@myslot/utils";
 import { Card } from "./card";
 
 export function StatCard({

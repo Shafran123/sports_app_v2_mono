@@ -2,7 +2,7 @@
 -- Idempotent development seed data (ON CONFLICT DO NOTHING everywhere).
 
 insert into platform_config (key, value) values
-  ('brand_name', '"Spots"'::jsonb),
+  ('brand_name', '"MySlot.LK"'::jsonb),
   ('hold_minutes', '10'::jsonb),
   ('advance_days', '14'::jsonb),
   ('cancellation_tiers', '[{"hours":24,"refund_pct":100},{"hours":12,"refund_pct":50},{"hours":0,"refund_pct":0}]'::jsonb)
@@ -30,9 +30,9 @@ insert into sports (slug, name, icon) values
 on conflict (slug) do nothing;
 
 insert into users (firebase_uid, email, name, phone, city, role) values
-  ('demo-admin-uid', 'admin@spots.lk', 'Demo Admin', '0700000001', 'Colombo', 'admin'),
-  ('demo-owner-uid', 'owner@spots.lk', 'Demo Owner', '0700000002', 'Colombo', 'venue_owner'),
-  ('demo-player-uid', 'player@spots.lk', 'Demo Player', '0700000003', 'Colombo', 'player')
+  ('demo-admin-uid', 'admin@myslot.lk', 'Demo Admin', '0700000001', 'Colombo', 'admin'),
+  ('demo-owner-uid', 'owner@myslot.lk', 'Demo Owner', '0700000002', 'Colombo', 'venue_owner'),
+  ('demo-player-uid', 'player@myslot.lk', 'Demo Player', '0700000003', 'Colombo', 'player')
 on conflict (firebase_uid) do nothing;
 
 insert into venues (id, owner_id, name, description, address, city, lat, lng, phone, amenities, status)

@@ -13,7 +13,7 @@ vi.mock("@/context/auth", () => ({
   useAuth: () => ({ user: { id: "u1", name: "T", email: "t@spots.app", role: "player" }, loading: false, logout: vi.fn() })
 }));
 
-vi.mock("@spots/api", () => ({
+vi.mock("@myslot/api", () => ({
   bookings: { list: vi.fn(), cancel: vi.fn() },
   toApiFailure: () => ({ status: 0, code: "UNKNOWN", message: "err" })
 }));
@@ -22,7 +22,7 @@ vi.mock("qrcode", () => ({
   toDataURL: vi.fn().mockResolvedValue("data:image/png;base64,xx")
 }));
 
-import { bookings } from "@spots/api";
+import { bookings } from "@myslot/api";
 
 const confirmedBooking = {
   id: "b-123",

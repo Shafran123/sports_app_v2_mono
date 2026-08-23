@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
-  "display": "Spots React Library",
+  "display": "MySlot React Library",
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "jsx": "react-jsx",

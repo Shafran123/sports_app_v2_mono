@@ -5,9 +5,10 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { MapPin, SearchX } from "lucide-react";
-import { events, sports, featureFlags } from "@spots/api";
-import { ActivityCard, Badge, Button, EmptyState, ErrorState, Input, SelectSheet, SkeletonCard } from "@spots/ui";
-import type { Event } from "@spots/types";
+import { events, sports, featureFlags } from "@myslot/api";
+import { ActivityCard, Badge, Button, EmptyState, ErrorState, Input, SelectSheet, SkeletonCard } from "@myslot/ui";
+import { DEFAULT_BRAND_NAME } from "@myslot/utils";
+import type { Event } from "@myslot/types";
 
 const LIMIT = 9;
 
@@ -91,7 +92,7 @@ export function EventsListPage() {
           className="mt-8"
           icon={SearchX}
           title="Events are paused"
-          message={`${flagsQuery.data?.brand_name ?? "Spots"} is not running events right now. Check back soon.`}
+          message={`${flagsQuery.data?.brand_name ?? DEFAULT_BRAND_NAME} is not running events right now. Check back soon.`}
           actionLabel="Explore venues"
           onAction={() => router.push("/explore")}
         />
@@ -110,7 +111,7 @@ export function EventsListPage() {
         <div className="mt-5 flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           <Badge variant="warning">Coming soon</Badge>
           <span>
-            Event listings are paused by {flagsQuery.data?.brand_name ?? "Spots"} — bookings open once events launch.
+            Event listings are paused by {flagsQuery.data?.brand_name ?? DEFAULT_BRAND_NAME} — bookings open once events launch.
           </span>
         </div>
       )}

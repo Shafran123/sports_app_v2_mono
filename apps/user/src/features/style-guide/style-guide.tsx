@@ -16,7 +16,7 @@ import {
   TabsContent,
   TabsList,
   TabsTrigger
-} from "@spots/ui";
+} from "@myslot/ui";
 
 export function StyleGuide() {
   return (

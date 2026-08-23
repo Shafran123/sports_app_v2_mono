@@ -3,12 +3,13 @@
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { toApiFailure, auth as authApi } from "@spots/api";
-import { Button, Input, PasswordInput } from "@spots/ui";
-import { loginWithGoogle, registerWithEmail } from "@spots/auth";
+import { toApiFailure, auth as authApi } from "@myslot/api";
+import { Button, BrandLockup, Input, PasswordInput } from "@myslot/ui";
+import { loginWithGoogle, registerWithEmail } from "@myslot/auth";
 import { useAuth } from "@/context/auth";
 import { VerifyPhoneModal } from "@/features/verify-phone/verify-phone-modal";
 import { useGoogleVerify } from "@/features/verify-phone/use-google-verify";
+import { useBrandName } from "@/hooks/use-brand-name";
 
 const FIREBASE_MESSAGES: Record<string, string> = {
   "auth/email-already-in-use": "An account with this email already exists. Try logging in.",
@@ -51,6 +52,7 @@ function GoogleGlyph() {
 
 export function RegisterForm() {
   const router = useRouter();
+  const brand = useBrandName();
   const { setUser } = useAuth();
   const { login, verifyOpen, closeVerify, busy: googleBusy } = useGoogleVerify(() =>
     router.push("/dashboard")
@@ -113,7 +115,7 @@ export function RegisterForm() {
     <section className="w-full max-w-md rounded-3xl border border-border bg-surface p-6 shadow-soft animate-fade-up sm:p-8">
       <div className="text-center">
         <p className="font-display text-3xl font-extrabold tracking-tight text-ink">
-          Spots<span className="text-primary">.</span>
+          <BrandLockup brand={brand} />
         </p>
         <p className="mt-2 text-sm text-ink-3">Create your account and get playing.</p>
       </div>

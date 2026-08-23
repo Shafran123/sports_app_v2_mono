@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Check, ChevronDown } from "lucide-react";
-import { cn } from "@spots/utils";
+import { cn } from "@myslot/utils";
 import { Dialog, DialogContent } from "./dialog";
 import { SHEET_CLASS } from "./sheet";
 

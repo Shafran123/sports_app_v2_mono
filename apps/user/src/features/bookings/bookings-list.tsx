@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CalendarDays, CalendarX2, ChevronRight, Clock } from "lucide-react";
-import { bookings as bookingsApi, toApiFailure } from "@spots/api";
+import { bookings as bookingsApi, toApiFailure } from "@myslot/api";
 import {
   Button,
   Card,
@@ -19,9 +19,9 @@ import {
   TabsList,
   TabsTrigger,
   Toast
-} from "@spots/ui";
-import { formatDateLong, formatLkr, formatTime12 } from "@spots/utils";
-import type { Booking } from "@spots/types";
+} from "@myslot/ui";
+import { formatDateLong, formatLkr, formatTime12 } from "@myslot/utils";
+import type { Booking } from "@myslot/types";
 import { useAuth } from "@/context/auth";
 import { BookingDetailDialog } from "./booking-detail-dialog";
 

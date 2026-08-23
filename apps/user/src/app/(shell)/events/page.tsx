@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { EventsListPage } from "@/features/events/events-list-page";
-import { SkeletonCard } from "@spots/ui";
+import { SkeletonCard } from "@myslot/ui";
 
 export default function Page() {
   return (

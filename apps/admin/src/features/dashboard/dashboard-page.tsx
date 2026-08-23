@@ -3,9 +3,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { Building2, CalendarDays, ShieldCheck, Wallet } from "lucide-react";
-import { StatCard, EmptyState, Button } from "@spots/ui";
-import { formatLkr } from "@spots/utils";
-import { business, admin } from "@spots/api";
+import { StatCard, EmptyState, Button } from "@myslot/ui";
+import { formatLkr } from "@myslot/utils";
+import { business, admin } from "@myslot/api";
 import { useAuth } from "@/context/auth";
 
 export function DashboardPage() {

@@ -1,4 +1,4 @@
-import type { Availability, CourtAvailability, Slot } from "@spots/types";
+import type { Availability, CourtAvailability, Slot } from "@myslot/types";
 
 export const MAX_SLOTS = 8;
 

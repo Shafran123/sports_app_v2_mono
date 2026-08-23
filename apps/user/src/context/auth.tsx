@@ -1,3 +1,3 @@
 "use client";
 
-export { AuthProvider, useAuth, RequireAuth } from "@spots/auth";
+export { AuthProvider, useAuth, RequireAuth } from "@myslot/auth";

@@ -1,6 +1,6 @@
 # Sports Arena Booking - Backend
 
-Express.js API for the sports venue booking marketplace (Spots).
+Express.js API for the sports venue booking marketplace (MySlot.LK).
 
 ## Tech Stack
 

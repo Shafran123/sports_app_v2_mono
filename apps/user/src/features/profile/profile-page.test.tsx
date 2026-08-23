@@ -17,7 +17,7 @@ vi.mock("@/context/auth", () => ({
   useAuth: () => ({ user: ctxUser, loading: false, logout: vi.fn(), setUser: setUserMock })
 }));
 
-vi.mock("@spots/api", () => ({
+vi.mock("@myslot/api", () => ({
   auth: { updateMe: updateMeMock, verifyPhoneSend: vi.fn(), verifyPhoneConfirm: vi.fn() },
   toApiFailure: (e: unknown) => ({ message: (e as Error).message })
 }));

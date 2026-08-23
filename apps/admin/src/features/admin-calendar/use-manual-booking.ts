@@ -1,9 +1,9 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { business } from "@spots/api";
-import type { Availability } from "@spots/types";
-import type { ManualBookingInput } from "@spots/types";
+import { business } from "@myslot/api";
+import type { Availability } from "@myslot/types";
+import type { ManualBookingInput } from "@myslot/types";
 
 function markSlotBooked(availability: Availability | undefined, courtId: string, startAt: string): Availability | undefined {
   if (!availability) return availability;

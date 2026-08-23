@@ -1,8 +1,8 @@
 "use client";
 
-import { Card, EmptyState, ErrorState, Skeleton, SLOT_STATE_LABEL, SLOT_STATE_STYLES } from "@spots/ui";
-import { cn, formatLkr, formatTime12 } from "@spots/utils";
-import type { Availability, CourtAvailability, Slot } from "@spots/types";
+import { Card, EmptyState, ErrorState, Skeleton, SLOT_STATE_LABEL, SLOT_STATE_STYLES } from "@myslot/ui";
+import { cn, formatLkr, formatTime12 } from "@myslot/utils";
+import type { Availability, CourtAvailability, Slot } from "@myslot/types";
 
 function AvailabilitySkeleton() {
   return (

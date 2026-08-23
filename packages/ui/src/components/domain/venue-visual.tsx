@@ -1,8 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { venueVisualSrc, sportGlyph } from "@spots/utils";
-import { cn } from "@spots/utils";
+import { venueVisualSrc, sportGlyph } from "@myslot/utils";
+import { cn } from "@myslot/utils";
 
 export function VenueVisual({
   venue,

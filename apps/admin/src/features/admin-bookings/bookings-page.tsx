@@ -3,10 +3,10 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { business, venues } from "@spots/api";
-import { buttonVariants, Card, EmptyState, ErrorState, Input, SelectSheet, StatusPill, Table, TableBody, TableHead, TableRow, Th, Td } from "@spots/ui";
-import { SkeletonRow } from "@spots/ui";
-import { cn, formatLkr, formatTime12, toDateKey } from "@spots/utils";
+import { business, venues } from "@myslot/api";
+import { buttonVariants, Card, EmptyState, ErrorState, Input, SelectSheet, StatusPill, Table, TableBody, TableHead, TableRow, Th, Td } from "@myslot/ui";
+import { SkeletonRow } from "@myslot/ui";
+import { cn, formatLkr, formatTime12, toDateKey } from "@myslot/utils";
 import { useAuth } from "@/context/auth";
 
 const STATUS_OPTIONS = [

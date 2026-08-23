@@ -5,11 +5,11 @@ import { useState } from "react";
 import Link from "next/link";
 import { useMutation } from "@tanstack/react-query";
 import { CheckCircle2, Ticket } from "lucide-react";
-import { events } from "@spots/api";
-import { Button, Card, Progress, buttonVariants } from "@spots/ui";
-import { formatLkr } from "@spots/utils";
-import { cn } from "@spots/utils";
-import type { Event, User } from "@spots/types";
+import { events } from "@myslot/api";
+import { Button, Card, Progress, buttonVariants } from "@myslot/ui";
+import { formatLkr } from "@myslot/utils";
+import { cn } from "@myslot/utils";
+import type { Event, User } from "@myslot/types";
 import { PayHereForm } from "./payhere-form";
 
 function splitName(name: string | null): { first_name: string; last_name: string } {

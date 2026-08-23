@@ -22,7 +22,7 @@ import {
   VenueAuditSchema,
   VenueDetailSchema,
   VenueSchema
-} from "@spots/types";
+} from "@myslot/types";
 export { TOKEN_KEY } from "./client";
 export { toApiFailure, getClient, setClient, createClient, type ApiFailure } from "./client";
 export { parseData, parseList, parsePaginated } from "./parse";

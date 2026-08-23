@@ -5,9 +5,9 @@ import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import * as QRCode from "qrcode";
 import { CircleCheckBig, Copy, MapPin, RefreshCw } from "lucide-react";
-import { bookings, toApiFailure } from "@spots/api";
-import { Button, Card, CardContent, CardFooter, ErrorState, Skeleton, SkeletonRow } from "@spots/ui";
-import { formatDateLong, formatLkr, formatTime12 } from "@spots/utils";
+import { bookings, toApiFailure } from "@myslot/api";
+import { Button, Card, CardContent, CardFooter, ErrorState, Skeleton, SkeletonRow } from "@myslot/ui";
+import { formatDateLong, formatLkr, formatTime12 } from "@myslot/utils";
 
 const SUCCESS_STATUSES = new Set(["confirmed", "checked_in", "completed"]);
 const FAILED_STATUSES = new Set(["cancelled", "failed"]);

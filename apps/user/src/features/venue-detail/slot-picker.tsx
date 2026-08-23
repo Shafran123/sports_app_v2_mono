@@ -1,8 +1,8 @@
 "use client";
 
-import { Card, ErrorState, EmptyState, Skeleton, SLOT_STATE_STYLES, SLOT_STATE_LABEL } from "@spots/ui";
-import { cn, formatLkr, formatTime12 } from "@spots/utils";
-import type { Availability, CourtAvailability, Slot } from "@spots/types";
+import { Card, ErrorState, EmptyState, Skeleton, SLOT_STATE_STYLES, SLOT_STATE_LABEL } from "@myslot/ui";
+import { cn, formatLkr, formatTime12 } from "@myslot/utils";
+import type { Availability, CourtAvailability, Slot } from "@myslot/types";
 import { selectionKey, type SelectedSlots } from "./selection";
 
 const GRID = "grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6";

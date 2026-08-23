@@ -8,7 +8,7 @@ const { sendMock, confirmMock, setUserMock } = vi.hoisted(() => ({
   setUserMock: vi.fn()
 }));
 
-vi.mock("@spots/api", () => ({
+vi.mock("@myslot/api", () => ({
   auth: { verifyPhoneSend: sendMock, verifyPhoneConfirm: confirmMock },
   toApiFailure: (e: { code?: string; message?: string } | Error) => ({
     status: 0,

@@ -1,4 +1,4 @@
 {
-  "extends": "@spots/config/tsconfig.react.json",
+  "extends": "@myslot/config/tsconfig.react.json",
   "include": ["src"]
 }

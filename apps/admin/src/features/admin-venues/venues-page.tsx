@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Building2, MapPin, Plus } from "lucide-react";
-import { Button, EmptyState, ErrorState, SkeletonCard, StatusPill } from "@spots/ui";
+import { Button, EmptyState, ErrorState, SkeletonCard, StatusPill } from "@myslot/ui";
 import { fetchMyVenues, type MyVenue } from "./venue-api";
 
 const STATUS_LABEL: Record<string, string> = {

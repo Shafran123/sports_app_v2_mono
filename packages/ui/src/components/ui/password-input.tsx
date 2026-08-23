@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Eye, EyeOff } from "lucide-react";
-import { cn } from "@spots/utils";
+import { cn } from "@myslot/utils";
 import { Input } from "./input";
 
 export function PasswordInput({ className, ...props }: React.InputHTMLAttributes<HTMLInputElement>) {

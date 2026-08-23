@@ -1,3 +1,3 @@
 "use client";
 
-export { useUnread } from "@spots/auth";
+export { useUnread } from "@myslot/auth";

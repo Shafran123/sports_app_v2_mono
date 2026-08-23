@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { Banknote, CheckCheck } from "lucide-react";
-import { Badge, Button, Dialog, DialogContent, StatusPill } from "@spots/ui";
-import { formatDateLong, formatLkr, formatTime12 } from "@spots/utils";
-import { toApiFailure } from "@spots/api";
-import type { Booking, CourtAvailability, Slot } from "@spots/types";
+import { Badge, Button, Dialog, DialogContent, StatusPill } from "@myslot/ui";
+import { formatDateLong, formatLkr, formatTime12 } from "@myslot/utils";
+import { toApiFailure } from "@myslot/api";
+import type { Booking, CourtAvailability, Slot } from "@myslot/types";
 import { useBookingActions } from "@/features/admin-bookings/use-booking-actions";
-import { SHEET_CLASS } from "@spots/ui";
+import { SHEET_CLASS } from "@myslot/ui";
 
 function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (

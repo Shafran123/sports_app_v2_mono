@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { CalendarDays, CheckCircle2, MapPin, XCircle } from "lucide-react";
-import { admin } from "@spots/api";
-import type { Venue } from "@spots/types";
+import { admin } from "@myslot/api";
+import type { Venue } from "@myslot/types";
 import {
   Badge,
   Button,
@@ -16,8 +16,8 @@ import {
   SkeletonCard,
   Textarea,
   VenueVisual
-} from "@spots/ui";
-import { formatDateLong } from "@spots/utils";
+} from "@myslot/ui";
+import { formatDateLong } from "@myslot/utils";
 import { useToasts } from "./toasts";
 
 type PendingVenue = Venue & {

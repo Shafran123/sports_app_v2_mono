@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { CheckCircle2, AlertCircle, Info, X } from "lucide-react";
-import { cn } from "@spots/utils";
+import { cn } from "@myslot/utils";
 
 export type ToastTone = "success" | "error" | "info";
 

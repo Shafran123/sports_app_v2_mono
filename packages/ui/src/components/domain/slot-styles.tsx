@@ -1,8 +1,8 @@
 "use client";
 
 import * as React from "react";
-import type { CourtAvailability, SlotState } from "@spots/types";
-import { cn } from "@spots/utils";
+import type { CourtAvailability, SlotState } from "@myslot/types";
+import { cn } from "@myslot/utils";
 
 export const SLOT_STATE_STYLES: Record<string, string> = {
   available:

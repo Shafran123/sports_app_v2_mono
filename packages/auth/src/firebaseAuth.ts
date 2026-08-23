@@ -9,9 +9,9 @@ import {
   type Auth,
   type ConfirmationResult
 } from "firebase/auth";
-import { normalizePhone } from "@spots/utils";
+import { normalizePhone } from "@myslot/utils";
 import { getFirebaseAuth } from "./firebase";
-import { TOKEN_KEY } from "@spots/api";
+import { TOKEN_KEY } from "@myslot/api";
 
 let phoneVerifier: RecaptchaVerifier | null = null;
 let phoneVerifierNode: HTMLElement | null = null;

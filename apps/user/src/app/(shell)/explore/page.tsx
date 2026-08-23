@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { ExplorePage } from "@/features/explore/explore-page";
-import { SkeletonCard } from "@spots/ui";
+import { SkeletonCard } from "@myslot/ui";
 
 export default function Page() {
   return (

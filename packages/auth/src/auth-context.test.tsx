@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
-import type { User } from "@spots/types";
+import type { User } from "@myslot/types";
 
 const watchAuthMock = vi.fn();
 const meMock = vi.fn();
@@ -10,7 +10,7 @@ vi.mock("./firebase", () => ({
   watchAuth: (cb: unknown) => watchAuthMock(cb)
 }));
 vi.mock("./firebaseAuth", () => ({ logoutFirebase: () => logoutFirebaseMock() }));
-vi.mock("@spots/api", () => ({
+vi.mock("@myslot/api", () => ({
   auth: { me: () => meMock() },
   TOKEN_KEY: "spots_token"
 }));
@@ -26,7 +26,7 @@ const FB_USER = {
   getIdToken: vi.fn().mockResolvedValue("id-token-abc")
 };
 
-const SPOTS_USER: User = {
+const MOCK_USER: User = {
   id: "u1",
   email: "dev@spots.app",
   name: "Dev",
@@ -44,7 +44,7 @@ describe("AuthProvider — token before /auth/me (login race regression)", () =>
       cb(FB_USER);
       return () => {};
     });
-    meMock.mockResolvedValue(SPOTS_USER);
+    meMock.mockResolvedValue(MOCK_USER);
   });
 
   it("persists the token BEFORE calling /auth/me", async () => {

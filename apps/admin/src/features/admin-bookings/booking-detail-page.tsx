@@ -3,11 +3,11 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { bookings, toApiFailure } from "@spots/api";
-import { Button, Card, Dialog, DialogContent, ErrorState, Skeleton, StatusPill } from "@spots/ui";
-import { formatDateLong, formatLkr, formatTime12 } from "@spots/utils";
-import type { Booking } from "@spots/types";
-import { SHEET_CLASS } from "@spots/ui";
+import { bookings, toApiFailure } from "@myslot/api";
+import { Button, Card, Dialog, DialogContent, ErrorState, Skeleton, StatusPill } from "@myslot/ui";
+import { formatDateLong, formatLkr, formatTime12 } from "@myslot/utils";
+import type { Booking } from "@myslot/types";
+import { SHEET_CLASS } from "@myslot/ui";
 import { useBookingActions } from "./use-booking-actions";
 import { BookingStatusSteps } from "./status-steps";
 

@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { auth as authApi, featureFlags } from "@spots/api";
-import { loginWithGoogle } from "@spots/auth";
+import { auth as authApi, featureFlags } from "@myslot/api";
+import { loginWithGoogle } from "@myslot/auth";
 import { useAuth } from "@/context/auth";
 
 /**

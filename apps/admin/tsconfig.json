@@ -1,5 +1,5 @@
 {
-  "extends": "@spots/config/tsconfig.nextjs.json",
+  "extends": "@myslot/config/tsconfig.nextjs.json",
   "compilerOptions": {
     "paths": {
       "@/*": [

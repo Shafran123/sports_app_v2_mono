@@ -1,8 +1,8 @@
 import type { AxiosInstance } from "axios";
 import { z } from "zod";
-import { getClient, parseList, venues } from "@spots/api";
-import { CourtSchema, VenueSchema } from "@spots/types";
-import type { VenueHours } from "@spots/types";
+import { getClient, parseList, venues } from "@myslot/api";
+import { CourtSchema, VenueSchema } from "@myslot/types";
+import type { VenueHours } from "@myslot/types";
 
 export const MyVenueSchema = VenueSchema.extend({
   court_count: z.number().int().optional(),

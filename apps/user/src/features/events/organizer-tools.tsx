@@ -4,9 +4,9 @@ import * as React from "react";
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { CalendarX2, ShieldCheck } from "lucide-react";
-import { events } from "@spots/api";
-import { Button, Card, Dialog, DialogContent } from "@spots/ui";
-import type { Event } from "@spots/types";
+import { events } from "@myslot/api";
+import { Button, Card, Dialog, DialogContent } from "@myslot/ui";
+import type { Event } from "@myslot/types";
 
 export function OrganizerTools({ event }: { event: Event }) {
   const [open, setOpen] = useState(false);

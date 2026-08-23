@@ -1,6 +1,6 @@
 import * as React from "react";
 import { SearchX } from "lucide-react";
-import { cn } from "@spots/utils";
+import { cn } from "@myslot/utils";
 import { Button } from "./button";
 
 export function EmptyState({

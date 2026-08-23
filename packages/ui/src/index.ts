@@ -23,6 +23,7 @@ export * from "./components/ui/avatar";
 export * from "./components/ui/toast";
 
 // Domain components
+export * from "./components/domain/brand-lockup";
 export * from "./components/domain/venue-visual";
 export * from "./components/domain/venue-card";
 export * from "./components/domain/slot-styles";

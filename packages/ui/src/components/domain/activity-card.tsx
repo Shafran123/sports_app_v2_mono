@@ -1,8 +1,8 @@
 import * as React from "react";
 import { CalendarDays, Clock, MapPin, Users } from "lucide-react";
-import { formatLkr, eventVisualSrc } from "@spots/utils";
-import type { Event } from "@spots/types";
-import { cn } from "@spots/utils";
+import { formatLkr, eventVisualSrc } from "@myslot/utils";
+import type { Event } from "@myslot/types";
+import { cn } from "@myslot/utils";
 import { Badge } from "../ui/badge";
 import { Card } from "../ui/card";
 import { VenueVisual } from "./venue-visual";

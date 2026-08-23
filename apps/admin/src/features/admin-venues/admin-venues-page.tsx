@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { History, MapPin, ShieldAlert, ShieldBan, ShieldCheck, Trash2 } from "lucide-react";
-import { admin } from "@spots/api";
-import type { Venue, VenueAudit } from "@spots/types";
+import { admin } from "@myslot/api";
+import type { Venue, VenueAudit } from "@myslot/types";
 import {
   Badge,
   Button,
@@ -16,8 +16,8 @@ import {
   SkeletonCard,
   StatusPill,
   Textarea
-} from "@spots/ui";
-import { formatDateLong } from "@spots/utils";
+} from "@myslot/ui";
+import { formatDateLong } from "@myslot/utils";
 import { useToasts } from "@/features/admin-console/toasts";
 
 type AdminVenue = Venue & {

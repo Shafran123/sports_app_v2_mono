@@ -1,5 +1,5 @@
 {
-  "name": "@spots/config",
+  "name": "@myslot/config",
   "private": true,
   "version": "0.1.0",
   "files": ["*.json", "eslint*.js"]

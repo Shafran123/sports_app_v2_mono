@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
-  "display": "Spots Base",
+  "display": "MySlot Base",
   "compilerOptions": {
     "strict": true,
     "skipLibCheck": true,

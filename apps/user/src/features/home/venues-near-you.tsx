@@ -1,8 +1,9 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { venues } from "@spots/api";
-import { EmptyState, ErrorState, SkeletonCard, VenueCard } from "@spots/ui";
+import { venues, featureFlags } from "@myslot/api";
+import { EmptyState, ErrorState, SkeletonCard, VenueCard } from "@myslot/ui";
+import { DEFAULT_BRAND_NAME } from "@myslot/utils";
 import { SectionHeader } from "./section-header";
 
 const CARD_SKELETONS = Array.from({ length: 6 });
@@ -12,6 +13,11 @@ export function VenuesNearYou() {
     queryKey: ["venues", "near-you"],
     queryFn: () => venues.list({ limit: 6 })
   });
+  const { data: flags } = useQuery({
+    queryKey: ["feature-flags"],
+    queryFn: () => featureFlags.get()
+  });
+  const brand = flags?.brand_name ?? DEFAULT_BRAND_NAME;
 
   const venueList = data?.data ?? [];
 
@@ -32,7 +38,7 @@ export function VenuesNearYou() {
         <div className="mt-4">
           <EmptyState
             title="No venues nearby yet"
-            message="Courts and clubs near you will appear here as they join Spots."
+            message={`Courts and clubs near you will appear here as they join ${brand}.`}
           />
         </div>
       ) : (

@@ -1,8 +1,8 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { sports } from "@spots/api";
-import { Checkbox, Input, SelectSheet } from "@spots/ui";
+import { sports } from "@myslot/api";
+import { Checkbox, Input, SelectSheet } from "@myslot/ui";
 
 export interface ExploreFiltersProps {
   sport: string;

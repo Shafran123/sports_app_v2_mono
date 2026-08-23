@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { CourtAvailability } from "@spots/types";
+import type { CourtAvailability } from "@myslot/types";
 import { buildCtaHref, summarizeSelection, toggleSlot, type SelectedSlots } from "./selection";
 
 const court: CourtAvailability = {

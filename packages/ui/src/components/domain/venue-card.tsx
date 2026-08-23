@@ -1,9 +1,9 @@
 import * as React from "react";
 import Link from "next/link";
 import { MapPin, Star } from "lucide-react";
-import { formatLkr, firstSportSlug } from "@spots/utils";
-import type { Venue } from "@spots/types";
-import { cn } from "@spots/utils";
+import { formatLkr, firstSportSlug } from "@myslot/utils";
+import type { Venue } from "@myslot/types";
+import { cn } from "@myslot/utils";
 import { VenueVisual } from "./venue-visual";
 
 export function VenueCard({

@@ -1,5 +1,5 @@
 import * as React from "react";
-import { cn } from "@spots/utils";
+import { cn } from "@myslot/utils";
 
 export function Input({ className, error, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { error?: boolean }) {
   return (

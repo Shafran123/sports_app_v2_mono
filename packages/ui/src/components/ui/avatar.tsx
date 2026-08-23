@@ -1,6 +1,6 @@
 import * as React from "react";
 import { User } from "lucide-react";
-import { cn } from "@spots/utils";
+import { cn } from "@myslot/utils";
 
 export function Avatar({ src, name, className, size = "md" }: { src?: string | null; name?: string | null; className?: string; size?: "sm" | "md" | "lg" }) {
   const dims = size === "lg" ? "h-16 w-16 text-xl" : size === "sm" ? "h-8 w-8 text-xs" : "h-10 w-10 text-sm";

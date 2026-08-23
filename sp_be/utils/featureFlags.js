@@ -74,7 +74,7 @@ async function getTaxRate() {
 }
 
 async function getBrandName() {
-  return String(await readConfig('brand_name', 'Spots'));
+  return String(await readConfig('brand_name', 'MySlot.LK'));
 }
 
 // Half-up rounding — matches Postgres round() semantics; used to derive the
@@ -91,10 +91,12 @@ function applyTax(base, rate) {
 }
 
 // Persist a new value with validation + audit trail. Admin only.
+const EXTRA_CONFIG_KEYS = ['tax_rate', 'brand_name'];
+
 async function setConfig(key, value, adminId) {
   const def = FLAG_DEFS[key];
-  if (!def && key !== 'tax_rate') {
-    const allowed = [...CONFIG_KEYS, 'tax_rate'].join(', ');
+  if (!def && !EXTRA_CONFIG_KEYS.includes(key)) {
+    const allowed = [...CONFIG_KEYS, ...EXTRA_CONFIG_KEYS].join(', ');
     throw Object.assign(new Error(`Unknown config key "${key}". Allowed: ${allowed}`), { code: 'UNKNOWN_CONFIG' });
   }
 
@@ -107,6 +109,18 @@ async function setConfig(key, value, adminId) {
       throw Object.assign(new Error('tax_rate must be between 0 and 100'), { code: 'INVALID_VALUE' });
     }
     parsed = value;
+  } else if (key === 'brand_name') {
+    if (typeof value !== 'string') {
+      throw Object.assign(new Error('brand_name must be a string'), { code: 'INVALID_VALUE' });
+    }
+    const trimmed = value.trim();
+    if (trimmed.length === 0) {
+      throw Object.assign(new Error('brand_name must not be empty'), { code: 'INVALID_VALUE' });
+    }
+    if (trimmed.length > 40) {
+      throw Object.assign(new Error('brand_name must be 40 characters or fewer'), { code: 'INVALID_VALUE' });
+    }
+    parsed = trimmed;
   } else if (def.type === 'boolean') {
     if (value === true || value === 'true') parsed = true;
     else if (value === false || value === 'false') parsed = false;

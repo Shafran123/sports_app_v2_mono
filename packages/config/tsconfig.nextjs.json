@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
-  "display": "Spots Next.js",
+  "display": "MySlot Next.js",
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "jsx": "preserve",

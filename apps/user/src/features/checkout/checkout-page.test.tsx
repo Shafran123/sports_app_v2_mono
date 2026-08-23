@@ -34,7 +34,7 @@ vi.mock("@/context/auth", () => ({
   })
 }));
 
-vi.mock("@spots/api", () => ({
+vi.mock("@myslot/api", () => ({
   venues: {
     detail: vi.fn(),
     list: vi.fn(),
@@ -57,7 +57,7 @@ vi.mock("@spots/api", () => ({
       sms_enabled: true,
       payhere_enabled: true,
       events_discovery_state: "enabled",
-      brand_name: "Spots"
+      brand_name: "MySlot.LK"
     }))
   },
   auth: {
@@ -76,7 +76,7 @@ vi.mock("@spots/api", () => ({
   setClient: vi.fn()
 }));
 
-import { venues, bookings, featureFlags, submitPayHere } from "@spots/api";
+import { venues, bookings, featureFlags, submitPayHere } from "@myslot/api";
 
 const onlineVenue = {
   id: "v1", name: "Smash Arena", status: "approved", description: null,
@@ -199,7 +199,7 @@ describe("CheckoutPage payhere_enabled OFF (payments paused)", () => {
       sms_enabled: true,
       payhere_enabled: false,
       events_discovery_state: "enabled",
-      brand_name: "Spots"
+      brand_name: "MySlot.LK"
     });
   }
 

@@ -11,8 +11,8 @@ const { loginWithGoogleMock, meMock, flagsGetMock, setUserMock, onDoneMock } = v
   onDoneMock: vi.fn()
 }));
 
-vi.mock("@spots/auth", () => ({ loginWithGoogle: loginWithGoogleMock }));
-vi.mock("@spots/api", () => ({
+vi.mock("@myslot/auth", () => ({ loginWithGoogle: loginWithGoogleMock }));
+vi.mock("@myslot/api", () => ({
   auth: { me: meMock },
   featureFlags: { get: flagsGetMock }
 }));

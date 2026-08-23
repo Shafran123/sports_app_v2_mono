@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { bookings, business } from "@spots/api";
+import { bookings, business } from "@myslot/api";
 
 export function useBookingActions(extraKeys: string[][] = []) {
   const queryClient = useQueryClient();

@@ -3,10 +3,10 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Banknote, QrCode, UserPlus } from "lucide-react";
-import { business, venues } from "@spots/api";
-import { Badge, Button, EmptyState, Skeleton, StatusPill } from "@spots/ui";
-import { dayLabel, formatDateLong, formatTime12, toDateKey } from "@spots/utils";
-import type { Booking } from "@spots/types";
+import { business, venues } from "@myslot/api";
+import { Badge, Button, EmptyState, Skeleton, StatusPill } from "@myslot/ui";
+import { dayLabel, formatDateLong, formatTime12, toDateKey } from "@myslot/utils";
+import type { Booking } from "@myslot/types";
 import { BookingDetailDialog } from "@/features/admin-calendar/booking-detail-dialog";
 import { QrScanDialog } from "./qr-scan-dialog";
 import { QuickBookDialog } from "./quick-book-dialog";

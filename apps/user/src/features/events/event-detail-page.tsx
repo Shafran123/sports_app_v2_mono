@@ -3,9 +3,9 @@
 import * as React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CalendarDays, Clock, MapPin } from "lucide-react";
-import { events, featureFlags } from "@spots/api";
-import { Badge, Card, ErrorState, Progress, Skeleton, VenueVisual } from "@spots/ui";
-import { eventVisualSrc, formatDateLong, formatTime12 } from "@spots/utils";
+import { events, featureFlags } from "@myslot/api";
+import { Badge, Card, ErrorState, Progress, Skeleton, VenueVisual } from "@myslot/ui";
+import { eventVisualSrc, formatDateLong, formatTime12, DEFAULT_BRAND_NAME } from "@myslot/utils";
 import { useAuth } from "@/context/auth";
 import { RegistrationCard } from "./registration-card";
 import { OrganizerTools } from "./organizer-tools";
@@ -105,7 +105,7 @@ export function EventDetailPage({ eventId }: { eventId: string }) {
           {capacity > 0 && (
             <Card className="p-6">
               <div className="flex items-center justify-between">
-                <h2 className="font-semibold tracking-tight text-ink">Spots</h2>
+                <h2 className="font-semibold tracking-tight text-ink">Availability</h2>
                 <span className="text-sm font-medium text-ink-2">
                   {registered} of {capacity} spots
                 </span>
@@ -131,7 +131,7 @@ export function EventDetailPage({ eventId }: { eventId: string }) {
             <Card className="p-6">
               <h3 className="font-semibold tracking-tight text-ink">Not available yet</h3>
               <p className="mt-1 text-sm text-ink-2">
-                Event listings are paused by {flags?.brand_name ?? "Spots"} — registrations open once the event goes
+                Event listings are paused by {flags?.brand_name ?? DEFAULT_BRAND_NAME} — registrations open once the event goes
                 live.
               </p>
             </Card>

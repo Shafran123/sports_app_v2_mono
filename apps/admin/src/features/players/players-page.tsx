@@ -3,9 +3,9 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ShieldCheck, ShieldQuestion } from "lucide-react";
-import { admin } from "@spots/api";
-import { Badge, Button, Card, EmptyState, Input, Skeleton } from "@spots/ui";
-import type { User } from "@spots/types";
+import { admin } from "@myslot/api";
+import { Badge, Button, Card, EmptyState, Input, Skeleton } from "@myslot/ui";
+import type { User } from "@myslot/types";
 
 export function PlayersPage() {
   const queryClient = useQueryClient();

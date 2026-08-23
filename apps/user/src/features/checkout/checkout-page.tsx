@@ -5,11 +5,11 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Banknote, ShieldCheck, Wallet } from "lucide-react";
-import { bookings, featureFlags, toApiFailure, venues } from "@spots/api";
-import { Badge, Button, Card, CardContent, CountdownPill, ErrorState, Skeleton } from "@spots/ui";
-import { formatDateLong, formatLkr, formatTime12, uuidV4 } from "@spots/utils";
+import { bookings, featureFlags, toApiFailure, venues } from "@myslot/api";
+import { Badge, Button, Card, CardContent, CountdownPill, ErrorState, Skeleton } from "@myslot/ui";
+import { formatDateLong, formatLkr, formatTime12, uuidV4 } from "@myslot/utils";
 import { useAuth } from "@/context/auth";
-import { submitPayHere } from "@spots/api";
+import { submitPayHere } from "@myslot/api";
 import { VerifyPhoneModal } from "@/features/verify-phone/verify-phone-modal";
 
 type PaymentMethod = "online" | "cash";

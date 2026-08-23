@@ -1,5 +1,5 @@
 import * as React from "react";
-import { cn } from "@spots/utils";
+import { cn } from "@myslot/utils";
 import { Card } from "./card";
 
 export function Skeleton({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {

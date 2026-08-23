@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { sports } from "@spots/api";
+import { sports } from "@myslot/api";
 import {
   EmptyState,
   ErrorState,
@@ -12,8 +12,8 @@ import {
   TableRow,
   Td,
   Th
-} from "@spots/ui";
-import { sportGlyph } from "@spots/utils";
+} from "@myslot/ui";
+import { sportGlyph } from "@myslot/utils";
 
 export function SportsTable() {
   const listQuery = useQuery({
@@ -64,11 +64,9 @@ export function SportsTable() {
       ) : (
         <Table>
           <TableHead>
-            <TableRow>
-              <Th>Sport</Th>
-              <Th>Name</Th>
-              <Th>Slug</Th>
-            </TableRow>
+            <Th>Sport</Th>
+            <Th>Name</Th>
+            <Th>Slug</Th>
           </TableHead>
           <TableBody>
             {rows.map((sport) => (

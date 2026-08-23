@@ -1,4 +1,4 @@
-import type { Role } from "@spots/types";
+import type { Role } from "@myslot/types";
 
 /** Staff roles that may operate the console app. */
 export function isStaff(role: Role | undefined | null): boolean {

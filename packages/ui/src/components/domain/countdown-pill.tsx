@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { cn } from "@spots/utils";
+import { cn } from "@myslot/utils";
 
 export function CountdownPill({ seconds, className }: { seconds: number; className?: string }) {
   const critical = seconds <= 60;

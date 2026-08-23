@@ -77,7 +77,7 @@ describe('phone verification — SMSGo OTP challenge', () => {
     const [, opts] = posted.mock.calls[0];
     const body = JSON.parse(opts.body);
     expect(body.to).toBe('+94771234567');
-    expect(body.mask).toBe('SPOTS');
+    expect(body.mask).toBe('MYSLOT');
     expect(body.message).toContain('verification code');
     expect(codeFromSms('+94771234567')).toMatch(/^\d{6}$/);
   });

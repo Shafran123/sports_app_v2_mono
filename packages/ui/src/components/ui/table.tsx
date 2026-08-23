@@ -1,6 +1,6 @@
 import * as React from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
-import { cn } from "@spots/utils";
+import { cn } from "@myslot/utils";
 
 export function Table({ className, children }: { className?: string; children: React.ReactNode }) {
   return (

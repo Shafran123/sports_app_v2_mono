@@ -131,7 +131,7 @@ async function runDigest() {
     }
     await emailService.sendEmail({
       to,
-      subject: `Spots daily digest — ${day}`,
+      subject: `MySlot.LK daily digest — ${day}`,
       html
     });
   } catch (error) {

@@ -71,7 +71,7 @@ exports.sendVerificationCode = async (req, res) => {
     // code, or lie to the client with a 200.
     const result = await sendSms({
       to: phone,
-      message: `Spots: your verification code is ${code}. It expires in ${CODE_TTL_MINUTES} minutes. Do not share it.`
+      message: `MySlot.LK: your verification code is ${code}. It expires in ${CODE_TTL_MINUTES} minutes. Do not share it.`
     });
     if (!result.success) {
       logger.error(`Verification SMS failed for ${phone}: ${result.error}`);

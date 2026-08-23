@@ -249,7 +249,7 @@ describe("featureFlags", () => {
       sms_enabled: false,
       payhere_enabled: false,
       events_discovery_state: "coming_soon",
-      brand_name: "Spots"
+      brand_name: "MySlot.LK"
     }));
     const flags = await featureFlags.get(client);
     expect(flags.events_discovery_state).toBe("coming_soon");
@@ -264,7 +264,7 @@ describe("admin settings & reports", () => {
     const client = mockClient(() => ({
       flags: [flagDef("sms_enabled")],
       tax_rate: 12,
-      brand_name: "Spots"
+      brand_name: "MySlot.LK"
     }));
     const config = await admin.platformConfig(client);
     expect(config.tax_rate).toBe(12);

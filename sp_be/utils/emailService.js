@@ -1,7 +1,7 @@
 const logger = require('./logger');
 const { fmtWhen, fmtLkr } = require('./format');
 
-const DEFAULT_FROM = process.env.FROM_EMAIL || 'Spots <no-reply@spots.lk>';
+const DEFAULT_FROM = process.env.FROM_EMAIL || 'MySlot.LK <no-reply@myslot.lk>';
 
 // Escape any user-sourced string before it lands in an HTML email template.
 // Venue names, player names, and rejection reasons are free text — unescaped,
@@ -77,7 +77,7 @@ async function sendEmail({ to, subject, html, attachment }) {
 }
 
 function shell(start) {
-  return `<!DOCTYPE html><html><body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f7f7f8;"><div style="background:#fff;padding:32px;border-radius:16px;margin:16px auto;">${start}<hr style="border:none;border-top:1px solid #eee;margin:24px 0;"><p style="color:#999;font-size:12px;text-align:center;">Spots — book courts, join games, find players.</p></div></body></html>`;
+  return `<!DOCTYPE html><html><body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f7f7f8;"><div style="background:#fff;padding:32px;border-radius:16px;margin:16px auto;">${start}<hr style="border:none;border-top:1px solid #eee;margin:24px 0;"><p style="color:#999;font-size:12px;text-align:center;">MySlot.LK — book courts, join games, find players.</p></div></body></html>`;
 }
 
 function buildBookingHtml(booking) {
@@ -92,7 +92,7 @@ function buildBookingHtml(booking) {
       <p><strong>Total:</strong> ${fmtLkr(booking.total_price)}</p>
       <p><strong>Payment:</strong> ${booking.payment_method === 'cash' ? 'Pay at venue' : 'Paid online'}</p>
     </div>
-    <p style="color:#666;">Find your QR code under Bookings in the Spots app and show it on arrival.</p>`);
+    <p style="color:#666;">Find your QR code under Bookings in the MySlot.LK app and show it on arrival.</p>`);
 }
 
 function buildReminderHtml(booking) {
@@ -110,7 +110,7 @@ function buildReminderHtml(booking) {
 
 function buildWelcomeHtml() {
   return shell(`
-    <h2 style="color:#176036;">Welcome to Spots!</h2>
+    <h2 style="color:#176036;">Welcome to MySlot.LK!</h2>
     <p>You're all set to book courts, join games, and discover sports near you.</p>
     <p style="color:#666;">Find a venue, pick a slot, and your next match starts here.</p>`);
 }
@@ -178,7 +178,7 @@ async function notifyBookingReminder(booking, userEmail) {
 async function notifySignupWelcome(userEmail, name) {
   const greeting = name ? `Hi ${escapeHtml(name)},` : 'Hi,';
   const html = buildWelcomeHtml().replace('<p>You\'re all set.', `<p>${greeting} You're all set.`);
-  return sendEmail({ to: userEmail, subject: 'Welcome to Spots', html });
+  return sendEmail({ to: userEmail, subject: 'Welcome to MySlot.LK', html });
 }
 
 async function notifyVenueApproved(venue, ownerEmail) {

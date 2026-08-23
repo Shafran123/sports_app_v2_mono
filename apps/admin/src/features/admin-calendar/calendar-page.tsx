@@ -2,10 +2,10 @@
 
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { business, venues } from "@spots/api";
-import { Button, EmptyState, SelectSheet, Skeleton } from "@spots/ui";
-import { dayjs, toDateKey } from "@spots/utils";
-import type { CourtAvailability, Slot } from "@spots/types";
+import { business, venues } from "@myslot/api";
+import { Button, EmptyState, SelectSheet, Skeleton } from "@myslot/ui";
+import { dayjs, toDateKey } from "@myslot/utils";
+import type { CourtAvailability, Slot } from "@myslot/types";
 import { AvailabilityView } from "./availability-view";
 import { DateStrip } from "./date-strip";
 import { ManualBookingDialog } from "./manual-booking-dialog";

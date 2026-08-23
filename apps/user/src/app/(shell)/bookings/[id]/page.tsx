@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { BookingConfirmationPage } from "@/features/booking-confirmation/booking-confirmation-page";
-import { SkeletonRow } from "@spots/ui";
+import { SkeletonRow } from "@myslot/ui";
 
 export default async function BookingConfirmationRoute({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

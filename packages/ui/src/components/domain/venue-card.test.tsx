@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { VenueCard } from "./venue-card";
-import type { Venue } from "@spots/types";
+import type { Venue } from "@myslot/types";
 
 const venue: Venue = {
   id: "v1",

@@ -1,5 +1,5 @@
 {
-  "name": "@spots/admin",
+  "name": "@myslot/admin",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -12,11 +12,11 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@spots/api": "workspace:*",
-    "@spots/auth": "workspace:^",
-    "@spots/types": "workspace:*",
-    "@spots/ui": "workspace:*",
-    "@spots/utils": "workspace:*",
+    "@myslot/api": "workspace:*",
+    "@myslot/auth": "workspace:^",
+    "@myslot/types": "workspace:*",
+    "@myslot/ui": "workspace:*",
+    "@myslot/utils": "workspace:*",
     "@tanstack/react-query": "^5.66.0",
     "axios": "^1.7.9",
     "firebase": "^11.4.0",
@@ -32,7 +32,7 @@
     "zustand": "^5.0.3"
   },
   "devDependencies": {
-    "@spots/config": "workspace:*",
+    "@myslot/config": "workspace:*",
     "@tailwindcss/postcss": "^4.3.3",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.1.0",

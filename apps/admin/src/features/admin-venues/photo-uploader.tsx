@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { ImagePlus, Loader2, X } from "lucide-react";
-import { toApiFailure, uploads } from "@spots/api";
+import { toApiFailure, uploads } from "@myslot/api";
 
 const MAX_PHOTOS = 8;
 

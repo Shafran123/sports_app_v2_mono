@@ -11,7 +11,7 @@ const { platformConfigMock, setConfigKeyMock, reportsMock, configAuditMock } = v
   configAuditMock: vi.fn()
 }));
 
-vi.mock("@spots/api", () => ({
+vi.mock("@myslot/api", () => ({
   admin: {
     platformConfig: platformConfigMock,
     setConfigKey: setConfigKeyMock,
@@ -55,7 +55,7 @@ function renderPage() {
 describe("SettingsPage flags tab", () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    platformConfigMock.mockResolvedValue({ flags, tax_rate: 0, brand_name: "Spots" });
+    platformConfigMock.mockResolvedValue({ flags, tax_rate: 0, brand_name: "MySlot.LK" });
     reportsMock.mockResolvedValue({
       range: 7,
       series: [{ day: "2026-08-22", bookings: 1, revenue: 900, tax: 0 }],
@@ -85,5 +85,20 @@ describe("SettingsPage flags tab", () => {
     await userEvent.click(toggle);
 
     await waitFor(() => expect(setConfigKeyMock).toHaveBeenCalledWith("phone_verification_required", true));
+  });
+
+  it("saves a new brand name from the Brand tab", async () => {
+    setConfigKeyMock.mockResolvedValue({ name: "brand_name", value: "MySlot.LK" });
+    renderPage();
+    await userEvent.click(screen.getByRole("tab", { name: "Brand" }));
+
+    const input = await screen.findByLabelText("Brand name");
+    expect(input).toHaveValue("MySlot.LK");
+    await userEvent.clear(input);
+    await userEvent.type(input, "Arena LK");
+    await userEvent.click(screen.getByRole("button", { name: "Save brand" }));
+
+    await waitFor(() => expect(setConfigKeyMock).toHaveBeenCalledWith("brand_name", "Arena LK"));
+    expect(await screen.findByText(/Saved/)).toBeInTheDocument();
   });
 });

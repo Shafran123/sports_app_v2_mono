@@ -1,8 +1,8 @@
 "use client";
 
 import { FilterX } from "lucide-react";
-import type { Venue } from "@spots/types";
-import { Button, EmptyState, ErrorState, SkeletonCard, VenueCard } from "@spots/ui";
+import type { Venue } from "@myslot/types";
+import { Button, EmptyState, ErrorState, SkeletonCard, VenueCard } from "@myslot/ui";
 
 const CARD_SKELETONS = Array.from({ length: 6 });
 

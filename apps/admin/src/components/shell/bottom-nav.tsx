@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Building2, CalendarDays, LayoutDashboard, ShieldCheck, Store } from "lucide-react";
-import { cn } from "@spots/utils";
+import { cn } from "@myslot/utils";
 
 const OWNER_TABS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },

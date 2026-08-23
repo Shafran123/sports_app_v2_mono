@@ -4,10 +4,10 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell } from "lucide-react";
-import { notifications as notificationsApi, toApiFailure } from "@spots/api";
-import { Button, Card, EmptyState, ErrorState, SkeletonRow, Toast } from "@spots/ui";
-import { cn, formatDateLong } from "@spots/utils";
-import type { Notification } from "@spots/types";
+import { notifications as notificationsApi, toApiFailure } from "@myslot/api";
+import { Button, Card, EmptyState, ErrorState, SkeletonRow, Toast } from "@myslot/ui";
+import { cn, formatDateLong } from "@myslot/utils";
+import type { Notification } from "@myslot/types";
 import { useAuth } from "@/context/auth";
 
 interface Feedback {

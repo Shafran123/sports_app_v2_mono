@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import * as DropdownPrimitive from "@radix-ui/react-dropdown-menu";
-import { cn } from "@spots/utils";
+import { cn } from "@myslot/utils";
 
 export function DropdownMenu({ children }: { children: React.ReactNode }) {
   return <DropdownPrimitive.Root>{children}</DropdownPrimitive.Root>;

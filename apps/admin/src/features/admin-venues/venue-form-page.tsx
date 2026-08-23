@@ -5,11 +5,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { CheckCircle2, Plus, X } from "lucide-react";
-import { sports } from "@spots/api";
-import { toApiFailure } from "@spots/api";
-import { Button, Card, Checkbox, Input, SelectSheet, Skeleton, Textarea } from "@spots/ui";
-import { cn } from "@spots/utils";
-import type { VenueHours } from "@spots/types";
+import { sports } from "@myslot/api";
+import { toApiFailure } from "@myslot/api";
+import { Button, Card, Checkbox, Input, SelectSheet, Skeleton, Textarea } from "@myslot/ui";
+import { cn } from "@myslot/utils";
+import type { VenueHours } from "@myslot/types";
 import { submitCreateVenue, type CourtInput } from "./venue-api";
 import { PhotoUploader } from "./photo-uploader";
 

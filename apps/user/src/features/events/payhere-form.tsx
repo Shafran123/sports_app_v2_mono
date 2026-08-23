@@ -2,9 +2,9 @@
 
 import { useEffect } from "react";
 import { ArrowRight, CreditCard, Loader2 } from "lucide-react";
-import { Button, Card } from "@spots/ui";
-import { formatLkr } from "@spots/utils";
-import { submitPayHere, type PayHereUserFields } from "@spots/api";
+import { Button, Card } from "@myslot/ui";
+import { formatLkr } from "@myslot/utils";
+import { submitPayHere, type PayHereUserFields } from "@myslot/api";
 
 export function PayHereForm({
   payment,

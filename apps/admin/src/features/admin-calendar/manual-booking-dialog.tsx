@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Button, Dialog, DialogContent, Input } from "@spots/ui";
-import { formatDateLong, formatLkr, formatTime12 } from "@spots/utils";
-import { toApiFailure } from "@spots/api";
-import type { CourtAvailability, Slot } from "@spots/types";
-import { SHEET_CLASS } from "@spots/ui";
+import { Button, Dialog, DialogContent, Input } from "@myslot/ui";
+import { formatDateLong, formatLkr, formatTime12 } from "@myslot/utils";
+import { toApiFailure } from "@myslot/api";
+import type { CourtAvailability, Slot } from "@myslot/types";
+import { SHEET_CLASS } from "@myslot/ui";
 import { useManualBooking } from "./use-manual-booking";
 
 export function ManualBookingDialog({

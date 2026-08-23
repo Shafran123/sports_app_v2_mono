@@ -3,17 +3,18 @@
 import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { toApiFailure } from "@spots/api";
-import { Button, Input, PasswordInput, Tabs, TabsContent, TabsList, TabsTrigger } from "@spots/ui";
-import { normalizePhone } from "@spots/utils";
+import { toApiFailure } from "@myslot/api";
+import { Button, BrandLockup, Input, PasswordInput, Tabs, TabsContent, TabsList, TabsTrigger } from "@myslot/ui";
+import { normalizePhone } from "@myslot/utils";
 import type { ConfirmationResult } from "firebase/auth";
 import {
   confirmPhoneOtp,
   loginWithEmail,
   sendPhoneOtp
-} from "@spots/auth";
+} from "@myslot/auth";
 import { VerifyPhoneModal } from "@/features/verify-phone/verify-phone-modal";
 import { useGoogleVerify } from "@/features/verify-phone/use-google-verify";
+import { useBrandName } from "@/hooks/use-brand-name";
 
 const FIREBASE_MESSAGES: Record<string, string> = {
   "auth/email-already-in-use": "An account with this email already exists.",
@@ -65,6 +66,7 @@ function GoogleGlyph() {
 
 export function LoginForm() {
   const router = useRouter();
+  const brand = useBrandName();
   const { login: loginViaGoogle, verifyOpen, closeVerify, busy: googleBusy } = useGoogleVerify(() =>
     router.push("/dashboard")
   );
@@ -161,7 +163,7 @@ export function LoginForm() {
     <section className="w-full max-w-md rounded-3xl border border-border bg-surface p-6 shadow-soft animate-fade-up sm:p-8">
       <div className="text-center">
         <p className="font-display text-3xl font-extrabold tracking-tight text-ink">
-          Spots<span className="text-primary">.</span>
+          <BrandLockup brand={brand} />
         </p>
         <p className="mt-2 text-sm text-ink-3">Welcome back. Find your game.</p>
       </div>
@@ -302,7 +304,7 @@ export function LoginForm() {
       </Tabs>
 
       <div className="mt-6 text-center text-sm">
-        <span className="text-ink-3">New to Spots?</span>{" "}
+        <span className="text-ink-3">New to {brand}?</span>{" "}
         <Link
           href="/register"
           className="font-semibold text-primary transition-colors hover:text-primary-hover"

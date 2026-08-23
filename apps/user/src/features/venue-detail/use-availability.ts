@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { venues } from "@spots/api";
+import { venues } from "@myslot/api";
 
 export function useAvailability(venueId: string, date: string) {
   return useQuery({

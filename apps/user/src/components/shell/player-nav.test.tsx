@@ -16,14 +16,14 @@ vi.mock("@/hooks/use-unread", () => ({
   useUnread: () => 3
 }));
 
-vi.mock("@spots/api", () => ({
+vi.mock("@myslot/api", () => ({
   featureFlags: {
     get: vi.fn(async () => ({
       phone_verification_required: false,
       sms_enabled: false,
       payhere_enabled: false,
       events_discovery_state: "enabled",
-      brand_name: "Spots"
+      brand_name: "MySlot.LK"
     }))
   }
 }));
@@ -48,6 +48,12 @@ describe("PlayerNav", () => {
     expect(screen.getByText("3")).toBeInTheDocument();
   });
 
+  it("renders the wordmark from the configured brand", async () => {
+    renderNav();
+    await waitFor(() => expect(screen.getByText("MySlot")).toBeInTheDocument());
+    expect(screen.getByText(".LK")).toBeInTheDocument();
+  });
+
   it("pushes the icon pair to the far right with a gap from the logo", () => {
     renderNav();
     const bell = screen.getByRole("link", { name: /notifications/i });
@@ -59,14 +65,14 @@ describe("PlayerNav", () => {
   });
 
   it("hides the Events link when discovery state is hidden", async () => {
-    const { featureFlags } = await import("@spots/api");
+    const { featureFlags } = await import("@myslot/api");
     const get = featureFlags.get as ReturnType<typeof vi.fn>;
     get.mockResolvedValue({
       phone_verification_required: false,
       sms_enabled: false,
       payhere_enabled: false,
       events_discovery_state: "hidden",
-      brand_name: "Spots"
+      brand_name: "MySlot.LK"
     });
     renderNav();
     await waitFor(() => expect(screen.queryByRole("link", { name: "Events" })).toBeNull());

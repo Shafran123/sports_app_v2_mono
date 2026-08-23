@@ -4,8 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Bell, Search } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { Avatar } from "@spots/ui";
-import { featureFlags } from "@spots/api";
+import { Avatar, BrandLockup } from "@myslot/ui";
+import { featureFlags } from "@myslot/api";
+import { DEFAULT_BRAND_NAME } from "@myslot/utils";
 import { useAuth } from "@/context/auth";
 import { useUnread } from "@/hooks/use-unread";
 
@@ -34,7 +35,7 @@ export function PlayerNav() {
     <header className="sticky top-0 z-40 border-b border-border bg-surface/85 backdrop-blur-lg">
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4">
         <Link href="/" className="shrink-0 font-display text-xl font-extrabold tracking-tight text-ink">
-          Spots<span className="text-primary">.</span>
+          <BrandLockup brand={flags?.brand_name ?? DEFAULT_BRAND_NAME} />
         </Link>
 
         <Link

@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Button, buttonVariants } from "@spots/ui";
-import { cn, formatLkr, formatTime12 } from "@spots/utils";
+import { Button, buttonVariants } from "@myslot/ui";
+import { cn, formatLkr, formatTime12 } from "@myslot/utils";
 import type { SelectionSummary } from "./selection";
 
 function ContinueButton({ count, total, href, className }: { count: number; total: number; href: string; className?: string }) {

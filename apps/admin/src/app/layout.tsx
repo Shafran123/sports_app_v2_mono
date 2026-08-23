@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Plus_Jakarta_Sans, Sora } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
+import { DEFAULT_BRAND_NAME } from "@myslot/utils";
 
 const plusJakarta = Plus_Jakarta_Sans({
   variable: "--font-plus-jakarta",
@@ -14,10 +15,25 @@ const sora = Sora({
   weight: ["800"]
 });
 
-export const metadata: Metadata = {
-  title: "Spots Console",
-  description: "Manage venues, courts, bookings and events."
-};
+async function getBrandName(): Promise<string> {
+  try {
+    const backend = process.env.NEXT_PUBLIC_API_URL || "http://localhost:2400";
+    const res = await fetch(`${backend}/api/v1/public/feature-flags`, { next: { revalidate: 300 } });
+    if (!res.ok) return DEFAULT_BRAND_NAME;
+    const body: { data?: { brand_name?: string } } = await res.json();
+    return body?.data?.brand_name || DEFAULT_BRAND_NAME;
+  } catch {
+    return DEFAULT_BRAND_NAME;
+  }
+}
+
+export async function generateMetadata(): Promise<Metadata> {
+  const brand = await getBrandName();
+  return {
+    title: `${brand} Console`,
+    description: "Manage venues, courts, bookings and events."
+  };
+}
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

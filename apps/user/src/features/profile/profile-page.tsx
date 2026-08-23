@@ -3,9 +3,9 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { LogOut, ShieldCheck } from "lucide-react";
-import { auth as authApi, toApiFailure } from "@spots/api";
-import { Avatar, Badge, Button, Card, Input, Toast } from "@spots/ui";
-import type { User } from "@spots/types";
+import { auth as authApi, toApiFailure } from "@myslot/api";
+import { Avatar, Badge, Button, Card, Input, Toast } from "@myslot/ui";
+import type { User } from "@myslot/types";
 import { useAuth } from "@/context/auth";
 import { VerifyPhoneModal } from "@/features/verify-phone/verify-phone-modal";
 

@@ -16,9 +16,9 @@ import {
   Wind,
   type LucideIcon
 } from "lucide-react";
-import { Badge, Card } from "@spots/ui";
-import { cn, dayName, formatLkr, humanizeSlug } from "@spots/utils";
-import type { VenueDetail } from "@spots/types";
+import { Badge, Card } from "@myslot/ui";
+import { cn, dayName, formatLkr, humanizeSlug } from "@myslot/utils";
+import type { VenueDetail } from "@myslot/types";
 
 const DAYS = [0, 1, 2, 3, 4, 5, 6];
 

@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { sports } from "@spots/api";
-import { Skeleton } from "@spots/ui";
-import { sportGlyph } from "@spots/utils";
+import { sports } from "@myslot/api";
+import { Skeleton } from "@myslot/ui";
+import { sportGlyph } from "@myslot/utils";
 import { SectionHeader } from "./section-header";
 
 const PILL_SKELETONS = Array.from({ length: 8 });

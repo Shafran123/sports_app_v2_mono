@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
-import { Button, Input } from "@spots/ui";
+import { Button, Input } from "@myslot/ui";
 
 const ROTATING_WORDS = [
   "Badminton",

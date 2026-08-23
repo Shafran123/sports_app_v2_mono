@@ -3,10 +3,10 @@
 import * as React from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { admin, toApiFailure } from "@spots/api";
-import { Button, Card, EmptyState, Skeleton, Tabs, TabsContent, TabsList, TabsTrigger } from "@spots/ui";
-import { formatLkr } from "@spots/utils";
-import type { AdminConfig, AdminReports, FeatureFlagDef } from "@spots/types";
+import { admin, toApiFailure } from "@myslot/api";
+import { Button, Card, EmptyState, Skeleton, Tabs, TabsContent, TabsList, TabsTrigger } from "@myslot/ui";
+import { formatLkr } from "@myslot/utils";
+import type { AdminConfig, AdminReports, FeatureFlagDef } from "@myslot/types";
 
 export function SettingsPage() {
   const { data, isError, isLoading, refetch } = useQuery({
@@ -24,6 +24,7 @@ export function SettingsPage() {
       <Tabs defaultValue="flags">
         <TabsList>
           <TabsTrigger value="flags">Feature flags</TabsTrigger>
+          <TabsTrigger value="brand">Brand</TabsTrigger>
           <TabsTrigger value="tax">Tax</TabsTrigger>
           <TabsTrigger value="reports">Reports</TabsTrigger>
           <TabsTrigger value="audit">Audit log</TabsTrigger>
@@ -36,6 +37,16 @@ export function SettingsPage() {
             <PanelError onRetry={() => refetch()} />
           ) : (
             <FlagsPanel config={data} />
+          )}
+        </TabsContent>
+
+        <TabsContent value="brand" className="mt-5">
+          {isLoading ? (
+            <Card className="p-6"><div className="skeleton h-24 rounded-2xl" /></Card>
+          ) : isError || !data ? (
+            <PanelError onRetry={() => refetch()} />
+          ) : (
+            <BrandPanel config={data} />
           )}
         </TabsContent>
 
@@ -126,6 +137,49 @@ function FlagsPanel({ config }: { config: AdminConfig }) {
           </li>
         ))}
       </ul>
+    </Card>
+  );
+}
+
+function BrandPanel({ config }: { config: AdminConfig }) {
+  const qc = useQueryClient();
+  const [name, setName] = React.useState(config.brand_name);
+  const [error, setError] = React.useState<string | null>(null);
+  const [saved, setSaved] = React.useState(false);
+
+  const save = useMutation({
+    mutationFn: () => admin.setConfigKey("brand_name", name),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-config"] });
+      setError(null);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    },
+    onError: (e) => setError(toApiFailure(e)?.message ?? "Could not save the brand name.")
+  });
+
+  return (
+    <Card className="p-6">
+      <h2 className="font-semibold text-ink">Brand name</h2>
+      <p className="mt-1 text-sm text-ink-2">
+        The platform name shown to players and venue owners across the apps. Emails and SMS keep their own
+        sender identity.
+      </p>
+      <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <input
+          aria-label="Brand name"
+          type="text"
+          maxLength={40}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="w-64 rounded-xl border border-border bg-surface px-3 py-2 text-sm text-ink"
+        />
+        <Button variant="primary" size="sm" onClick={() => save.mutate()} disabled={save.isPending || !name.trim()}>
+          {save.isPending ? "Saving…" : "Save brand"}
+        </Button>
+        {saved && <span className="text-sm text-success">Saved — brand names update immediately.</span>}
+      </div>
+      {error && <p className="mt-3 rounded-xl bg-red-50 p-3 text-sm text-error">{error}</p>}
     </Card>
   );
 }

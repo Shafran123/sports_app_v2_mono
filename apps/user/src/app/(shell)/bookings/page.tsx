@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { BookingsList } from "@/features/bookings/bookings-list";
-import { SkeletonRow } from "@spots/ui";
+import { SkeletonRow } from "@myslot/ui";
 
 export default function Page() {
   return (

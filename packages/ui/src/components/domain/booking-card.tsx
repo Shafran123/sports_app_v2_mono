@@ -1,8 +1,8 @@
 import * as React from "react";
 import { CalendarDays, Clock, MapPin } from "lucide-react";
-import { formatLkr } from "@spots/utils";
-import type { Booking } from "@spots/types";
-import { cn } from "@spots/utils";
+import { formatLkr } from "@myslot/utils";
+import type { Booking } from "@myslot/types";
+import { cn } from "@myslot/utils";
 import { StatusPill } from "../ui/badge";
 import { Card } from "../ui/card";
 

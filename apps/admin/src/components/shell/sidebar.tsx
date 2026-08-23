@@ -15,8 +15,10 @@ import {
   Users,
   X
 } from "lucide-react";
-import { cn } from "@spots/utils";
+import { cn } from "@myslot/utils";
+import { BrandLockup } from "@myslot/ui";
 import { useAuth } from "@/context/auth";
+import { useBrandName } from "@/hooks/use-brand-name";
 
 const STAFF_NAV = [
   { section: "Operations", items: [{ href: "/", label: "Dashboard", icon: LayoutDashboard }] }
@@ -88,6 +90,7 @@ export function AdminSidebar({ role }: { role: "admin" | "venue_owner" }) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuth();
+  const brand = useBrandName();
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -112,7 +115,7 @@ export function AdminSidebar({ role }: { role: "admin" | "venue_owner" }) {
       >
         <div className="flex h-16 items-center justify-between border-b border-border px-5">
           <Link href="/" className="font-display text-xl font-extrabold tracking-tight text-ink">
-            Spots<span className="text-primary">.</span>
+            <BrandLockup brand={brand} />
             <span className="ml-1.5 align-middle text-xs font-semibold text-ink-3">Console</span>
           </Link>
           <button
@@ -191,7 +194,7 @@ export function AdminSidebar({ role }: { role: "admin" | "venue_owner" }) {
           <Menu className="h-5 w-5" />
         </button>
         <p className="font-display font-extrabold tracking-tight text-ink">
-          Spots<span className="text-primary">.</span>
+          <BrandLockup brand={brand} />
         </p>
       </header>
     </>

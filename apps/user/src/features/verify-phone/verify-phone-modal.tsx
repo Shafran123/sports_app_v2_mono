@@ -1,9 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { auth as authApi, toApiFailure } from "@spots/api";
-import { Button, Dialog, DialogContent, Input } from "@spots/ui";
-import type { User } from "@spots/types";
+import { auth as authApi, toApiFailure } from "@myslot/api";
+import { Button, Dialog, DialogContent, Input } from "@myslot/ui";
+import type { User } from "@myslot/types";
 import { useAuth } from "@/context/auth";
 
 interface VerifyPhoneModalProps {

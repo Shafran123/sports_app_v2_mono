@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Clock, Info, Lock, MapPin, Plus, RefreshCw, Trash2 } from "lucide-react";
-import { courts, sports, venues, business, getClient, toApiFailure } from "@spots/api";
+import { courts, sports, venues, business, getClient, toApiFailure } from "@myslot/api";
 import {
   Badge,
   Button,
@@ -21,9 +21,9 @@ import {
   TabsContent,
   TabsList,
   TabsTrigger
-} from "@spots/ui";
-import { dayName, formatLkr } from "@spots/utils";
-import type { Block, VenueHours } from "@spots/types";
+} from "@myslot/ui";
+import { dayName, formatLkr } from "@myslot/utils";
+import type { Block, VenueHours } from "@myslot/types";
 import { fetchMyVenues, fetchOwnerCourts } from "./venue-api";
 import { PhotoUploader } from "./photo-uploader";
 

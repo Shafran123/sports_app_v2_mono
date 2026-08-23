@@ -4,8 +4,8 @@ import * as React from "react";
 import { useEffect, useState, type FormEvent } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { CalendarDays, Clock, MapPin, Plus, Users, AlertTriangle } from "lucide-react";
-import { sports, venues, events as eventsApi, featureFlags, toApiFailure } from "@spots/api";
-import type { Event } from "@spots/types";
+import { sports, venues, events as eventsApi, featureFlags, toApiFailure } from "@myslot/api";
+import type { Event } from "@myslot/types";
 import {
   Button,
   Card,
@@ -23,8 +23,8 @@ import {
   Skeleton,
   StatusPill,
   Textarea
-} from "@spots/ui";
-import { formatDateLong, formatLkr, formatTime12 } from "@spots/utils";
+} from "@myslot/ui";
+import { formatDateLong, formatLkr, formatTime12, DEFAULT_BRAND_NAME } from "@myslot/utils";
 import { useToasts } from "./toasts";
 
 
@@ -96,7 +96,7 @@ export function EventsManager() {
     queryFn: () => featureFlags.get()
   });
   const discovery = flagsQuery.data?.events_discovery_state ?? "enabled";
-  const brandName = flagsQuery.data?.brand_name ?? "Spots";
+  const brandName = flagsQuery.data?.brand_name ?? DEFAULT_BRAND_NAME;
 
   useEffect(() => {
     if (listQuery.data) setEventsList(listQuery.data);

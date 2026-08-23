@@ -1,5 +1,5 @@
 {
-  "name": "@spots/types",
+  "name": "@myslot/types",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -16,7 +16,7 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
-    "@spots/config": "workspace:*",
+    "@myslot/config": "workspace:*",
     "typescript": "^5.7.2",
     "vitest": "^3.0.5",
     "eslint": "^9.18.0",

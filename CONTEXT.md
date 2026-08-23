@@ -1,8 +1,12 @@
 # Spots — Sports Booking Marketplace
 
-A multi-sided marketplace where players book courts at venues, venue owners run their facilities, and admins oversee the platform. MVP focused on Sri Lanka. Brand name is admin-configurable (default "Spots").
+A multi-sided marketplace where players book courts at venues, venue owners run their facilities, and admins oversee the platform. MVP focused on Sri Lanka. Brand name is admin-configurable (default "MySlot.LK").
 
 ## Language
+
+**Brand Name**:
+The admin-configurable display name of the platform (default "MySlot.LK"), shown to Players and Venue Owners on config-driven surfaces. Distinct from the internal package namespace and from the transactional email from-address, which are code-baked.
+_Avoid_: product name, brand (bare)
 
 **Venue**:
 A sports facility that lists courts for hire. Has an owner, address, photos, opening hours, and a cancellation policy. Lifecycle: pending → approved → (rejected / suspended / banned / archived).

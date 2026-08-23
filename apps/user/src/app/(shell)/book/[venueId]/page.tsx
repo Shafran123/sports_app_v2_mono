@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { CheckoutPage } from "@/features/checkout/checkout-page";
-import { SkeletonRow } from "@spots/ui";
+import { SkeletonRow } from "@myslot/ui";
 
 export default async function CheckoutRoute({ params }: { params: Promise<{ venueId: string }> }) {
   const { venueId } = await params;

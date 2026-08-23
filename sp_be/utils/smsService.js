@@ -3,7 +3,7 @@ const { fmtWhen } = require('./format');
 const { getFlag } = require('./featureFlags');
 
 const SMSGO_URL = process.env.SMSGO_URL || 'https://api.smsgo.lk/api/v1/sms/send';
-const DEFAULT_MASK = process.env.SMSGO_MASK || 'SPOTS';
+const DEFAULT_MASK = process.env.SMSGO_MASK || 'MYSLOT';
 
 function isConfigured() {
   return Boolean(process.env.SMSGO_API_KEY);
@@ -19,11 +19,11 @@ function formatSriLankanPhone(phone) {
 
 function buildBookingSms(booking) {
   const method = booking.payment_method === 'cash' ? 'Pay at venue' : 'Paid online';
-  return `Spots: Booking confirmed at ${booking.venue_name || ''} (${booking.court_name || ''}) on ${fmtWhen(booking.start_at)}. ${method}. Show the QR at check-in.`;
+  return `MySlot.LK: Booking confirmed at ${booking.venue_name || ''} (${booking.court_name || ''}) on ${fmtWhen(booking.start_at)}. ${method}. Show the QR at check-in.`;
 }
 
 function buildCancellationSms(booking) {
-  return `Spots: Your booking at ${booking.venue_name || ''} (${booking.court_name || ''}) on ${fmtWhen(booking.start_at)} was cancelled by the venue.`;
+  return `MySlot.LK: Your booking at ${booking.venue_name || ''} (${booking.court_name || ''}) on ${fmtWhen(booking.start_at)} was cancelled by the venue.`;
 }
 
 /**

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import * as TabsPrimitive from "@radix-ui/react-tabs";
-import { cn } from "@spots/utils";
+import { cn } from "@myslot/utils";
 
 export function Tabs({ defaultValue, value, onValueChange, children }: { defaultValue?: string; value?: string; onValueChange?: (v: string) => void; children: React.ReactNode }) {
   return (

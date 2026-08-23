@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { Toast, ToastViewport, type ToastTone } from "@spots/ui";
+import { Toast, ToastViewport, type ToastTone } from "@myslot/ui";
 
 export type ToastItem = {
   id: number;

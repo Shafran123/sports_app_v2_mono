@@ -2,8 +2,8 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { auth as authApi, TOKEN_KEY } from "@spots/api";
-import type { Role, User } from "@spots/types";
+import { auth as authApi, TOKEN_KEY } from "@myslot/api";
+import type { Role, User } from "@myslot/types";
 import { watchAuth } from "./firebase";
 import { logoutFirebase } from "./firebaseAuth";
 

@@ -1,5 +1,5 @@
 import * as React from "react";
-import { cn } from "@spots/utils";
+import { cn } from "@myslot/utils";
 
 export function Progress({ value, className, tone = "primary" }: { value: number; className?: string; tone?: "primary" | "warning" | "error" }) {
   const pct = Math.max(0, Math.min(100, value));

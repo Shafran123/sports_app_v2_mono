@@ -4,9 +4,9 @@ import * as React from "react";
 import * as QRCode from "qrcode";
 import Link from "next/link";
 import { MapPin } from "lucide-react";
-import { buttonVariants, Dialog, DialogContent, SHEET_CLASS, Skeleton, StatusPill } from "@spots/ui";
-import { formatDateLong, formatLkr, formatTime12 } from "@spots/utils";
-import type { Booking } from "@spots/types";
+import { buttonVariants, Dialog, DialogContent, SHEET_CLASS, Skeleton, StatusPill } from "@myslot/ui";
+import { formatDateLong, formatLkr, formatTime12 } from "@myslot/utils";
+import type { Booking } from "@myslot/types";
 
 function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (

@@ -1,7 +1,7 @@
 "use client";
 
-import { VenueVisual } from "@spots/ui";
-import { cn } from "@spots/utils";
+import { VenueVisual } from "@myslot/ui";
+import { cn } from "@myslot/utils";
 
 export function Gallery({
   photos,

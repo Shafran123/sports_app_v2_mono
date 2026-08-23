@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { io, type Socket } from "socket.io-client";
 import { useAuth } from "@/context/auth";
-import { TOKEN_KEY } from "@spots/api";
+import { TOKEN_KEY } from "@myslot/api";
 
 const BOOKING_EVENTS = [
   "booking.created",

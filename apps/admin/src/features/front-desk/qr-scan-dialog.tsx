@@ -3,11 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import jsQR from "jsqr";
-import { Button, Dialog, DialogContent, ErrorState, Input, StatusPill } from "@spots/ui";
-import { toApiFailure, business } from "@spots/api";
-import { SHEET_CLASS } from "@spots/ui";
-import { formatDateLong, formatLkr, formatTime12 } from "@spots/utils";
-import type { Booking } from "@spots/types";
+import { Button, Dialog, DialogContent, ErrorState, Input, StatusPill } from "@myslot/ui";
+import { toApiFailure, business } from "@myslot/api";
+import { SHEET_CLASS } from "@myslot/ui";
+import { formatDateLong, formatLkr, formatTime12 } from "@myslot/utils";
+import type { Booking } from "@myslot/types";
 
 export function QrScanDialog({
   open,

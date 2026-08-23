@@ -14,19 +14,19 @@ importers:
 
   apps/admin:
     dependencies:
-      '@spots/api':
+      '@myslot/api':
         specifier: workspace:*
         version: link:../../packages/api
-      '@spots/auth':
+      '@myslot/auth':
         specifier: workspace:^
         version: link:../../packages/auth
-      '@spots/types':
+      '@myslot/types':
         specifier: workspace:*
         version: link:../../packages/types
-      '@spots/ui':
+      '@myslot/ui':
         specifier: workspace:*
         version: link:../../packages/ui
-      '@spots/utils':
+      '@myslot/utils':
         specifier: workspace:*
         version: link:../../packages/utils
       '@tanstack/react-query':
@@ -69,7 +69,7 @@ importers:
         specifier: ^5.0.3
         version: 5.0.3(@types/react@19.0.0)(react@19.0.0)
     devDependencies:
-      '@spots/config':
+      '@myslot/config':
         specifier: workspace:*
         version: link:../../packages/config
       '@tailwindcss/postcss':
@@ -108,19 +108,19 @@ importers:
 
   apps/user:
     dependencies:
-      '@spots/api':
+      '@myslot/api':
         specifier: workspace:*
         version: link:../../packages/api
-      '@spots/auth':
+      '@myslot/auth':
         specifier: workspace:^
         version: link:../../packages/auth
-      '@spots/types':
+      '@myslot/types':
         specifier: workspace:*
         version: link:../../packages/types
-      '@spots/ui':
+      '@myslot/ui':
         specifier: workspace:*
         version: link:../../packages/ui
-      '@spots/utils':
+      '@myslot/utils':
         specifier: workspace:*
         version: link:../../packages/utils
       '@tanstack/react-query':
@@ -157,7 +157,7 @@ importers:
         specifier: ^5.0.3
         version: 5.0.3(@types/react@19.0.0)(react@19.0.0)
     devDependencies:
-      '@spots/config':
+      '@myslot/config':
         specifier: workspace:*
         version: link:../../packages/config
       '@tailwindcss/postcss':
@@ -199,7 +199,7 @@ importers:
 
   packages/api:
     dependencies:
-      '@spots/types':
+      '@myslot/types':
         specifier: workspace:*
         version: link:../types
       axios:
@@ -209,7 +209,7 @@ importers:
         specifier: ^3.24.1
         version: 3.24.1
     devDependencies:
-      '@spots/config':
+      '@myslot/config':
         specifier: workspace:*
         version: link:../config
       '@typescript-eslint/eslint-plugin':
@@ -233,13 +233,13 @@ importers:
 
   packages/auth:
     dependencies:
-      '@spots/api':
+      '@myslot/api':
         specifier: workspace:*
         version: link:../api
-      '@spots/types':
+      '@myslot/types':
         specifier: workspace:*
         version: link:../types
-      '@spots/utils':
+      '@myslot/utils':
         specifier: workspace:*
         version: link:../utils
       firebase:
@@ -255,7 +255,7 @@ importers:
         specifier: ^19.0.0
         version: 19.0.0(react@19.0.0)
     devDependencies:
-      '@spots/config':
+      '@myslot/config':
         specifier: workspace:*
         version: link:../config
       '@testing-library/jest-dom':
@@ -303,7 +303,7 @@ importers:
         specifier: ^3.24.1
         version: 3.24.1
     devDependencies:
-      '@spots/config':
+      '@myslot/config':
         specifier: workspace:*
         version: link:../config
       '@typescript-eslint/eslint-plugin':
@@ -327,6 +327,12 @@ importers:
 
   packages/ui:
     dependencies:
+      '@myslot/types':
+        specifier: workspace:*
+        version: link:../types
+      '@myslot/utils':
+        specifier: workspace:*
+        version: link:../utils
       '@radix-ui/react-dialog':
         specifier: ^1.1.4
         version: 1.1.4(@types/react-dom@19.0.0)(@types/react@19.0.0)(react-dom@19.0.0)(react@19.0.0)
@@ -339,12 +345,6 @@ importers:
       '@radix-ui/react-tooltip':
         specifier: ^1.1.6
         version: 1.1.6(@types/react-dom@19.0.0)(@types/react@19.0.0)(react-dom@19.0.0)(react@19.0.0)
-      '@spots/types':
-        specifier: workspace:*
-        version: link:../types
-      '@spots/utils':
-        specifier: workspace:*
-        version: link:../utils
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -361,7 +361,7 @@ importers:
         specifier: ^19.0.0
         version: 19.0.0(react@19.0.0)
     devDependencies:
-      '@spots/config':
+      '@myslot/config':
         specifier: workspace:*
         version: link:../config
       '@testing-library/jest-dom':
@@ -413,7 +413,7 @@ importers:
         specifier: ^2.6.0
         version: 2.6.0
     devDependencies:
-      '@spots/config':
+      '@myslot/config':
         specifier: workspace:*
         version: link:../config
       '@typescript-eslint/eslint-plugin':

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 const { sendPhoneOtpMock, confirmPhoneOtpMock, loginWithGoogleMock, meMock, setUserMock, pushMock } = vi.hoisted(() => ({
   sendPhoneOtpMock: vi.fn(),
@@ -15,7 +16,7 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: pushMock })
 }));
 
-vi.mock("@spots/auth", () => ({
+vi.mock("@myslot/auth", () => ({
   loginWithEmail: vi.fn(),
   loginWithGoogle: loginWithGoogleMock,
   sendPhoneOtp: sendPhoneOtpMock,
@@ -26,13 +27,22 @@ vi.mock("@/context/auth", () => ({
   useAuth: () => ({ user: { id: "u1" }, loading: false, logout: vi.fn(), setUser: setUserMock })
 }));
 
-vi.mock("@spots/api", () => ({
+vi.mock("@myslot/api", () => ({
   auth: { me: meMock, verifyPhoneSend: vi.fn(), verifyPhoneConfirm: vi.fn() },
-  featureFlags: { get: vi.fn(async () => ({ phone_verification_required: true, sms_enabled: false, payhere_enabled: false, events_discovery_state: "enabled", brand_name: "Spots" })) },
+  featureFlags: { get: vi.fn(async () => ({ phone_verification_required: true, sms_enabled: false, payhere_enabled: false, events_discovery_state: "enabled", brand_name: "MySlot.LK" })) },
   toApiFailure: (e: unknown) => ({ message: (e as Error).message })
 }));
 
 import { LoginForm } from "./login-form";
+
+function renderForm() {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={client}>
+      <LoginForm />
+    </QueryClientProvider>
+  );
+}
 
 async function openPhoneTab(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole("tab", { name: "Phone OTP" }));
@@ -45,14 +55,14 @@ describe("LoginForm — phone OTP tab", () => {
 
   it("shows the SMS disclosure line", async () => {
     const user = userEvent.setup();
-    render(<LoginForm />);
+    renderForm();
     await openPhoneTab(user);
     expect(screen.getByText(/Standard SMS rates apply/)).toBeInTheDocument();
   });
 
   it("rejects a malformed phone number locally without calling Firebase", async () => {
     const user = userEvent.setup();
-    render(<LoginForm />);
+    renderForm();
     await openPhoneTab(user);
 
     await user.type(screen.getByRole("textbox"), "071 234 5678");
@@ -65,7 +75,7 @@ describe("LoginForm — phone OTP tab", () => {
   it("normalizes a valid phone number before sending", async () => {
     sendPhoneOtpMock.mockResolvedValue({ confirm: vi.fn() });
     const user = userEvent.setup();
-    render(<LoginForm />);
+    renderForm();
     await openPhoneTab(user);
 
     await user.type(screen.getByRole("textbox"), "+94 71 234 5678");
@@ -77,7 +87,7 @@ describe("LoginForm — phone OTP tab", () => {
 
   it("toggles the password field between hidden and visible", async () => {
     const user = userEvent.setup();
-    render(<LoginForm />);
+    renderForm();
 
     const password = screen.getByLabelText("Password");
     expect(password).toHaveAttribute("type", "password");
@@ -107,7 +117,7 @@ describe("LoginForm — Google sign-in verify prompt", () => {
       phone_verified_at: null
     });
     const user = userEvent.setup();
-    render(<LoginForm />);
+    renderForm();
 
     const googleButton = screen.getByRole("button", { name: /Continue with Google|Sign in with Google|Google/i });
     await user.click(googleButton);
@@ -127,7 +137,7 @@ describe("LoginForm — Google sign-in verify prompt", () => {
       phone_verified_at: "2026-08-22T10:00:00.000Z"
     });
     const user = userEvent.setup();
-    render(<LoginForm />);
+    renderForm();
 
     await user.click(screen.getByRole("button", { name: /Google/i }));
 

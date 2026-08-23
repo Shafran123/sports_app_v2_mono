@@ -21,11 +21,11 @@ vi.mock("@/context/auth", () => ({
   })
 }));
 
-vi.mock("@spots/api", () => ({
+vi.mock("@myslot/api", () => ({
   admin: { listPlayers: listPlayersMock, verifyPlayer: verifyPlayerMock }
 }));
 
-import { admin } from "@spots/api";
+import { admin } from "@myslot/api";
 import { PlayersPage } from "./players-page";
 
 const players = [

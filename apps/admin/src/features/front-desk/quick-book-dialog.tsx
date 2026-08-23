@@ -2,11 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { venues, business, toApiFailure } from "@spots/api";
-import { Button, Dialog, DialogContent, Input, SelectSheet, Skeleton } from "@spots/ui";
-import { formatLkr, formatTime12, toDateKey } from "@spots/utils";
-import type { Venue } from "@spots/types";
-import { SHEET_CLASS } from "@spots/ui";
+import { venues, business, toApiFailure } from "@myslot/api";
+import { Button, Dialog, DialogContent, Input, SelectSheet, Skeleton } from "@myslot/ui";
+import { formatLkr, formatTime12, toDateKey } from "@myslot/utils";
+import type { Venue } from "@myslot/types";
+import { SHEET_CLASS } from "@myslot/ui";
 import { useManualBooking } from "@/features/admin-calendar/use-manual-booking";
 
 export function QuickBookDialog({

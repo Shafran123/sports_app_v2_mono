@@ -2,9 +2,10 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { toApiFailure } from "@spots/api";
-import { Button, Input, PasswordInput } from "@spots/ui";
-import { loginWithEmail } from "@spots/auth";
+import { toApiFailure } from "@myslot/api";
+import { Button, BrandLockup, Input, PasswordInput } from "@myslot/ui";
+import { loginWithEmail } from "@myslot/auth";
+import { useBrandName } from "@/hooks/use-brand-name";
 
 const FIREBASE_MESSAGES: Record<string, string> = {
   "auth/invalid-email": "Enter a valid email address.",
@@ -25,6 +26,7 @@ function messageFor(error: unknown): string {
 
 export function LoginForm() {
   const router = useRouter();
+  const brand = useBrandName();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -52,7 +54,7 @@ export function LoginForm() {
     <section className="w-full max-w-md rounded-3xl border border-border bg-surface p-6 shadow-soft animate-fade-up sm:p-8">
       <div className="text-center">
         <p className="font-display text-3xl font-extrabold tracking-tight text-ink">
-          Spots<span className="text-primary">.</span> Console
+          <BrandLockup brand={brand} /> Console
         </p>
         <p className="mt-2 text-sm text-ink-3">Staff &amp; venue owners</p>
       </div>

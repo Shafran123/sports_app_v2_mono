@@ -1,7 +1,7 @@
 "use client";
 
-import { cn } from "@spots/utils";
-import type { BookingStatus } from "@spots/types";
+import { cn } from "@myslot/utils";
+import type { BookingStatus } from "@myslot/types";
 
 const FLOW: { status: BookingStatus; label: string }[] = [
   { status: "pending", label: "Pending" },

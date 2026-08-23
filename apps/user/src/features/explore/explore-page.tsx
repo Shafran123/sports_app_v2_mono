@@ -4,9 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { Search } from "lucide-react";
-import { venues } from "@spots/api";
-import type { Venue } from "@spots/types";
-import { Input } from "@spots/ui";
+import { venues } from "@myslot/api";
+import type { Venue } from "@myslot/types";
+import { Input } from "@myslot/ui";
 import { ExploreFilters } from "./explore-filters";
 import { VenueResults } from "./venue-results";
 

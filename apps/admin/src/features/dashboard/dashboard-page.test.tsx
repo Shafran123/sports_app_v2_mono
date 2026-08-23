@@ -15,7 +15,7 @@ vi.mock("@/context/auth", () => ({
   })
 }));
 
-vi.mock("@spots/api", () => ({
+vi.mock("@myslot/api", () => ({
   business: { overview: vi.fn() },
   admin: {
     overview: vi.fn(),
@@ -23,7 +23,7 @@ vi.mock("@spots/api", () => ({
   }
 }));
 
-import { admin, business } from "@spots/api";
+import { admin, business } from "@myslot/api";
 
 function renderPage() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });

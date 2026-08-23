@@ -1,6 +1,6 @@
 "use client";
 
-import { addDaysKey, cn, dayjs, toDateKey } from "@spots/utils";
+import { addDaysKey, cn, dayjs, toDateKey } from "@myslot/utils";
 
 const DAY_COUNT = 7;
 

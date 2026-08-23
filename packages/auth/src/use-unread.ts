@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { notifications } from "@spots/api";
+import { notifications } from "@myslot/api";
 import { useAuth } from "./auth-context";
 
 /** Unread notification count, refreshed when the auth user changes. */

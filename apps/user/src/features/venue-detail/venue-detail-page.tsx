@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { venues, featureFlags, toApiFailure } from "@spots/api";
-import { Card, ErrorState, Skeleton, SkeletonCard } from "@spots/ui";
-import { dayjs, firstSportSlug, formatLkr, toDateKey } from "@spots/utils";
-import type { CourtAvailability, Slot } from "@spots/types";
+import { venues, featureFlags, toApiFailure } from "@myslot/api";
+import { Card, ErrorState, Skeleton, SkeletonCard } from "@myslot/ui";
+import { dayjs, firstSportSlug, formatLkr, toDateKey } from "@myslot/utils";
+import type { CourtAvailability, Slot } from "@myslot/types";
 import { useAuth } from "@/context/auth";
 import { VerifiedPhonePrompt } from "@/features/verify-phone/verified-phone-prompt";
 import { VerifyPhoneModal } from "@/features/verify-phone/verify-phone-modal";
