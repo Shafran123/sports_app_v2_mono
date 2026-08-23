@@ -2,7 +2,6 @@
 
 import { copy } from "@/lib/copy";
 import { Hero } from "./hero";
-import { Nav } from "./nav";
 import { HowItWorks } from "./how-it-works";
 import { FeatureSection } from "./features/section";
 import { TrialBand } from "./trial-band";
@@ -14,7 +13,6 @@ import { Reveal } from "./reveal";
 export function LandingPage() {
   return (
     <main className="min-h-screen bg-paper text-ink">
-      <Nav />
       <Hero />
 
       <Reveal>

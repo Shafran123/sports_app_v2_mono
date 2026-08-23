@@ -38,15 +38,14 @@ describe("LandingPage", () => {
     expect(screen.queryByRole("link", { name: /claim your free trial/i })).not.toBeInTheDocument();
   });
 
-  it("renders the For players nav link pointing at the player app", () => {
+  it("has no header — the logo lives at the top of the hero", () => {
     renderPage();
-    expect(screen.getByRole("link", { name: "For players" })).toHaveAttribute("href", "http://localhost:3000");
-  });
-
-  it("renders a mobile demo CTA in the header", () => {
-    renderPage();
-    const mobileCta = screen.getByRole("link", { name: "Book a demo" });
-    expect(mobileCta).toHaveAttribute("href", "#inquire");
+    expect(screen.queryByRole("banner")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "For players" })).not.toBeInTheDocument();
+    const hero = screen.getByRole("heading", { level: 1 }).parentElement;
+    expect(hero).toBeInTheDocument();
+    expect(within(hero as HTMLElement).getAllByText(/MySlot/).length).toBeGreaterThan(0);
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(/booked-out/i);
   });
 
   it("renders the two player feature sections after the owner features", () => {
@@ -78,13 +77,6 @@ describe("LandingPage", () => {
     expect(screen.getByText(/be one of the first venues on it/i)).toBeInTheDocument();
   });
 
-  it("renders the nav at the top with the hero headline", () => {
-    renderPage();
-    const header = screen.getByRole("banner");
-    expect(within(header).getByRole("link", { name: "List your venue" })).toHaveAttribute("href", "#inquire");
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(/booked-out/i);
-  });
-
   it("rotates the one-word headline as the only USP, lead-in + fine print", () => {
     renderPage();
     const h1 = screen.getByRole("heading", { level: 1 });
@@ -99,14 +91,6 @@ describe("LandingPage", () => {
     renderPage();
     const cue = screen.getByRole("link", { name: /scroll to see how it works/i });
     expect(cue).toHaveAttribute("href", "#how-it-works");
-  });
-
-  it("renders a transparent non-sticky header with a filled demo CTA", () => {
-    renderPage();
-    const header = screen.getByRole("banner");
-    expect(header).not.toHaveClass("sticky");
-    const desktopCta = within(header).getByRole("link", { name: "List your venue" });
-    expect(desktopCta).toHaveClass("bg-primary");
   });
 
   it("renders the one-word rotating USP as the headline, no phrase prefix", () => {

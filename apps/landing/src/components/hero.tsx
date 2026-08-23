@@ -1,19 +1,25 @@
 "use client";
 
-import { buttonVariants } from "@myslot/ui";
+import { buttonVariants, BrandLockup } from "@myslot/ui";
 import { copy } from "@/lib/copy";
 import { trackCta } from "@/lib/analytics";
+import { useBrandName } from "@/hooks/use-brand-name";
 import { RotatingHeadline } from "./rotating-headline";
 import { ScrollCue } from "./scroll-cue";
 import { TrackSection } from "./track-section";
 
 export function Hero() {
+  const brand = useBrandName();
+
   return (
     <section className="relative flex min-h-[100svh] flex-col items-center justify-center overflow-hidden border-b border-border bg-paper">
       <TrackSection name="hero" />
-      <div className="mx-auto w-full max-w-5xl px-4 pb-24 pt-0 text-center sm:pt-6">
-        <h1 className="font-display text-ink">
-          <span className="block animate-fade-up text-2xl font-extrabold tracking-tight sm:text-3xl">
+      <div className="mx-auto w-full max-w-5xl px-4 pb-10 pt-8 text-center">
+        <p className="animate-fade-up font-display text-2xl font-extrabold tracking-tight text-ink">
+          <BrandLockup brand={brand} />
+        </p>
+        <h1 className="mt-8 font-display text-ink">
+          <span className="block animate-fade-up text-xl font-extrabold tracking-tight sm:text-2xl">
             {copy.hero.headlineLead}
           </span>
           <span
@@ -27,7 +33,7 @@ export function Hero() {
           {copy.hero.body}
         </p>
         <div
-          className="animate-pop-in mt-8 flex flex-wrap items-center justify-center gap-3"
+          className="animate-pop-in mt-6 flex flex-wrap items-center justify-center gap-3"
           style={{ animationDelay: "0.24s" }}
         >
           <a
