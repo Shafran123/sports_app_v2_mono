@@ -18,14 +18,14 @@ export interface Screenshot {
  *   3. `DeviceFrame` renders the image instead of the mockup — nothing else changes.
  */
 export const screenshots: Screenshot[] = [
-  { id: "hero-player", label: "Player app — find your game", frame: "phone" },
+  { id: "hero-player", label: "Player app — find your game", frame: "phone", src: "/shots/hero-player.png" },
   { id: "real-time-bookings", label: "Courts bookable in real time", frame: "browser" },
-  { id: "front-desk", label: "Front-desk & walk-in check-ins", frame: "phone" },
-  { id: "payments", label: "Payments your way", frame: "browser" },
-  { id: "events", label: "Events & registrations", frame: "phone" },
+  { id: "front-desk", label: "Front-desk & walk-in check-ins", frame: "phone", src: "/shots/front-desk.png" },
+  { id: "payments", label: "Payments your way", frame: "phone", src: "/shots/payments.png" },
+  { id: "events", label: "Events & registrations", frame: "phone", src: "/shots/events.png" },
   { id: "owner-dashboard", label: "Know what's happening", frame: "browser" },
-  { id: "player-venue-detail", label: "Pick a court, pick a slot", frame: "phone" },
-  { id: "player-confirmation", label: "Your booking, QR-ready", frame: "phone" }
+  { id: "player-venue-detail", label: "Pick a court, pick a slot", frame: "phone", src: "/shots/player-venue-detail.png" },
+  { id: "player-confirmation", label: "Your booking, QR-ready", frame: "phone", src: "/shots/player-confirmation.png" }
 ];
 
 export function getScreenshot(id: string): Screenshot | undefined {

@@ -43,6 +43,12 @@ describe("LandingPage", () => {
     expect(screen.getByRole("link", { name: "For players" })).toHaveAttribute("href", "http://localhost:3000");
   });
 
+  it("renders a mobile demo CTA in the header", () => {
+    renderPage();
+    const mobileCta = screen.getByRole("link", { name: "Book a demo" });
+    expect(mobileCta).toHaveAttribute("href", "#inquire");
+  });
+
   it("renders the two player feature sections after the owner features", () => {
     renderPage();
     expect(screen.getByText(/pick a court, pick a slot/i)).toBeInTheDocument();
@@ -52,17 +58,23 @@ describe("LandingPage", () => {
     }
   });
 
-  it("renders the photo strip with real court images", () => {
+  it("renders the real product screenshots in the phone-framed slots", () => {
     renderPage();
-    expect(screen.getByRole("img", { name: /badminton courts with lined flooring/i })).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: /football turf under floodlights/i })).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: /cricket nets ready for practice/i })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /screenshot: player app — find your game/i })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /screenshot: pick a court, pick a slot/i })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /screenshot: your booking, qr-ready/i })).toBeInTheDocument();
   });
 
-  it("renders the social proof stats and testimonials", () => {
+  it("has no photo strip and no social proof sections", () => {
     renderPage();
-    expect(screen.getByText("50+")).toBeInTheDocument();
-    expect(screen.getByText("10k+")).toBeInTheDocument();
-    expect(screen.getByText(/my courts used to be empty on weekdays/i)).toBeInTheDocument();
+    expect(screen.queryByText(/real courts, real games/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/50\+/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/as han fernando/i)).not.toBeInTheDocument();
+  });
+
+  it("keeps the trial band sub honest at pre-launch", () => {
+    renderPage();
+    expect(screen.queryByText(/thousands of players/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/be one of the first venues on it/i)).toBeInTheDocument();
   });
 });

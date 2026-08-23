@@ -18,8 +18,9 @@ describe("landing copy", () => {
     expect("cta" in copy.trialBand).toBe(false);
   });
 
-  it("adds a For players nav link", () => {
+  it("adds a For players nav link and a mobile demo CTA", () => {
     expect(copy.nav.players).toBe("For players");
+    expect(copy.nav.mobileCta).toBe("Book a demo");
   });
 
   it("keeps five owner feature sections and drops the old players one", () => {
@@ -34,25 +35,13 @@ describe("landing copy", () => {
     expect(copy.playerFeatures.items[0].cta?.label).toBe("Explore the player app");
   });
 
-  it("declares a photo strip with three photos carrying src and alt", () => {
-    expect(copy.photoStrip.photos).toHaveLength(3);
-    for (const photo of copy.photoStrip.photos) {
-      expect(photo.src).toMatch(/^\/photos\//);
-      expect(photo.alt.length).toBeGreaterThan(0);
-    }
+  it("has no photo strip and no fabricated social proof", () => {
+    expect("photoStrip" in copy).toBe(false);
+    expect("socialProof" in copy).toBe(false);
   });
 
-  it("declares draft social proof stats and testimonials", () => {
-    expect(copy.socialProof.draft).toBe(true);
-    expect(copy.socialProof.stats).toHaveLength(3);
-    expect(copy.socialProof.testimonials).toHaveLength(2);
-    for (const stat of copy.socialProof.stats) {
-      expect(stat.value.length).toBeGreaterThan(0);
-      expect(stat.label.length).toBeGreaterThan(0);
-    }
-    for (const t of copy.socialProof.testimonials) {
-      expect(t.quote.length).toBeGreaterThan(0);
-      expect(t.author.length).toBeGreaterThan(0);
-    }
+  it("keeps the trial band sub honest at pre-launch", () => {
+    expect(copy.trialBand.sub).not.toContain("thousands");
+    expect(copy.trialBand.sub).toContain("first");
   });
 });

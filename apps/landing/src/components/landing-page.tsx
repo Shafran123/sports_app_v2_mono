@@ -4,10 +4,8 @@ import { copy } from "@/lib/copy";
 import { Nav } from "./nav";
 import { Hero } from "./hero";
 import { HowItWorks } from "./how-it-works";
-import { PhotoStrip } from "./photo-strip";
 import { FeatureSection } from "./features/section";
 import { TrialBand } from "./trial-band";
-import { SocialProof } from "./social-proof";
 import { InquireForm } from "./inquire-form";
 import { Footer } from "./footer";
 import { TrackSection } from "./track-section";
@@ -18,7 +16,6 @@ export function LandingPage() {
       <Nav />
       <Hero />
       <HowItWorks />
-      <PhotoStrip />
 
       <section id="features" className="py-20">
         <TrackSection name="features" />
@@ -51,8 +48,6 @@ export function LandingPage() {
           </div>
         </div>
       </section>
-
-      <SocialProof />
 
       <section id="inquire" className="py-20">
         <TrackSection name="inquire" />

@@ -21,6 +21,7 @@ export const copy = {
     features: "Features",
     howItWorks: "How it works",
     players: "For players",
+    mobileCta: "Book a demo",
     cta: "List your venue"
   },
   hero: {
@@ -142,48 +143,7 @@ id: "payments",
   },
   trialBand: {
     title: "List your venue free for 3 months",
-    sub: "No setup fees. No lock-in. Just your venue, bookable to thousands of players."
-  },
-  photoStrip: {
-    eyebrow: "Real courts, real games",
-    title: "Made for the venues players already love",
-    // DRAFT: swap for partner venue photos when available
-    photos: [
-      {
-        src: "/photos/court-badminton.jpg",
-        alt: "Indoor badminton courts with lined flooring"
-      },
-      {
-        src: "/photos/court-turf.jpg",
-        alt: "Football turf under floodlights at a member venue"
-      },
-      {
-        src: "/photos/court-cricket.jpg",
-        alt: "Cricket nets ready for practice"
-      }
-    ]
-  },
-  socialProof: {
-    // DRAFT: replace with real platform numbers
-    draft: true,
-    stats: [
-      { value: "50+", label: "venues listed" },
-      { value: "10k+", label: "bookings made" },
-      { value: "5k+", label: "players finding their game" }
-    ],
-    // DRAFT: replace with real testimonials
-    testimonials: [
-      {
-        quote: "My courts used to be empty on weekdays. Now they fill up before lunch.",
-        author: "Ashan Fernando",
-        role: "Venue owner, Colombo"
-      },
-      {
-        quote: "Booked a badminton court in under a minute and checked in with the QR at the door.",
-        author: "Nethmi Perera",
-        role: "Player"
-      }
-    ]
+    sub: "No setup fees. No lock-in. We're building a player network — be one of the first venues on it."
   },
   inquire: {
     eyebrow: "Ready when you are",

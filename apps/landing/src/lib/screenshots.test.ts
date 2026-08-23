@@ -28,8 +28,19 @@ describe("screenshot config", () => {
   });
 
   it("placeholder entries have no src yet, so they resolve to null (render the mock)", () => {
-    for (const shot of screenshots) {
+    const placeholders = screenshots.filter((shot) => !shot.src);
+    expect(placeholders).toHaveLength(2);
+    for (const shot of placeholders) {
       expect(resolveScreenshot(shot)).toBeNull();
+    }
+  });
+
+  it("six phone-framed slots resolve to real screenshots under /shots/", () => {
+    const withSrc = screenshots.filter((shot) => shot.src);
+    expect(withSrc).toHaveLength(6);
+    for (const shot of withSrc) {
+      expect(shot.src).toMatch(/^\/shots\/[a-z0-9-]+\.png$/);
+      expect(shot.frame).toBe("phone");
     }
   });
 
