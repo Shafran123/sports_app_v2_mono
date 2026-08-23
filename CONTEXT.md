@@ -122,3 +122,7 @@ _Avoid_: VAT, GST, service charge
 **Booking Bill**:
 A PDF invoice for a Booking or Event Registration, itemizing base price, tax, and total. Emailed on payment and printable on demand. Walk-in Guest bills are printed at the venue, never emailed.
 _Avoid_: receipt, invoice slip, statement
+
+**Venue Photo**:
+An image of a Venue stored in the public Supabase Storage bucket `venue_images` as an absolute URL in `venues.photos[]`. Uploaded via the backend (authenticated, base64, magic-byte validated) — never written directly by the browser. Removed from the bucket when removed from the venue. A Venue Photo is not sensitive; it is rendered by any client as a plain `<img>`.
+_Avoid_: venue image (photo is the canonical term), upload, attachment

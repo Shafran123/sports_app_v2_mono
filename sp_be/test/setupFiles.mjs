@@ -7,6 +7,8 @@ process.env.OTP_HMAC_SECRET = process.env.OTP_HMAC_SECRET || 'otp-test-key';
 process.env.FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 process.env.PAYHERE_MERCHANT_ID = process.env.PAYHERE_MERCHANT_ID || 'TEST_MERCHANT_ID';
 process.env.PAYHERE_MERCHANT_SECRET = process.env.PAYHERE_MERCHANT_SECRET || 'test-merchant-secret';
+process.env.SUPABASE_URL = process.env.SUPABASE_URL || 'https://project.supabase.co';
+process.env.SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'test-service-role-key';
 // Give the suite generous headroom for the per-player hold cap; the
 // security test pins HOLD_LIMIT=3 to exercise the real production default.
 process.env.HOLD_LIMIT = process.env.HOLD_LIMIT || '50';

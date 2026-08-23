@@ -25,8 +25,6 @@ const { requireRole } = require('./middleware/requireRole');
 const { authenticate } = require('./middleware/authenticate');
 const { makeRateLimiter } = require('./middleware/rateLimit');
 
-const path = require('path');
-
 const app = express();
 
 // Behind a proxy on Railway. Keeps the app-level rate limiter keyed per real
@@ -79,7 +77,6 @@ app.use('/api/v1/public', publicConfigRoute);
 app.use('/api/v1/notifications', authenticate, notificationsRoute);
 app.use('/api/v1/events', eventsRoute);
 app.use('/api/v1/uploads', authenticate, requireRole('venue_owner', 'admin'), uploadsLimiter, uploadsRoute);
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.use((err, req, res, next) => {
   if (err.type === 'entity.too.large') {

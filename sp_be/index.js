@@ -5,6 +5,7 @@ validate();
 
 const app = require('./app');
 const logger = require('./utils/logger');
+const { ensureBucket } = require('./utils/storage');
 const { realtime } = require('./realtime');
 const { startReminderJob } = require('./jobs/reminders');
 const { startDigestJob } = require('./jobs/dailyDigest');
@@ -28,7 +29,16 @@ function warnMissingConfig() {
 }
 warnMissingConfig();
 
-server.listen(port, function () {
-  logger.info(`Server started and listening on port ${port}`);
-  console.log(`Sports Arena BE listening on port ${port}!`);
-});
+// Fail closed: venue photos live in Supabase Storage (ADR-0010); a missing or
+// non-public bucket must stop the boot, not silently degrade uploads.
+ensureBucket()
+  .then(() => {
+    server.listen(port, function () {
+      logger.info(`Server started and listening on port ${port}`);
+      console.log(`Sports Arena BE listening on port ${port}!`);
+    });
+  })
+  .catch((error) => {
+    logger.error(`Storage bucket check failed: ${error.message}`);
+    process.exit(1);
+  });

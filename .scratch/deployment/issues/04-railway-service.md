@@ -16,18 +16,19 @@ Backend deploys on Railway via nixpacks (`railway.toml` exists in `sp_be`, healt
    - `FRONTEND_URL` = `https://sports-app-user.vercel.app` (user app; *not* admin — see ticket 02)
    - `API_PUBLIC_URL` = the Railway `https://*.up.railway.app` URL
    - `SOCKET_ALLOWED_ORIGINS` = `https://sports-app-admin.vercel.app,https://sports-app-user.vercel.app`
+   - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` = Supabase project `jxhhlwgwcarhhujhwctv` (venue photos — required)
    - `PAYHERE_*`, Mailgun, SMSGo, `OTP_HMAC_SECRET`, Firebase credential — identical to local (sandbox)
    - `PORT` = 2400 (as in `railway.toml`)
-4. **Volume**: attach to the service, mount path **`/app/sp_be/uploads`** (monorepo root is `/app`).
-5. Deploy; confirm `GET /health` → 200 and the healthcheck passes.
-6. `npm run db:setup` once (opens `migrations` 0001–0013 in order + idempotent seed — 18 sports, demo venues, demo accounts). Confirm `schema_migrations` has 13 rows.
-7. Copy local `sp_be/uploads/*` (existing venue images) into the volume.
-8. Verify a test image at `/uploads/<uuid>.png` returns 200 from the Railway URL and stays after a redeploy.
+4. Deploy; confirm `GET /health` → 200 and the healthcheck passes.
+5. `npm run db:setup` once (opens `migrations` 0001–0014 in order + idempotent seed — 18 sports, demo venues, demo accounts). Confirm `schema_migrations` has 14 rows.
+6. Confirm boot log shows the Supabase storage bucket ensure succeeded (venue photos, ADR-0010).
 
 ## Done
 
-- [ ] Service healthy; healthcheck green; `db:setup` applied 13 migrations + seed.
-- [ ] Volume mounted at `/app/sp_be/uploads`; legacy images present; survive one redeploy.
+- [ ] Service healthy; healthcheck green; `db:setup` applied 14 migrations + seed.
 - [ ] All env vars set; boot log shows no "missing" warnings for required vars.
+- [ ] Supabase bucket `venue_images` ensured at boot; upload → Railway redeploy → image still 200 (see ticket 07).
+
+> NOTE (2026-08-23): the earlier **volume** plan (mount at `/app/sp_be/uploads`, seed legacy files) is **obsolete** — uploads moved to Supabase Storage (`.scratch/supabase-storage/`). Remove any volume from the service.
 
 Blocked by: 01, 02

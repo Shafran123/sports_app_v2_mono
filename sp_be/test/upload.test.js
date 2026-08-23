@@ -1,22 +1,29 @@
 const request = require('supertest');
 const { SignJWT } = require('jose');
-const fs = require('fs');
-const path = require('path');
 const app = require('../app');
 
 const secret = new TextEncoder().encode('test-secret');
 const tokenFor = (uid) =>
   new SignJWT({ uid }).setProtectedHeader({ alg: 'HS256' }).setIssuedAt().sign(secret);
 
-const UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
-
 describe('image upload', () => {
   let ownerToken;
+  let posted;
+
   beforeAll(async () => {
     ownerToken = await tokenFor('demo-owner-uid');
   });
 
-  it('stores an uploaded image and returns a URL', async () => {
+  beforeEach(() => {
+    posted = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}), text: async () => '' }));
+    vi.stubGlobal('fetch', posted);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('stores an uploaded image in Supabase and returns the absolute public URL', async () => {
     const png = Buffer.from(
       'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
       'base64'
@@ -27,19 +34,26 @@ describe('image upload', () => {
       .send({ filename: 'photo.png', data: png.toString('base64') });
 
     expect(res.status).toBe(201);
-    expect(res.body.data.url).toMatch(/^\/uploads\/[a-f0-9-]+\.png$/);
+    expect(res.body.data.url).toMatch(
+      /^https:\/\/project\.supabase\.co\/storage\/v1\/object\/public\/venue_images\/[a-f0-9-]+\.png$/
+    );
 
-    const filePath = path.join(UPLOADS_DIR, path.basename(res.body.data.url));
-    expect(fs.existsSync(filePath)).toBe(true);
-    fs.unlinkSync(filePath);
+    expect(posted).toHaveBeenCalledTimes(1);
+    const [url, opts] = posted.mock.calls[0];
+    expect(url).toMatch(/\/storage\/v1\/object\/venue_images\/[a-f0-9-]+\.png$/);
+    expect(opts.method).toBe('POST');
+    expect(opts.headers['Content-Type']).toBe('image/png');
+    expect(opts.headers.apikey).toBeTruthy();
+    expect(Buffer.isBuffer(opts.body)).toBe(true);
   });
 
-  it('rejects a non-image extension', async () => {
+  it('rejects a non-image extension without hitting storage', async () => {
     const res = await request(app)
       .post('/api/v1/uploads')
       .set('Authorization', `Bearer ${ownerToken}`)
       .send({ filename: 'evil.sh', data: Buffer.from('#!/bin/sh').toString('base64') });
     expect(res.status).toBe(400);
+    expect(posted).not.toHaveBeenCalled();
   });
 
   it('requires auth', async () => {
@@ -89,6 +103,5 @@ describe('image upload', () => {
       .set('Authorization', `Bearer ${ownerToken}`)
       .send({ filename: 'bigger.png', data: png.toString('base64') });
     expect(res.status).toBe(201);
-    fs.unlinkSync(path.join(UPLOADS_DIR, path.basename(res.body.data.url)));
   });
 });

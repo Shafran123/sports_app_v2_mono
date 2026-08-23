@@ -1,6 +1,7 @@
 const pool = require('../db');
 const { ok, fail } = require('../utils/response');
 const logger = require('../utils/logger');
+const storage = require('../utils/storage');
 
 async function resolveSportIds(client, sports) {
   if (!Array.isArray(sports) || sports.length === 0) {
@@ -276,6 +277,17 @@ exports.updateVenue = async (req, res) => {
         accepts_cash !== undefined ? !!accepts_cash : null
       ]
     );
+
+    const oldPhotos = Array.isArray(venue.photos) ? venue.photos : [];
+    const newPhotos = Array.isArray(photos) ? photos : oldPhotos;
+    for (const url of oldPhotos.filter((p) => !newPhotos.includes(p))) {
+      const objectName = storage.extractObjectName(url);
+      if (objectName) {
+        storage.deleteObject(objectName).catch((err) => {
+          logger.error(`Failed to delete venue photo ${objectName}: ${err.message}`);
+        });
+      }
+    }
 
     ok(res, 200, updated[0]);
   } catch (error) {

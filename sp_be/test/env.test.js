@@ -10,7 +10,9 @@ describe('fail-closed env validation', () => {
     GOOGLE_APPLICATION_CREDENTIALS: '/tmp/sa.json',
     MAILGUN_API_KEY: 'mg',
     SMSGO_API_KEY: 'sg',
-    OTP_HMAC_SECRET: 'otp'
+    OTP_HMAC_SECRET: 'otp',
+    SUPABASE_URL: 'https://project.supabase.co',
+    SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_test'
   };
 
   it('reports every missing required key in production', () => {

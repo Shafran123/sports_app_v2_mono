@@ -1,13 +1,12 @@
 const express = require('express');
-const fs = require('fs');
-const path = require('path');
 const crypto = require('crypto');
+const path = require('path');
 const { ok, fail } = require('../utils/response');
 const logger = require('../utils/logger');
+const storage = require('../utils/storage');
 
 const router = express.Router();
 
-const UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
 const ALLOWED = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp' };
 const MAX_BYTES = 8 * 1024 * 1024;
 
@@ -50,11 +49,10 @@ router.post('/', async (req, res) => {
       return fail(res, 400, 'UPLOAD_INVALID_IMAGE', 'File content does not match the image type');
     }
 
-    if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
     const name = `${crypto.randomUUID()}${ext}`;
-    fs.writeFileSync(path.join(UPLOADS_DIR, name), buffer);
+    const url = await storage.uploadObject(name, buffer, ALLOWED[ext]);
 
-    ok(res, 201, { url: `/uploads/${name}` });
+    ok(res, 201, { url });
   } catch (error) {
     logger.error(`Error handling upload: ${error.message}`);
     fail(res, 500, 'INTERNAL_SERVER_ERROR', 'Something went wrong');

@@ -1,7 +1,9 @@
 # 09 — Uploads: supersede Railway volume with Supabase Storage (ADR-0010)
 
 Type: task
-Status: ready-for-human
+Status: wontfix (superseded)
+
+> **SUPERSEDED 2026-08-23** — implemented in `.scratch/supabase-storage/` (ticket 01, spec.md). Bucket `venue_images`, backend proxy uploads, orphan deletion, migration 0014, `/uploads` stack removed. This ticket's checklist is now covered there; kept for history.
 
 ## Context
 
