@@ -521,5 +521,9 @@ export const ownerOnboarding = {
   async passwordChanged(client: AxiosInstance = getClient()) {
     const res = await client.post("/owner-onboarding/password-changed");
     return res.data.data as Record<string, unknown>;
+  },
+  async agreementPdf(id: string, client: AxiosInstance = getClient()) {
+    const res = await client.get(`/owner-onboarding/agreements/${id}/pdf`, { responseType: "blob" });
+    return res.data as Blob;
   }
 };

@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ownerOnboarding, toApiFailure } from "@myslot/api";
-import { Button, Card, EmptyState, Input } from "@myslot/ui";
+import { Button, Card, EmptyState, PasswordInput } from "@myslot/ui";
 import { formatLkr } from "@myslot/utils";
 import { useAuth } from "@/context/auth";
 
@@ -11,23 +11,20 @@ export function PlanPage() {
   const { setUser, user } = useAuth();
   const qc = useQueryClient();
   const [error, setError] = React.useState<string | null>(null);
+  const [pdfBusy, setPdfBusy] = React.useState(false);
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["owner-plan"],
     queryFn: () => ownerOnboarding.myPlan()
   });
 
-  const { data: current, isLoading: currentLoading, isError: currentError, refetch: refetchCurrent } = useQuery({
-    queryKey: ["owner-agreement-current"],
-    queryFn: () => ownerOnboarding.currentAgreement()
-  });
+  const pendingAgreement = data?.agreements.find((a) => a.status === "pending");
 
   const accept = useMutation({
-    mutationFn: () => ownerOnboarding.acceptAgreement(current!.id),
+    mutationFn: () => ownerOnboarding.acceptAgreement(pendingAgreement!.id),
     onSuccess: async () => {
       setError(null);
       qc.invalidateQueries({ queryKey: ["owner-plan"] });
-      qc.invalidateQueries({ queryKey: ["owner-agreement-current"] });
       const { auth } = await import("@myslot/api");
       const me = await auth.me();
       setUser(me);
@@ -36,15 +33,34 @@ export function PlanPage() {
   });
 
   const decline = useMutation({
-    mutationFn: () => ownerOnboarding.declineAgreement(current!.id),
+    mutationFn: () => ownerOnboarding.declineAgreement(pendingAgreement!.id),
     onSuccess: () => {
       setError(null);
-      qc.invalidateQueries({ queryKey: ["owner-agreement-current"] });
+      qc.invalidateQueries({ queryKey: ["owner-plan"] });
     },
     onError: (e) => setError(toApiFailure(e)?.message ?? "Could not decline the agreement.")
   });
 
-  if (isLoading || currentLoading) {
+  async function openPdf(id: string) {
+    const win = window.open("about:blank", "_blank");
+    if (!win) {
+      setError("Your browser blocked the PDF tab. Allow popups for this app and try again.");
+      return;
+    }
+    setPdfBusy(true);
+    try {
+      const { ownerOnboarding } = await import("@myslot/api");
+      const blob = await ownerOnboarding.agreementPdf(id);
+      win.location.replace(URL.createObjectURL(blob));
+    } catch (e) {
+      win.close();
+      setError(toApiFailure(e)?.message ?? "Could not load the PDF.");
+    } finally {
+      setPdfBusy(false);
+    }
+  }
+
+  if (isLoading) {
     return <Card className="p-6"><div className="skeleton h-64 rounded-2xl" /></Card>;
   }
 
@@ -59,7 +75,6 @@ export function PlanPage() {
     );
   }
 
-  const pendingAgreement = data.agreements.find((a) => a.status === "pending") ?? current;
   const bank = data.bank_details ?? {};
   const grandfathered = user?.onboarding_state === "grandfathered";
   const mustChange = user?.must_change_password === true;
@@ -105,9 +120,9 @@ export function PlanPage() {
             <Button variant="secondary" onClick={() => decline.mutate()} disabled={decline.isPending}>
               Decline
             </Button>
-            <a href={`/api/owner-onboarding/agreements/${pendingAgreement.id}/pdf`} target="_blank" rel="noreferrer">
-              <Button variant="secondary">Download PDF</Button>
-            </a>
+            <Button variant="secondary" onClick={() => openPdf(pendingAgreement.id)} disabled={pdfBusy}>
+              {pdfBusy ? "Preparing…" : "Download PDF"}
+            </Button>
           </div>
         </Card>
       )}
@@ -161,9 +176,9 @@ export function PlanPage() {
                     {a.status === "accepted" ? `Accepted ${a.accepted_at ? new Date(a.accepted_at).toLocaleDateString() : ""}` : a.status}
                   </p>
                 </div>
-                <a href={`/api/owner-onboarding/agreements/${a.id}/pdf`} target="_blank" rel="noreferrer">
-                  <Button variant="secondary" size="sm">PDF</Button>
-                </a>
+                <Button variant="secondary" size="sm" onClick={() => openPdf(a.id)} disabled={pdfBusy}>
+                  {pdfBusy ? "Preparing…" : "PDF"}
+                </Button>
               </li>
             ))}
           </ul>
@@ -205,11 +220,11 @@ function PasswordChangeCard({ onDone, onError }: { onDone: () => void; onError: 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
           <label htmlFor="new-password" className="text-xs font-semibold uppercase tracking-wide text-ink-3">New password</label>
-          <Input id="new-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Min 8 characters" />
+          <PasswordInput id="new-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Min 8 characters" />
         </div>
         <div className="space-y-1.5">
           <label htmlFor="confirm-password" className="text-xs font-semibold uppercase tracking-wide text-ink-3">Confirm password</label>
-          <Input id="confirm-password" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+          <PasswordInput id="confirm-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
         </div>
       </div>
       {error && <p className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-error">{error}</p>}

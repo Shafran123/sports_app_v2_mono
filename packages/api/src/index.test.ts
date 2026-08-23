@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AxiosInstance } from "axios";
-import { venues, bookings, events, notifications, auth, business, admin, uploads, featureFlags } from "./index";
+import { venues, bookings, events, notifications, auth, business, admin, uploads, featureFlags, ownerOnboarding } from "./index";
 
 function mockClient(handler: (method: string, url: string, opts?: unknown) => unknown): AxiosInstance {
   return {
@@ -296,5 +296,15 @@ describe("admin settings & reports", () => {
     const reports = await admin.reports(7, client);
     expect(reports.series[0]?.tax).toBe(144);
     expect(reports.payment_split.cash.bookings).toBe(1);
+  });
+});
+
+describe("ownerOnboarding.agreementPdf", () => {
+  it("requests the agreement as a blob over the authenticated client", async () => {
+    const get = vi.fn(async () => ({ data: new Blob(["%PDF-1.4"]) }));
+    const client = { get, post: vi.fn(), patch: vi.fn() } as unknown as AxiosInstance;
+    const blob = await ownerOnboarding.agreementPdf("ag1", client);
+    expect(get).toHaveBeenCalledWith("/owner-onboarding/agreements/ag1/pdf", { responseType: "blob" });
+    expect(blob).toBeInstanceOf(Blob);
   });
 });
