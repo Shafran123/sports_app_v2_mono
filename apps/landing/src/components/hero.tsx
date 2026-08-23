@@ -5,6 +5,7 @@ import { copy } from "@/lib/copy";
 import { trackCta } from "@/lib/analytics";
 import { DeviceFrame } from "./device-frame";
 import { MockExplore } from "./features/mockups";
+import { RotatingUsps } from "./rotating-usps";
 import { ScrollCue } from "./scroll-cue";
 import { TrackSection } from "./track-section";
 
@@ -26,7 +27,10 @@ export function Hero() {
           <p className="animate-fade-up mt-3 text-lg text-ink-2" style={{ animationDelay: "0.12s" }}>
             {copy.hero.body}
           </p>
-          <div className="animate-pop-in flex flex-wrap items-center justify-center gap-3 lg:justify-start" style={{ animationDelay: "0.2s" }}>
+          <div className="animate-fade-up" style={{ animationDelay: "0.18s" }}>
+            <RotatingUsps />
+          </div>
+          <div className="animate-pop-in flex flex-wrap items-center justify-center gap-3 lg:justify-start" style={{ animationDelay: "0.24s" }}>
             <a
               href="#inquire"
               className={buttonVariants({ variant: "primary", size: "lg" })}
@@ -39,8 +43,8 @@ export function Hero() {
             </a>
           </div>
         </div>
-        <div className="animate-fade-up min-w-0" style={{ animationDelay: "0.28s" }}>
-          <DeviceFrame shotId="hero-player" className="animate-float">
+        <div className="animate-fade-up min-w-0" style={{ animationDelay: "0.32s" }}>
+          <DeviceFrame shotId="hero-player" className="animate-float rotate-[-2deg]">
             <MockExplore />
           </DeviceFrame>
         </div>

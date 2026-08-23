@@ -18,12 +18,26 @@ export function DeviceFrame({ shotId, children, className }: DeviceFrameProps) {
   const src = resolveScreenshot(shot);
   const frame = (shot?.frame ?? "browser") as FrameKind;
 
+  if (frame === "phone") {
+    return (
+      <figure className={cn("mx-auto w-[300px] rounded-[2.5rem] bg-ink p-2.5 shadow-soft", className)}>
+        <div className="relative h-[calc(100%-1.25rem)] overflow-hidden rounded-[2rem]">
+          <span aria-hidden="true" className="absolute left-1/2 top-2 z-10 h-5 w-20 -translate-x-1/2 rounded-full bg-ink" />
+          {src ? (
+            <img src={src} alt={`Screenshot: ${shot?.label ?? shotId}`} className="h-full w-full object-cover" />
+          ) : (
+            <div className="h-full bg-paper p-3">{children}</div>
+          )}
+        </div>
+      </figure>
+    );
+  }
+
   if (src) {
     return (
       <figure
         className={cn(
-          "overflow-hidden rounded-3xl border border-border bg-surface shadow-soft",
-          frame === "phone" ? "mx-auto w-[300px] aspect-[9/19]" : "w-full aspect-[16/10]",
+          "overflow-hidden rounded-3xl border border-border bg-surface shadow-soft w-full aspect-[16/10]",
           className
         )}
       >
@@ -36,12 +50,12 @@ export function DeviceFrame({ shotId, children, className }: DeviceFrameProps) {
     <div
       className={cn(
         "relative rounded-3xl border border-border bg-surface shadow-soft overflow-hidden",
-        frame === "phone" ? "mx-auto w-[300px]" : "w-full",
+        "w-full",
         className
       )}
     >
-      <FrameChrome frame={frame} label={shot?.label ?? shotId} />
-      <div className={cn(frame === "phone" ? "bg-paper p-3" : "bg-paper")}>{children}</div>
+      <FrameChrome frame="browser" label={shot?.label ?? shotId} />
+      <div className="bg-paper">{children}</div>
     </div>
   );
 }

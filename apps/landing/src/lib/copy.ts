@@ -31,7 +31,15 @@ export const copy = {
     body: "MySlot.LK puts your venue on a live booking platform — real-time slots, instant bookings, and payments your way. List your venue free for 3 months.",
     primaryCta: "Book a demo with us",
     secondaryCta: "See how it works",
-    scrollCue: "See how it works"
+    scrollCue: "See how it works",
+    // DRAFT: rotate the featured USPs; pulled from the feature set
+    usps: [
+      "Real-time slot availability for every court",
+      "One-tap QR check-ins at your front desk",
+      "Payments your way — online or cash",
+      "Events, leagues & clinics that sell out",
+      "Your first 3 months free"
+    ]
   },
   howItWorks: {
     eyebrow: "How it works",

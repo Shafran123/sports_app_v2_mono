@@ -54,4 +54,13 @@ describe("landing copy", () => {
     expect(flat.some((l) => l.label === "Explore the player app")).toBe(false);
     expect(flat.some((l) => l.label === "Contact")).toBe(true);
   });
+
+  it("declares rotating hero USPs, distinct and non-empty", () => {
+    expect(copy.hero.usps.length).toBeGreaterThanOrEqual(3);
+    const set = new Set(copy.hero.usps);
+    expect(set.size).toBe(copy.hero.usps.length);
+    for (const u of copy.hero.usps) {
+      expect(u.length).toBeGreaterThan(0);
+    }
+  });
 });

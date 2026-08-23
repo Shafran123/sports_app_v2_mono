@@ -91,6 +91,21 @@ describe("LandingPage", () => {
     expect(cue).toHaveAttribute("href", "#how-it-works");
   });
 
+  it("renders a transparent desktop header with a filled demo CTA", () => {
+    renderPage();
+    const header = screen.getByRole("banner");
+    expect(header).not.toHaveClass("bg-surface");
+    const desktopCta = within(header).getByRole("link", { name: "List your venue" });
+    expect(desktopCta).toHaveClass("bg-primary");
+  });
+
+  it("renders the rotating hero USP line", () => {
+    renderPage();
+    const matches = screen.getAllByText(/real-time slot availability for every court/i);
+    const visible = matches.find((el) => el.closest("p")?.getAttribute("aria-hidden") === "true");
+    expect(visible).toBeTruthy();
+  });
+
   it("footer lists Contact as a mailto and no player-app link or About link", () => {
     renderPage();
     const footer = screen.getByRole("contentinfo");

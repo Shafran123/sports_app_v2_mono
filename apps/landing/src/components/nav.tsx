@@ -39,7 +39,7 @@ export function Nav() {
         </div>
       </div>
 
-      <div className="hidden md:flex border-b border-border bg-surface/85 backdrop-blur-lg">
+      <div className="hidden md:flex">
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4">
           <Link href="#" className="shrink-0 font-display text-xl font-extrabold tracking-tight text-ink">
             <BrandLockup brand={brand} />
