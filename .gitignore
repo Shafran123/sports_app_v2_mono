@@ -31,6 +31,7 @@ sports-app-20029-firebase*.json
 # Vercel deployment configs (in each app root)
 !/apps/user/vercel.json
 !/apps/admin/vercel.json
+!/vercel.json
 
 # backend local uploads (persist on the Railway volume, not in git)
 /sp_be/uploads/
