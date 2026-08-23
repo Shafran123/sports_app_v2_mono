@@ -29,7 +29,7 @@ export function Hero() {
             <RotatingHeadline />
           </span>
         </h1>
-        <p className="animate-fade-up mt-4 text-lg text-ink-2" style={{ animationDelay: "0.12s" }}>
+        <p className="animate-fade-up mx-auto mt-4 max-w-2xl text-base text-ink-2" style={{ animationDelay: "0.12s" }}>
           {copy.hero.body}
         </p>
         <div
