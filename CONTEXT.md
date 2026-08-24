@@ -38,7 +38,7 @@ _Avoid_: order, purchase
 _Note_: A booking has a payment method (online via PayHere, or cash collected at the venue). See **Payment** below.
 
 **QR Token**:
-A random, secret, single-use string minted when a Booking is created. Encoded in the player's check-in QR code; the venue consumes it by scanning and checking in. Re-scanning a consumed token returns "already used." Disclosed only to the Booking's Player (in their own app) and consumed only by the Venue Owner of the Venue the Booking was made on — the check-in validates ownership of the Venue as well as the identity of the Token. Never surfaced through player-facing or venue-facing read APIs.
+A random, secret, single-use string minted when a Booking is created. Encoded in the player's check-in QR code; the venue consumes it by scanning and checking in. Re-scanning a consumed token returns "already used." Disclosed to the Booking's Player in their own app and in transactional emails sent to that player's inbox (booking confirmation, reminder, and bill); never surfaced to Venue Owners or in venue-facing read APIs. Disclosed only to the Booking's Player (in their own app) and consumed only by the Venue Owner of the Venue the Booking was made on — the check-in validates ownership of the Venue as well as the identity of the Token.
 _Avoid_: ticket number, booking ID (the Booking UUID is NOT the QR token)
 
 **Payment**:

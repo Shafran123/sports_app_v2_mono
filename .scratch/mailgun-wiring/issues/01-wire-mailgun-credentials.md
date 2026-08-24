@@ -13,3 +13,5 @@
 ## Comments
 
 Wired + smoke-tested 2026-08-22 by agent: sandbox accepted the send (`{"success":true}`) to devshaf@proton.me. No code changes needed — client already uses Mailgun via raw `fetch` (utils/emailService.js:27-34); keeping it, per decision in spec.
+
+**2026-08-24 — production domain live.** Swapped sandbox creds for the real sending key + `MAILGUN_DOMAIN=myslot.lk` + `FROM_EMAIL=MySlot.LK <no-reply@myslot.lk>` in `.env` (stale `RESEND_API_KEY` block removed). Verified with `node sp_be/scripts/smoke-email.js` (red-capable: bogus key → `Mailgun 401`, exit 1; real key → `delivered` event under `@myslot.lk` message-id, exit 0). Domain `myslot.lk` reports `state: active` on the Mailgun API. Note: Mailgun rewrites the From header to `Mailgun Sandbox <postmaster@myslot.lk>` on trial accounts — server-side, not code; latest sends show `MySlot.LK <no-reply@myslot.lk>`, so the rewrite appears to have lifted.

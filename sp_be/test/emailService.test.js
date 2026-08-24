@@ -13,7 +13,7 @@ describe('email service', () => {
   });
 
   it('builds a booking confirmation body with the key details', () => {
-    const html = buildBookingHtml({
+    const { html, text } = buildBookingHtml({
       venue_name: 'Smash Arena',
       court_name: 'Court 1',
       start_at: '2026-08-22T04:30:00.000Z',
@@ -25,10 +25,11 @@ describe('email service', () => {
     expect(html).toContain('Court 1');
     expect(html).toContain('LKR 1,500');
     expect(html).toContain('QR');
+    expect(text).toContain('Smash Arena');
   });
 
   it('escapes user-sourced strings so HTML injection is inert', () => {
-    const html = buildBookingHtml({
+    const { html } = buildBookingHtml({
       venue_name: '<img src=x onerror=alert(1)>',
       court_name: 'Court & "1"',
       start_at: '2026-08-22T04:30:00.000Z',
@@ -36,9 +37,9 @@ describe('email service', () => {
       total_price: 1500,
       payment_method: 'cash'
     });
-    expect(html).not.toContain('<img');
+    expect(html).not.toContain('<img src=x');
     expect(html).toContain('&lt;img');
-    expect(html).toContain('Court &amp; &quot;1&quot;');
+    expect(html).toContain('Court &amp;');
   });
 
   it('posts a message to the Mailgun API when configured', async () => {

@@ -10,7 +10,9 @@ const WINDOW_HOURS = 24;
 async function runReminderJob() {
   try {
     const { rows } = await pool.query(
-      `select b.*, c.name as court_name, v.name as venue_name, u.email as user_email
+      `select b.*, c.name as court_name, v.name as venue_name,
+              v.address as venue_address, v.city as venue_city, v.phone as venue_phone,
+              u.email as user_email
        from bookings b
        join courts c on c.id = b.court_id
        join venues v on v.id = c.venue_id

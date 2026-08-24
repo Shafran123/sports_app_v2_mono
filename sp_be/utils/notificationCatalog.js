@@ -1,9 +1,19 @@
 const pool = require('../db');
 const logger = require('./logger');
 const emailService = require('./emailService');
+const emailTemplates = require('./emailTemplates');
 const smsService = require('./smsService');
 const { getBrandName, getSmsEvents } = require('./featureFlags');
-const { loadBookingForEvents } = require('./bookingLoader');
+const { loadBookingForEvents, loadQrToken } = require('./bookingLoader');
+
+// Booking-key emails that carry the player's inline check-in QR. QR is never
+// rendered on owner/admin roles (guarded in the email loop + confirmed here).
+const QR_KEYS = new Set(['booking.confirmed', 'booking.reminder', 'booking.bill']);
+
+// First token of the booking's player name for subject personalization.
+function firstNameOf(booking) {
+  return String(booking?.player_name || '').trim().split(/\s+/)[0] || '';
+}
 
 // ---- Event / registration loaders (notification-specific shapes) ----
 
@@ -125,9 +135,22 @@ const MESSAGES = {
     inApp: ['player'],
     recipients: recipientsForBooking,
     buildInApp: () => ({ type: 'booking_confirmed', title: 'Booking confirmed', body: 'Your booking has been confirmed.' }),
-    buildEmail: (ctx, role) => role === 'player'
-      ? { subject: `Booking confirmed — ${ctx.payload.booking.venue_name || 'your slot'}`, html: emailService.buildBookingHtml(ctx.payload.booking, ctx.brand) }
-      : { subject: `New booking — ${ctx.payload.booking.venue_name || 'your venue'}`, html: emailService.buildOwnerBookingHtml(ctx.payload.booking, ctx.brand) },
+    buildEmail: (ctx, role) => {
+      if (role === 'owner') {
+        const built = emailService.buildOwnerBookingHtml(ctx.payload.booking, ctx.brand);
+        return { subject: `New booking — ${ctx.payload.booking.venue_name || 'your venue'}`, html: built.html, text: built.text };
+      }
+      const first = firstNameOf(ctx.payload.booking);
+      const built = emailService.buildBookingHtml(ctx.payload.booking, ctx.brand, ctx.qr ? { qr: { cid: ctx.qr.cid } } : {});
+      return {
+        subject: first
+          ? `${first}, your court at ${ctx.payload.booking.venue_name || 'the venue'} is booked`
+          : `Booking confirmed — ${ctx.payload.booking.venue_name || 'your slot'}`,
+        html: built.html,
+        text: built.text,
+        attachments: ctx.qr ? [{ filename: 'booking-qr.png', content: ctx.qr.png, contentType: 'image/png', inline: true }] : []
+      };
+    },
     buildSms: (ctx, role) => role === 'player'
       ? smsService.buildBookingSms(ctx.payload.booking, ctx.brand)
       : smsService.buildOwnerBookingSms(ctx.payload.booking, ctx.brand)
@@ -137,7 +160,18 @@ const MESSAGES = {
     email: ['player'],
     sms: ['player'],
     recipients: recipientsForBooking,
-    buildEmail: (ctx) => ({ subject: `Reminder — ${ctx.payload.booking.venue_name || 'your booking'} tomorrow`, html: emailService.buildReminderHtml(ctx.payload.booking, ctx.brand) }),
+    buildEmail: (ctx) => {
+      const first = firstNameOf(ctx.payload.booking);
+      const built = emailService.buildReminderHtml(ctx.payload.booking, ctx.brand, ctx.qr ? { qr: { cid: ctx.qr.cid } } : {});
+      return {
+        subject: first
+          ? `Reminder, ${first} — your booking at ${ctx.payload.booking.venue_name || 'the venue'} is tomorrow`
+          : `Reminder — ${ctx.payload.booking.venue_name || 'your booking'} tomorrow`,
+        html: built.html,
+        text: built.text,
+        attachments: ctx.qr ? [{ filename: 'booking-qr.png', content: ctx.qr.png, contentType: 'image/png', inline: true }] : []
+      };
+    },
     buildSms: (ctx) => smsService.buildReminderSms(ctx.payload.booking, ctx.brand)
   },
 
@@ -151,11 +185,17 @@ const MESSAGES = {
       if (booking.user_id === booking.venue_owner_id || !booking.user_email) return null;
       const pdf = await billService.bookingBillPdf(ctx.payload.bookingId);
       if (!pdf) return null;
+      const attachments = [{ filename: `spots-bill-${booking.id.slice(0, 8)}.pdf`, content: pdf, contentType: 'application/pdf' }];
+      let qr;
+      if (booking.qr_token) qr = { cid: 'booking-qr.png', png: await emailTemplates.qrPng(booking.qr_token) };
+      const built = emailService.buildBillHtml(booking, ctx.brand, qr ? { qr: { cid: qr.cid } } : {});
+      if (qr) attachments.push({ filename: 'booking-qr.png', content: qr.png, contentType: 'image/png', inline: true });
       return {
         to: booking.user_email,
         subject: `Your bill — ${booking.venue_name || 'booking'}`,
-        html: emailService.buildBillHtml(booking, ctx.brand),
-        attachment: { filename: `spots-bill-${booking.id.slice(0, 8)}.pdf`, content: pdf, contentType: 'application/pdf' }
+        html: built.html,
+        text: built.text,
+        attachments
       };
     }
   },
@@ -169,10 +209,12 @@ const MESSAGES = {
       if (!reg || !reg.player_email) return null;
       const pdf = await billService.registrationBillPdf(ctx.payload.registrationId);
       if (!pdf) return null;
+      const built = emailService.buildRegistrationBillHtml(reg, ctx.brand);
       return {
         to: reg.player_email,
         subject: `Your bill — ${reg.event_name || 'event registration'}`,
-        html: emailService.buildRegistrationBillHtml(reg, ctx.brand),
+        html: built.html,
+        text: built.text,
         attachment: { filename: `spots-event-bill-${reg.id.slice(0, 8)}.pdf`, content: pdf, contentType: 'application/pdf' }
       };
     }
@@ -184,9 +226,21 @@ const MESSAGES = {
     inApp: ['player'],
     recipients: recipientsForBooking,
     buildInApp: () => ({ type: 'booking_cancelled', title: 'Booking cancelled', body: 'Your booking has been cancelled.' }),
-    buildEmail: (ctx, role) => role === 'player'
-      ? { subject: `Booking cancelled — ${ctx.payload.booking.venue_name || 'your booking'}`, html: emailService.buildPlayerCancelledHtml(ctx.payload.booking, ctx.payload.refund, ctx.brand) }
-      : { subject: `Booking cancelled — ${ctx.payload.booking.venue_name || 'your venue'}`, html: emailService.buildOwnerBookingCancelledHtml(ctx.payload.booking, ctx.brand) },
+    buildEmail: (ctx, role) => {
+      if (role === 'owner') {
+        const built = emailService.buildOwnerBookingCancelledHtml(ctx.payload.booking, ctx.brand);
+        return { subject: `Booking cancelled — ${ctx.payload.booking.venue_name || 'your venue'}`, html: built.html, text: built.text };
+      }
+      const first = firstNameOf(ctx.payload.booking);
+      const built = emailService.buildPlayerCancelledHtml(ctx.payload.booking, ctx.payload.refund, ctx.brand);
+      return {
+        subject: first
+          ? `${first}, your booking at ${ctx.payload.booking.venue_name || 'the venue'} was cancelled`
+          : `Booking cancelled — ${ctx.payload.booking.venue_name || 'your booking'}`,
+        html: built.html,
+        text: built.text
+      };
+    },
     buildSms: (ctx, role) => role === 'player'
       ? smsService.buildPlayerCancelledSms(ctx.payload.booking, ctx.brand)
       : smsService.buildOwnerBookingCancelledSms(ctx.payload.booking, ctx.brand)
@@ -198,7 +252,10 @@ const MESSAGES = {
     inApp: ['player'],
     recipients: recipientsForBooking,
     buildInApp: () => ({ type: 'booking_cancelled', title: 'Booking cancelled', body: 'Your booking has been cancelled by the venue.' }),
-    buildEmail: (ctx) => ({ subject: `Booking cancelled — ${ctx.payload.booking.venue_name || 'your booking'}`, html: emailService.buildVenueCancelledHtml(ctx.payload.booking, ctx.brand) }),
+    buildEmail: (ctx) => {
+      const built = emailService.buildVenueCancelledHtml(ctx.payload.booking, ctx.brand);
+      return { subject: `Booking cancelled — ${ctx.payload.booking.venue_name || 'your booking'}`, html: built.html, text: built.text };
+    },
     buildSms: (ctx) => smsService.buildVenueCancelledSms(ctx.payload.booking, ctx.brand)
   },
 
@@ -208,7 +265,10 @@ const MESSAGES = {
     inApp: ['player'],
     recipients: recipientsForBooking,
     buildInApp: () => ({ type: 'booking_cancelled', title: 'Booking cancelled', body: 'Your booking has been cancelled.' }),
-    buildEmail: (ctx) => ({ subject: `Booking cancelled — ${ctx.payload.booking.venue_name || 'your booking'}`, html: emailService.buildVenueCancelledHtml(ctx.payload.booking, ctx.brand) }),
+    buildEmail: (ctx) => {
+      const built = emailService.buildVenueCancelledHtml(ctx.payload.booking, ctx.brand);
+      return { subject: `Booking cancelled — ${ctx.payload.booking.venue_name || 'your booking'}`, html: built.html, text: built.text };
+    },
     buildSms: (ctx) => smsService.buildVenueCancelledSms(ctx.payload.booking, ctx.brand)
   },
 
@@ -224,7 +284,10 @@ const MESSAGES = {
     inApp: ['player'],
     recipients: recipientsForRegistration,
     buildInApp: (ctx) => ({ type: 'event_registered', title: 'Registration confirmed', body: `You're registered for ${ctx.payload.registration.event_name || 'the event'}.` }),
-    buildEmail: (ctx) => ({ subject: `You're in — ${ctx.payload.registration.event_name || 'the event'}`, html: emailService.buildEventRegisteredHtml(ctx.payload.registration, ctx.brand) }),
+    buildEmail: (ctx) => {
+      const built = emailService.buildEventRegisteredHtml(ctx.payload.registration, ctx.brand);
+      return { subject: `You're in — ${ctx.payload.registration.event_name || 'the event'}`, html: built.html, text: built.text };
+    },
     buildSms: (ctx) => smsService.buildEventRegisteredSms(ctx.payload.registration, ctx.brand)
   },
 
@@ -234,9 +297,14 @@ const MESSAGES = {
     inApp: ['registrant'],
     recipients: recipientsForEventCancelled,
     buildInApp: (ctx) => ({ type: 'event_cancelled', title: 'Event cancelled', body: `The event ${ctx.payload.event.name || ''} has been cancelled.` }),
-    buildEmail: (ctx, role) => role === 'organizer'
-      ? { subject: `Event cancelled — ${ctx.payload.event.name || 'your event'}`, html: emailService.buildEventCancelledOwnerHtml(ctx.payload.event, ctx.brand) }
-      : { subject: `Event cancelled — ${ctx.payload.event.name || ''}`, html: emailService.buildEventCancelledHtml({ event_name: ctx.payload.event.name, event_start: ctx.payload.event.start_at }, ctx.brand) },
+    buildEmail: (ctx, role) => {
+      if (role === 'organizer') {
+        const built = emailService.buildEventCancelledOwnerHtml(ctx.payload.event, ctx.brand);
+        return { subject: `Event cancelled — ${ctx.payload.event.name || 'your event'}`, html: built.html, text: built.text };
+      }
+      const built = emailService.buildEventCancelledHtml({ event_name: ctx.payload.event.name, event_start: ctx.payload.event.start_at }, ctx.brand);
+      return { subject: `Event cancelled — ${ctx.payload.event.name || ''}`, html: built.html, text: built.text };
+    },
     buildSms: (ctx) => smsService.buildEventCancelledSms({ event_name: ctx.payload.event.name, event_start: ctx.payload.event.start_at }, ctx.brand)
   },
 
@@ -246,19 +314,28 @@ const MESSAGES = {
       const u = payload.user;
       return u?.email ? [{ userId: u.id, email: u.email }] : [];
     },
-    buildEmail: (ctx) => ({ subject: `Welcome to ${ctx.brand}`, html: emailService.buildWelcomeHtml(ctx.brand) })
+    buildEmail: (ctx) => {
+      const built = emailService.buildWelcomeHtml(ctx.brand);
+      return { subject: `Welcome to ${ctx.brand}`, html: built.html, text: built.text };
+    }
   },
 
   'venue.approved': {
     email: ['owner'],
     recipients: (payload) => (payload.ownerEmail ? [{ email: payload.ownerEmail }] : []),
-    buildEmail: (ctx) => ({ subject: `Your venue "${ctx.payload.venue.name || ''}" is live!`, html: emailService.buildVenueApprovedHtml(ctx.payload.venue, ctx.brand) })
+    buildEmail: (ctx) => {
+      const built = emailService.buildVenueApprovedHtml(ctx.payload.venue, ctx.brand);
+      return { subject: `Your venue "${ctx.payload.venue.name || ''}" is live!`, html: built.html, text: built.text };
+    }
   },
 
   'venue.rejected': {
     email: ['owner'],
     recipients: (payload) => (payload.ownerEmail ? [{ email: payload.ownerEmail }] : []),
-    buildEmail: (ctx) => ({ subject: `Update on your venue "${ctx.payload.venue.name || ''}"`, html: emailService.buildVenueRejectedHtml(ctx.payload.venue, ctx.payload.reason, ctx.brand) })
+    buildEmail: (ctx) => {
+      const built = emailService.buildVenueRejectedHtml(ctx.payload.venue, ctx.payload.reason, ctx.brand);
+      return { subject: `Update on your venue "${ctx.payload.venue.name || ''}"`, html: built.html, text: built.text };
+    }
   },
 
   'owner.welcome': {
@@ -276,11 +353,8 @@ const MESSAGES = {
           logger.error(`Agreement PDF failed: ${err.message}`);
         }
       }
-      return {
-        subject: 'Your venue-owner account is ready',
-        html: emailService.buildOwnerWelcomeHtml(owner, password, plan, bankDetails, ctx.brand),
-        attachment
-      };
+      const built = emailService.buildOwnerWelcomeHtml(owner, password, plan, bankDetails, ctx.brand);
+      return { subject: 'Your venue-owner account is ready', html: built.html, text: built.text, attachment };
     }
   },
 
@@ -299,21 +373,18 @@ const MESSAGES = {
           logger.error(`Agreement PDF failed: ${err.message}`);
         }
       }
-      return {
-        subject: 'Your plan has been renewed',
-        html: emailService.buildOwnerRenewalHtml(owner, plan, bankDetails, ctx.brand),
-        attachment
-      };
+      const built = emailService.buildOwnerRenewalHtml(owner, plan, bankDetails, ctx.brand);
+      return { subject: 'Your plan has been renewed', html: built.html, text: built.text, attachment };
     }
   },
 
   'owner.nudge': {
     email: ['owner'],
     recipients: (payload) => (payload.owner?.email ? [{ userId: payload.owner.id, email: payload.owner.email }] : []),
-    buildEmail: (ctx) => ({
-      subject: 'Your plan is ending soon',
-      html: emailService.buildOwnerNudgeHtml(ctx.payload.owner, ctx.payload.plan, ctx.payload.bankDetails, ctx.brand)
-    })
+    buildEmail: (ctx) => {
+      const built = emailService.buildOwnerNudgeHtml(ctx.payload.owner, ctx.payload.plan, ctx.payload.bankDetails, ctx.brand);
+      return { subject: 'Your plan is ending soon', html: built.html, text: built.text };
+    }
   },
 
   'lead.new': {
@@ -321,13 +392,18 @@ const MESSAGES = {
     inApp: ['admin'],
     recipients: async () => loadAdmins(),
     buildInApp: (ctx) => ({ type: 'owner_lead', title: 'New owner lead', body: `${ctx.payload.lead?.name || ''} wants to list a venue` }),
-    buildEmail: (ctx) => ({
-      subject: `New owner lead: ${ctx.payload.lead?.name || ''}`,
-      html: emailService.shell(`
-        <h2 style="color:#176036;">New owner lead</h2>
-        <p><strong>${emailService.escapeHtml(ctx.payload.lead?.name || '')}</strong> (${emailService.escapeHtml(ctx.payload.lead?.email || '')}) wants to list a venue${ctx.payload.lead?.venue_name ? ` — "${emailService.escapeHtml(ctx.payload.lead.venue_name)}"` : ''}.</p>
-        <p style="color:#666;">Open the Leads tab in the console to review and convert this lead.</p>`, ctx.brand)
-    })
+    buildEmail: (ctx) => {
+      const html = emailTemplates.shell({
+        brand: ctx.brand,
+        preheader: `New owner lead: ${ctx.payload.lead?.name || ''}`,
+        content: `
+          <h1 class="ms-ink" style="margin:0 0 8px;color:${emailTemplates.C.ink};font-size:22px;font-weight:800;line-height:1.25;">New owner lead</h1>
+          <p class="ms-ink2" style="margin:0 0 20px;color:${emailTemplates.C.ink2};font-size:15px;"><strong>${emailTemplates.escapeHtml(ctx.payload.lead?.name || '')}</strong> (${emailTemplates.escapeHtml(ctx.payload.lead?.email || '')}) wants to list a venue${ctx.payload.lead?.venue_name ? ` — "${emailTemplates.escapeHtml(ctx.payload.lead.venue_name)}"` : ''}.</p>
+          <p class="ms-muted" style="margin:0;color:${emailTemplates.C.ink2};font-size:13px;">Open the Leads tab in the console to review and convert this lead.</p>`,
+        plainText: `New owner lead: ${ctx.payload.lead?.name || ''} (${ctx.payload.lead?.email || ''}) wants to list a venue${ctx.payload.lead?.venue_name ? ` — "${ctx.payload.lead.venue_name}"` : ''}.`
+      });
+      return { subject: `New owner lead: ${ctx.payload.lead?.name || ''}`, html };
+    }
   },
 
   'digest.daily': {
@@ -355,7 +431,9 @@ async function sendEmailChannel({ key, to, content }) {
   const outcome = { channel: 'email', key, to, success: false, status: 'failed' };
   try {
     const payload = { to, subject: content.subject, html: content.html };
-    if (content.attachment) payload.attachment = content.attachment;
+    if (content.text) payload.text = content.text;
+    const allAttachments = [...(content.attachments || []), ...(content.attachment ? [content.attachment] : [])];
+    if (allAttachments.length) payload.attachments = allAttachments;
     const result = await emailService.sendEmail(payload);
     if (result.success) {
       outcome.success = true;
@@ -451,7 +529,18 @@ async function dispatch(key, payload, opts = {}) {
         for (const rec of recipients) {
           let content = null;
           try {
-            content = await def.buildEmail({ payload, key, role, brand }, role);
+            // QR (booking.confirmed/reminder): load the token only for the
+            // player recipient of the booking — never for owner/admin roles.
+            const ctx = { payload, key, role, brand, qr: null };
+            if (role === 'player' && QR_KEYS.has(key) && rec.email === payload.booking?.user_email && payload.booking?.id) {
+              try {
+                const token = await loadQrToken(payload.booking.id);
+                if (token) ctx.qr = { cid: 'booking-qr.png', png: await emailTemplates.qrPng(token) };
+              } catch (err) {
+                logger.error(`QR load failed for ${key} player email (sent without QR): ${err.message}`);
+              }
+            }
+            content = await def.buildEmail(ctx, role);
           } catch (err) {
             logger.error(`Email builder failed for ${key} ${role}: ${err.message}`);
           }

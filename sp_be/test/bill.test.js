@@ -158,7 +158,8 @@ describe('booking bills', () => {
     expect(spy).toHaveBeenCalled();
     const arg = spy.mock.calls[0][0];
     expect(arg.subject).toContain('Your bill');
-    expect(arg.attachment.filename).toMatch(/\.pdf$/);
+    const files = arg.attachments || (arg.attachment ? [arg.attachment] : []);
+    expect(files[0].filename).toMatch(/\.pdf$/);
     spy.mockRestore();
   });
 });

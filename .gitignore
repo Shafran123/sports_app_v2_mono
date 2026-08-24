@@ -42,4 +42,7 @@ sports-app-20029-firebase*.json
 
 # backend local uploads (persist on the Railway volume, not in git)
 /sp_be/uploads/
+
+# rendered transactional-emails preview output (node sp_be/scripts/render-emails.js)
+.scratch/emails-preview/
 .vercel

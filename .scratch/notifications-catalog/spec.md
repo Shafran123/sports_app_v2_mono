@@ -59,3 +59,7 @@ Introduce a **notification catalog** — `sp_be/utils/notificationCatalog.js` �
 - [ ] Brand name read from config in every subject/body
 - [ ] `sms_events` gate wired; `sms_enabled` still master
 - [ ] ADR-0023 recorded; tests green
+
+## Comments
+
+Implemented in commit `a213de5` (2026-08-24). Delivery notes: `event.bill` was added to the catalog to keep the existing event bill email path (not in the original table, deliberate); `outbound_messages` uses `recipient` for the destination column (ticket said `to`); email subjects stay brand-free (no hardcoded brand) while all bodies/footers read `brand_name` — a conscious deviation from the literal "every subject" wording.

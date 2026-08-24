@@ -11,7 +11,7 @@ const notificationCatalog = require('./notificationCatalog');
 
 const BOOKING_BILL_SELECT = `
   select b.*, c.name as court_name, s.name as sport, v.name as venue_name,
-         v.address as venue_address, v.city as venue_city,
+         v.address as venue_address, v.city as venue_city, v.phone as venue_phone,
          u.email as user_email, v.owner_id as venue_owner_id
   from bookings b
   join courts c on c.id = b.court_id
