@@ -2,7 +2,7 @@ const express = require('express');
 const pool = require('../db');
 const { ok, fail } = require('../utils/response');
 const logger = require('../utils/logger');
-const emailService = require('../utils/emailService');
+const notificationCatalog = require('../utils/notificationCatalog');
 
 const router = express.Router();
 
@@ -119,9 +119,7 @@ router.post('/:id/approve', async (req, res) => {
 
     const ownerEmail = ownerRows[0]?.email;
     if (ownerEmail) {
-      emailService.notifyVenueApproved(venue, ownerEmail).catch((err) => {
-        logger.error(`Failed to send venue approval email: ${err.message}`);
-      });
+      await notificationCatalog.dispatch('venue.approved', { venue, ownerEmail });
     }
 
     ok(res, 200, venue);
@@ -177,9 +175,7 @@ router.post('/:id/reject', async (req, res) => {
 
     const ownerEmail = ownerRows[0]?.email;
     if (ownerEmail) {
-      emailService.notifyVenueRejected(venue, ownerEmail, reason).catch((err) => {
-        logger.error(`Failed to send venue rejection email: ${err.message}`);
-      });
+      await notificationCatalog.dispatch('venue.rejected', { venue, ownerEmail, reason });
     }
 
     ok(res, 200, venue);

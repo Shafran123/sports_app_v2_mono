@@ -1,7 +1,7 @@
 const pool = require('../db');
 const { ok, fail } = require('../utils/response');
 const logger = require('../utils/logger');
-const emailService = require('../utils/emailService');
+const notificationCatalog = require('../utils/notificationCatalog');
 
 const LEAD_STATUSES = ['new', 'contacted', 'converted', 'closed'];
 
@@ -29,27 +29,9 @@ exports.submitLead = async (req, res) => {
     );
     const lead = rows[0];
 
-    // New lead -> notify every admin (in-app row + fire-and-forget email).
-    const { rows: admins } = await pool.query(
-      `select id, email from users where role = 'admin' and email is not null`
-    );
-    for (const admin of admins) {
-      await pool.query(
-        `insert into notifications (user_id, type, title, body)
-         values ($1, 'owner_lead', $2, $3)`,
-        [admin.id, 'New owner lead', `${lead.name} wants to list a venue`]
-      );
-    }
-    for (const admin of admins) {
-      emailService.sendEmail({
-        to: admin.email,
-        subject: `New owner lead: ${lead.name}`,
-        html: emailService.shell(`
-          <h2 style="color:#176036;">New owner lead</h2>
-          <p><strong>${emailService.escapeHtml(lead.name)}</strong> (${emailService.escapeHtml(lead.email)}) wants to list a venue${lead.venue_name ? ` — "${emailService.escapeHtml(lead.venue_name)}"` : ''}.</p>
-          <p style="color:#666;">Open the Leads tab in the console to review and convert this lead.</p>`)
-      }).catch((err) => logger.error(`New-lead admin email failed: ${err.message}`));
-    }
+    // New lead -> notify every admin (in-app row + fire-and-forget email),
+    // fanned out by the notification catalog.
+    await notificationCatalog.dispatch('lead.new', { lead });
 
     ok(res, 201, { id: lead.id, status: lead.status });
   } catch (error) {

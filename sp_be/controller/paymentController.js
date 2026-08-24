@@ -4,7 +4,7 @@ const { ok, fail } = require('../utils/response');
 const logger = require('../utils/logger');
 const { mintQrToken } = require('../utils/tokens');
 const { publishBookingEvent } = require('../utils/publish');
-const { notifyBookingConfirmed, notifyAdminCancellation } = require('../utils/notify');
+const notificationCatalog = require('../utils/notificationCatalog');
 const billService = require('../utils/billService');
 
 // Fail-closed: config/env.js guarantees these exist outside NODE_ENV=test.
@@ -69,6 +69,7 @@ exports.handleNotify = async (req, res) => {
           [payment.id]
         );
         await client.query('commit');
+        await notificationCatalog.dispatchEventRegistration('event.registered', payment.event_registration_id);
         void billService.emailBillForRegistration(payment.event_registration_id);
         return ok(res, 200, { handled: true, event_registration_id: payment.event_registration_id });
       }
@@ -161,16 +162,10 @@ exports.handleNotify = async (req, res) => {
       );
       await client.query(`delete from holds where id = $1`, [hold.id]);
 
-      await client.query(
-        `insert into notifications (user_id, type, title, body)
-         values ($1, 'booking_confirmed', 'Booking confirmed', 'Your booking has been confirmed.')`,
-        [payment.user_id]
-      );
-
       await client.query('commit');
 
       await publishBookingEvent('booking.created', booking.id);
-      void notifyBookingConfirmed(booking.id);
+      await notificationCatalog.dispatchBooking('booking.confirmed', booking.id);
       void billService.emailBillForBooking(booking.id);
 
       return ok(res, 200, { handled: true, booking_id: booking.id });
@@ -255,7 +250,7 @@ exports.adminRefund = async (req, res) => {
 
     if (payment.booking_id) {
       await publishBookingEvent('booking.cancelled', payment.booking_id);
-      void notifyAdminCancellation(payment.booking_id);
+      await notificationCatalog.dispatchBooking('booking.cancelled.admin', payment.booking_id);
     }
 
     ok(res, 200, { id: payment.id, status: 'refunded' });

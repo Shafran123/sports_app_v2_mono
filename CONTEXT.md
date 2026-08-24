@@ -108,8 +108,12 @@ Platform staff with full oversight over users, venues, bookings, payments, event
 An Email Notification sent ahead of a Booking's slot (one day before) to prompt the Player. Distinct from the Booking Confirmation sent at creation.
 _Avoid_: reminder booking
 
+**Booking Alert**:
+An Email or SMS Notification sent to a Venue Owner about a Booking on their venue (created, cancelled). Distinct from the Player-facing Booking Confirmation — it informs the Owner their venue has business, not the Player that they are booked.
+_Avoid_: owner notification, venue update
+
 **Email Notification**:
-A transactional email about a domain event — signup welcome, booking confirmation, booking reminder, venue approved/rejected. Sent fire-and-forget via Mailgun; never blocks the request.
+A transactional email about a domain event — signup welcome, booking confirmation, booking reminder, booking alerts, venue approved/rejected. Sent fire-and-forget via Mailgun; never blocks the request.
 _Avoid_: marketing email, newsletter
 
 **Phone Sign-in**:
@@ -122,7 +126,7 @@ A phone number on a Player account proven to belong to that Player by passing an
 _Avoid_: confirmed phone, validated phone, trusted number
 
 **SMS Notification**:
-A transactional SMS about a Booking — sent only on **booking confirmation** and **admin-initiated cancellation** (via SMSGo.lk). Not used for marketing or reminders.
+A transactional SMS sent via SMSGo.lk covering the Booking lifecycle — confirmation, updates, cancellation — plus phone OTP verification codes. Not used for marketing.
 _Avoid_: broadcast SMS, promo SMS
 
 **Feature Flag**:

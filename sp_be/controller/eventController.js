@@ -5,6 +5,7 @@ const { buildCheckoutParams } = require('../utils/payhere');
 const { requestBaseUrl } = require('../utils/tokens');
 const { getFlag, getTaxRate, getVenueTaxRate, applyInclusiveTax } = require('../utils/featureFlags');
 const billService = require('../utils/billService');
+const notificationCatalog = require('../utils/notificationCatalog');
 
 // Players only ever see Events when discovery state is 'enabled' — or the
 // teaser surface when 'coming_soon'. 'hidden' removes the section entirely.
@@ -147,6 +148,7 @@ exports.cancelEvent = async (req, res) => {
     );
 
     await client.query('commit');
+    await notificationCatalog.dispatchEventCancelled(req.params.id);
     ok(res, 200, { cancelled: true, event_id: req.params.id });
   } catch (error) {
     await client.query('rollback').catch(() => {});
@@ -223,6 +225,8 @@ exports.registerForEvent = async (req, res) => {
     );
 
     await client.query('commit');
+
+    await notificationCatalog.dispatchEventRegistration('event.registered', registration.id);
 
     ok(res, 201, {
       registration_id: registration.id,

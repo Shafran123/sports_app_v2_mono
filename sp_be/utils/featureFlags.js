@@ -100,6 +100,21 @@ async function getBrandName() {
   return String(await readConfig('brand_name', 'MySlot.LK'));
 }
 
+// Per-message SMS gate: an admin-controlled array of notification keys that
+// are allowed to send SMS. null/absent means all transactional SMS keys are
+// enabled; an empty array disables SMS entirely (beyond the sms_enabled flag).
+async function getSmsEvents() {
+  const value = await readConfig('sms_events', null);
+  if (Array.isArray(value)) return value;
+  if (value === null || value === undefined) return null;
+  try {
+    const parsed = JSON.parse(String(value));
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 // Half-up rounding — matches Postgres round() semantics; used to derive the
 // tax line at checkout so totals stay integer LKR.
 function halfUp(n) {
@@ -136,7 +151,7 @@ function applyInclusiveTax(total, platformRate, venueRate) {
 }
 
 // Persist a new value with validation + audit trail. Admin only.
-const EXTRA_CONFIG_KEYS = ['tax_rate', 'brand_name', 'bank_details'];
+const EXTRA_CONFIG_KEYS = ['tax_rate', 'brand_name', 'bank_details', 'sms_events'];
 
 async function setConfig(key, value, adminId) {
   const def = FLAG_DEFS[key];
@@ -182,6 +197,14 @@ async function setConfig(key, value, adminId) {
         parsed[field] = raw;
       }
     }
+  } else if (key === 'sms_events') {
+    if (value === null || value === undefined) {
+      parsed = null;
+    } else if (Array.isArray(value) && value.every((k) => typeof k === 'string')) {
+      parsed = value;
+    } else {
+      throw Object.assign(new Error('sms_events must be an array of notification keys'), { code: 'INVALID_VALUE' });
+    }
   } else if (def.type === 'boolean') {
     if (value === true || value === 'true') parsed = true;
     else if (value === false || value === 'false') parsed = false;
@@ -224,6 +247,7 @@ module.exports = {
   getVenueTaxRate,
   getBankDetails,
   getBrandName,
+  getSmsEvents,
   applyTax,
   applyInclusiveTax,
   setConfig

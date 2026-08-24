@@ -4,6 +4,7 @@ const { getFlag } = require('./featureFlags');
 
 const SMSGO_URL = process.env.SMSGO_URL || 'https://api.smsgo.lk/api/v1/sms/send';
 const DEFAULT_MASK = process.env.SMSGO_MASK || 'MYSLOT';
+const DEFAULT_BRAND = 'MySlot.LK';
 
 function isConfigured() {
   return Boolean(process.env.SMSGO_API_KEY);
@@ -17,13 +18,42 @@ function formatSriLankanPhone(phone) {
   return `+94${digits}`;
 }
 
-function buildBookingSms(booking) {
+function buildBookingSms(booking, brand = DEFAULT_BRAND) {
   const method = booking.payment_method === 'cash' ? 'Pay at venue' : 'Paid online';
-  return `MySlot.LK: Booking confirmed at ${booking.venue_name || ''} (${booking.court_name || ''}) on ${fmtWhen(booking.start_at)}. ${method}. Show the QR at check-in.`;
+  return `${brand}: Booking confirmed at ${booking.venue_name || ''} (${booking.court_name || ''}) on ${fmtWhen(booking.start_at)}. ${method}. Show the QR at check-in.`;
 }
 
-function buildCancellationSms(booking) {
-  return `MySlot.LK: Your booking at ${booking.venue_name || ''} (${booking.court_name || ''}) on ${fmtWhen(booking.start_at)} was cancelled by the venue.`;
+function buildOwnerBookingSms(booking, brand = DEFAULT_BRAND) {
+  const method = booking.payment_method === 'cash' ? 'Pay at venue' : 'Paid online';
+  return `${brand}: New booking at your venue ${booking.venue_name || ''} (${booking.court_name || ''}) on ${fmtWhen(booking.start_at)}. ${method}.`;
+}
+
+function buildReminderSms(booking, brand = DEFAULT_BRAND) {
+  return `${brand}: Reminder — your booking at ${booking.venue_name || ''} (${booking.court_name || ''}) is on ${fmtWhen(booking.start_at)}. Have your QR ready.`;
+}
+
+function buildPlayerCancelledSms(booking, brand = DEFAULT_BRAND) {
+  return `${brand}: Your booking at ${booking.venue_name || ''} (${booking.court_name || ''}) on ${fmtWhen(booking.start_at)} was cancelled.`;
+}
+
+function buildOwnerBookingCancelledSms(booking, brand = DEFAULT_BRAND) {
+  return `${brand}: A booking at your venue ${booking.venue_name || ''} (${booking.court_name || ''}) on ${fmtWhen(booking.start_at)} was cancelled by the player.`;
+}
+
+function buildVenueCancelledSms(booking, brand = DEFAULT_BRAND) {
+  return `${brand}: Your booking at ${booking.venue_name || ''} (${booking.court_name || ''}) on ${fmtWhen(booking.start_at)} was cancelled by the venue.`;
+}
+
+function buildWalkinSms(booking, brand = DEFAULT_BRAND) {
+  return `${brand}: Booking confirmed at ${booking.venue_name || ''} (${booking.court_name || ''}) on ${fmtWhen(booking.start_at)}. Show the QR at check-in.`;
+}
+
+function buildEventRegisteredSms(reg, brand = DEFAULT_BRAND) {
+  return `${brand}: You're in for ${reg.event_name || ''} on ${fmtWhen(reg.event_start)}. See you there!`;
+}
+
+function buildEventCancelledSms(reg, brand = DEFAULT_BRAND) {
+  return `${brand}: The event ${reg.event_name || ''} on ${fmtWhen(reg.event_start)} has been cancelled.`;
 }
 
 /**
@@ -64,19 +94,16 @@ async function sendSms({ to, message }) {
   }
 }
 
-async function notifyBookingConfirmed(booking, phone) {
-  return sendSms({ to: formatSriLankanPhone(phone), message: buildBookingSms(booking) });
-}
-
-async function notifyCancelledByAdmin(booking, phone) {
-  return sendSms({ to: formatSriLankanPhone(phone), message: buildCancellationSms(booking) });
-}
-
 module.exports = {
   sendSms,
   formatSriLankanPhone,
   buildBookingSms,
-  buildCancellationSms,
-  notifyBookingConfirmed,
-  notifyCancelledByAdmin
+  buildOwnerBookingSms,
+  buildReminderSms,
+  buildPlayerCancelledSms,
+  buildOwnerBookingCancelledSms,
+  buildVenueCancelledSms,
+  buildWalkinSms,
+  buildEventRegisteredSms,
+  buildEventCancelledSms
 };

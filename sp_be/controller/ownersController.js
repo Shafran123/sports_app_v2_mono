@@ -3,7 +3,7 @@ const { ok, fail } = require('../utils/response');
 const logger = require('../utils/logger');
 const { getBankDetails } = require('../utils/featureFlags');
 const { createOwnerAccount } = require('../services/ownerAccounts');
-const emailService = require('../utils/emailService');
+const notificationCatalog = require('../utils/notificationCatalog');
 
 const PLAN_FIELDS = ['name', 'term_days', 'price_lkr'];
 
@@ -268,9 +268,7 @@ exports.createOwner = async (req, res) => {
     await client.query('commit');
 
     const bankDetails = await getBankDetails();
-    emailService.notifyOwnerWelcome(owner, password, plan, ownerAgreement, bankDetails).catch((err) => {
-      logger.error(`Owner welcome email failed: ${err.message}`);
-    });
+    await notificationCatalog.dispatch('owner.welcome', { owner, password, plan, agreement: ownerAgreement, bankDetails });
 
     const { rows: savedPlan } = await pool.query(
       `select * from owner_plans where id = $1`,
@@ -330,9 +328,7 @@ exports.renewOwner = async (req, res) => {
     await client.query('commit');
 
     const bankDetails = await getBankDetails();
-    emailService.notifyOwnerRenewal(owner, plan, ownerAgreement, bankDetails).catch((err) => {
-      logger.error(`Owner renewal email failed: ${err.message}`);
-    });
+    await notificationCatalog.dispatch('owner.renewal', { owner, plan, agreement: ownerAgreement, bankDetails });
 
     ok(res, 200, { plan: fmtPlanDates(plan), agreement: ownerAgreement });
   } catch (error) {
@@ -367,9 +363,7 @@ exports.nudgeOwner = async (req, res) => {
     const plan = planRows[0] || null;
 
     const bankDetails = await getBankDetails();
-    emailService.notifyOwnerNudge(owner, plan, bankDetails).catch((err) => {
-      logger.error(`Owner nudge email failed: ${err.message}`);
-    });
+    await notificationCatalog.dispatch('owner.nudge', { owner, plan, bankDetails });
 
     ok(res, 200, { nudged: true });
   } catch (error) {

@@ -9,11 +9,13 @@ const BOOKING_EVENTS_SELECT = `
          b.payment_method, b.total_price, b.player_name, b.player_phone,
          c.name as court_name, v.name as venue_name,
          v.owner_id as venue_owner_id,
-         u.email as user_email, u.phone as user_phone
+         u.email as user_email, u.phone as user_phone,
+         o.email as owner_email, o.phone as owner_phone
   from bookings b
   join courts c on c.id = b.court_id
   join venues v on v.id = c.venue_id
   left join users u on u.id = b.user_id
+  left join users o on o.id = v.owner_id
   where b.id = $1`;
 
 async function loadBookingForEvents(bookingId) {

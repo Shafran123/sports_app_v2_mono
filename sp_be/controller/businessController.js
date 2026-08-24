@@ -2,7 +2,7 @@ const pool = require('../db');
 const { ok, fail } = require('../utils/response');
 const logger = require('../utils/logger');
 const { publishBookingEvent } = require('../utils/publish');
-const { notifyAdminCancellation } = require('../utils/notify');
+const notificationCatalog = require('../utils/notificationCatalog');
 const { stripBookingSecrets, stripBookingSecretsList } = require('../utils/scrub');
 const cancellationService = require('../services/cancellation');
 const { mintQrToken } = require('../utils/tokens');
@@ -645,9 +645,10 @@ exports.cancelBooking = async (req, res) => {
     }
     await client.query('commit');
     await publishBookingEvent('booking.cancelled', req.params.id);
-    if (req.user.role === 'admin') {
-      void notifyAdminCancellation(req.params.id);
-    }
+    const cancelKey = req.user.role === 'admin' ? 'booking.cancelled.admin' : 'booking.cancelled.owner';
+    await notificationCatalog.dispatchBooking(cancelKey, req.params.id, {
+      refund: { refund_amount: result.refund_amount, refund_pct: result.refund_pct }
+    });
     ok(res, 200, result);
   } catch (error) {
     await client.query('rollback').catch(() => {});
@@ -772,6 +773,7 @@ exports.createManualBooking = async (req, res) => {
       await client.query('commit');
       const created = rows[0];
       await publishBookingEvent('booking.created', created.id);
+      await notificationCatalog.dispatchBooking('booking.walkin_created', created.id);
       ok(res, 201, created);
     } catch (error) {
       await client.query('rollback to savepoint manual_insert');

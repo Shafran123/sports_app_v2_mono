@@ -1,8 +1,8 @@
 const pool = require('../db');
 const logger = require('./logger');
 const { fmtWhen, fmtLkr } = require('./format');
-const emailService = require('./emailService');
 const { getBrandName } = require('./featureFlags');
+const notificationCatalog = require('./notificationCatalog');
 
 // Stateless Booking Bill: a PDF invoice generated on demand from DB rows
 // (nothing is stored). Doubles as the check-in pass via the QR token.
@@ -170,20 +170,7 @@ async function registrationBillPdf(registrationId, statusOverride) {
 // (booking whose player row IS the venue owner) are skipped — print-only.
 async function emailBillForBooking(bookingId) {
   try {
-    const booking = await loadBookingForBill(bookingId);
-    if (!booking) return;
-    if (booking.user_id === booking.venue_owner_id || !booking.user_email) {
-      logger.info(`Bill ${bookingId}: walk-in booking — print only, no email.`);
-      return;
-    }
-    const pdf = await bookingBillPdf(bookingId);
-    if (!pdf) return;
-    await emailService.sendEmail({
-      to: booking.user_email,
-      subject: `Your bill — ${booking.venue_name || 'booking'}`,
-      html: emailService.buildBillHtml(booking),
-      attachment: { filename: `spots-bill-${booking.id.slice(0, 8)}.pdf`, content: pdf, contentType: 'application/pdf' }
-    });
+    await notificationCatalog.dispatch('booking.bill', { bookingId }, { awaitTransports: true });
   } catch (error) {
     logger.error(`Failed to email bill for booking ${bookingId}: ${error.message}`);
   }
@@ -191,16 +178,7 @@ async function emailBillForBooking(bookingId) {
 
 async function emailBillForRegistration(registrationId) {
   try {
-    const reg = await loadRegistrationForBill(registrationId);
-    if (!reg || !reg.player_email) return;
-    const pdf = await registrationBillPdf(registrationId);
-    if (!pdf) return;
-    await emailService.sendEmail({
-      to: reg.player_email,
-      subject: `Your bill — ${reg.event_name || 'event registration'}`,
-      html: emailService.buildRegistrationBillHtml(reg),
-      attachment: { filename: `spots-event-bill-${reg.id.slice(0, 8)}.pdf`, content: pdf, contentType: 'application/pdf' }
-    });
+    await notificationCatalog.dispatch('event.bill', { registrationId }, { awaitTransports: true });
   } catch (error) {
     logger.error(`Bill email failed for registration ${registrationId}: ${error.message}`);
   }

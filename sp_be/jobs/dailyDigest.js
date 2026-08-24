@@ -3,6 +3,7 @@ const logger = require('../utils/logger');
 const { fmtLkr } = require('../utils/format');
 const emailService = require('../utils/emailService');
 const { getBrandName } = require('../utils/featureFlags');
+const notificationCatalog = require('../utils/notificationCatalog');
 
 // Daily admin digest: previous day's platform numbers as an HTML email,
 // 06:00 Asia/Colombo. Sent to every admin account; fire-and-forget via
@@ -125,17 +126,7 @@ async function runDigest() {
   try {
     const day = colomboDate();
     const html = await buildDigest(day);
-    const { rows } = await pool.query(`select email from users where role = 'admin' and email is not null`);
-    const to = rows.map((r) => r.email).filter(Boolean);
-    if (to.length === 0) {
-      logger.info('Digest skipped: no admin emails configured');
-      return;
-    }
-    await emailService.sendEmail({
-      to,
-      subject: `MySlot.LK daily digest — ${day}`,
-      html
-    });
+    await notificationCatalog.dispatch('digest.daily', { day, html });
   } catch (error) {
     logger.error(`Daily digest failed: ${error.message}`);
   }

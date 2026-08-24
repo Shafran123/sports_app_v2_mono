@@ -3,6 +3,8 @@ const pool = require('../db');
 const { ok, fail } = require('../utils/response');
 const logger = require('../utils/logger');
 const { sendSms, formatSriLankanPhone } = require('../utils/smsService');
+const { recordOutbound } = require('../utils/notificationCatalog');
+const { getBrandName } = require('../utils/featureFlags');
 
 const CODE_TTL_MINUTES = 10;
 const MAX_ATTEMPTS = 5;
@@ -65,13 +67,22 @@ exports.sendVerificationCode = async (req, res) => {
     }
 
     const code = generateCode();
+    const brand = await getBrandName();
 
     // Send first; only record the code once the SMS actually went out. A
     // failed send must not burn the resend window, invalidate a still-valid
     // code, or lie to the client with a 200.
     const result = await sendSms({
       to: phone,
-      message: `MySlot.LK: your verification code is ${code}. It expires in ${CODE_TTL_MINUTES} minutes. Do not share it.`
+      message: `${brand}: your verification code is ${code}. It expires in ${CODE_TTL_MINUTES} minutes. Do not share it.`
+    });
+    await recordOutbound({
+      channel: 'sms',
+      to: phone,
+      key: 'otp.code',
+      status: result.success ? 'sent' : ['SMS disabled', 'SMS not configured'].includes(result.error) ? 'skipped' : 'failed',
+      error: result.success ? null : result.error,
+      providerRef: result.id || null
     });
     if (!result.success) {
       logger.error(`Verification SMS failed for ${phone}: ${result.error}`);

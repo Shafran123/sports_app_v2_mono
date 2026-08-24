@@ -2,6 +2,7 @@ const logger = require('./logger');
 const { fmtWhen, fmtLkr } = require('./format');
 
 const DEFAULT_FROM = process.env.FROM_EMAIL || 'MySlot.LK <no-reply@myslot.lk>';
+const DEFAULT_BRAND = 'MySlot.LK';
 
 // Escape any user-sourced string before it lands in an HTML email template.
 // Venue names, player names, and rejection reasons are free text — unescaped,
@@ -76,11 +77,12 @@ async function sendEmail({ to, subject, html, attachment }) {
   }
 }
 
-function shell(start) {
-  return `<!DOCTYPE html><html><body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f7f7f8;"><div style="background:#fff;padding:32px;border-radius:16px;margin:16px auto;">${start}<hr style="border:none;border-top:1px solid #eee;margin:24px 0;"><p style="color:#999;font-size:12px;text-align:center;">MySlot.LK — book courts, join games, find players.</p></div></body></html>`;
+function shell(start, brand = DEFAULT_BRAND) {
+  const safeBrand = escapeHtml(brand);
+  return `<!DOCTYPE html><html><body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f7f7f8;"><div style="background:#fff;padding:32px;border-radius:16px;margin:16px auto;">${start}<hr style="border:none;border-top:1px solid #eee;margin:24px 0;"><p style="color:#999;font-size:12px;text-align:center;">${safeBrand} — book courts, join games, find players.</p></div></body></html>`;
 }
 
-function buildBookingHtml(booking) {
+function buildBookingHtml(booking, brand = DEFAULT_BRAND) {
   const venueName = escapeHtml(booking.venue_name || '');
   const courtName = escapeHtml(booking.court_name || '');
   return shell(`
@@ -92,10 +94,27 @@ function buildBookingHtml(booking) {
       <p><strong>Total:</strong> ${fmtLkr(booking.total_price)}</p>
       <p><strong>Payment:</strong> ${booking.payment_method === 'cash' ? 'Pay at venue' : 'Paid online'}</p>
     </div>
-    <p style="color:#666;">Find your QR code under Bookings in the MySlot.LK app and show it on arrival.</p>`);
+    <p style="color:#666;">Find your QR code under Bookings in the app and show it on arrival.</p>`, brand);
 }
 
-function buildReminderHtml(booking) {
+function buildOwnerBookingHtml(booking, brand = DEFAULT_BRAND) {
+  const venueName = escapeHtml(booking.venue_name || '');
+  const courtName = escapeHtml(booking.court_name || '');
+  const playerName = escapeHtml(booking.player_name || '');
+  return shell(`
+    <h2 style="color:#176036;">New booking — ${venueName}</h2>
+    <p>You have a new booking at your venue.</p>
+    <div style="background:#f0fdf4;padding:16px;border-radius:12px;border:1px solid #22c55e;">
+      <p><strong>${venueName || 'Venue'}</strong> — ${courtName}</p>
+      <p><strong>Time:</strong> ${fmtWhen(booking.start_at)} — ${fmtWhen(booking.end_at)}</p>
+      <p><strong>Total:</strong> ${fmtLkr(booking.total_price)}</p>
+      <p><strong>Payment:</strong> ${booking.payment_method === 'cash' ? 'Pay at venue' : 'Paid online'}</p>
+      ${playerName ? `<p><strong>Player:</strong> ${playerName}</p>` : ''}
+    </div>
+    <p style="color:#666;">Manage this booking from your venue console.</p>`, brand);
+}
+
+function buildReminderHtml(booking, brand = DEFAULT_BRAND) {
   const venueName = escapeHtml(booking.venue_name || '');
   const courtName = escapeHtml(booking.court_name || '');
   return shell(`
@@ -105,36 +124,32 @@ function buildReminderHtml(booking) {
       <p><strong>${venueName || 'Venue'}</strong> — ${courtName}</p>
       <p><strong>Time:</strong> ${fmtWhen(booking.start_at)} — ${fmtWhen(booking.end_at)}</p>
     </div>
-    <p style="color:#666;">Please arrive a few minutes early. Have your QR code ready to check in.</p>`);
+    <p style="color:#666;">Please arrive a few minutes early. Have your QR code ready to check in.</p>`, brand);
 }
 
-function buildWelcomeHtml() {
+function buildWelcomeHtml(brand = DEFAULT_BRAND) {
   return shell(`
-    <h2 style="color:#176036;">Welcome to MySlot.LK!</h2>
+    <h2 style="color:#176036;">Welcome to ${escapeHtml(brand)}!</h2>
     <p>You're all set to book courts, join games, and discover sports near you.</p>
-    <p style="color:#666;">Find a venue, pick a slot, and your next match starts here.</p>`);
+    <p style="color:#666;">Find a venue, pick a slot, and your next match starts here.</p>`, brand);
 }
 
-function buildVenueApprovedHtml(venue) {
+function buildVenueApprovedHtml(venue, brand = DEFAULT_BRAND) {
   const venueName = escapeHtml(venue.name || '');
   return shell(`
     <h2 style="color:#176036;">Your venue is live!</h2>
     <p>Good news — <strong>"${venueName}"</strong> has been approved and is now visible to players.</p>
-    <p>Log in to manage your courts, pricing, and bookings.</p>`);
+    <p>Log in to manage your courts, pricing, and bookings.</p>`, brand);
 }
 
-function buildVenueRejectedHtml(venue, reason) {
+function buildVenueRejectedHtml(venue, reason, brand = DEFAULT_BRAND) {
   const venueName = escapeHtml(venue.name || '');
   const safeReason = escapeHtml(reason || '');
   return shell(`
     <h2 style="color:#b91c1c;">Update on your venue "${venueName}"</h2>
     <p><strong>"${venueName}"</strong> could not be approved this time.</p>
     <p><strong>Reason:</strong> ${safeReason}</p>
-    <p>You can edit and resubmit the venue for review.</p>`);
-}
-
-async function notifyBookingConfirmed(booking, userEmail) {
-  return sendEmail({ to: userEmail, subject: `Booking confirmed — ${booking.venue_name || 'your slot'}`, html: buildBookingHtml(booking) });
+    <p>You can edit and resubmit the venue for review.</p>`, brand);
 }
 
 function taxLine(rate, tax, venueRate, venueTax) {
@@ -144,7 +159,7 @@ function taxLine(rate, tax, venueRate, venueTax) {
   return lines.join('<br>');
 }
 
-function buildBillHtml(booking) {
+function buildBillHtml(booking, brand = DEFAULT_BRAND) {
   const venueName = escapeHtml(booking.venue_name || '');
   const courtName = escapeHtml(booking.court_name || '');
   return shell(`
@@ -157,10 +172,10 @@ function buildBillHtml(booking) {
       <p><strong>Total:</strong> ${fmtLkr(booking.total_price)}</p>
       <p><strong>Payment:</strong> ${booking.payment_method === 'cash' ? 'Pay at venue' : 'Paid online'} — ${escapeHtml(booking.status || '')}</p>
     </div>
-    <p style="color:#666;">Your bill PDF is attached — it also carries the QR code for check-in.</p>`);
+    <p style="color:#666;">Your bill PDF is attached — it also carries the QR code for check-in.</p>`, brand);
 }
 
-function buildRegistrationBillHtml(reg) {
+function buildRegistrationBillHtml(reg, brand = DEFAULT_BRAND) {
   const eventName = escapeHtml(reg.event_name || '');
   const amount = Number(reg.amount || 0);
   return shell(`
@@ -173,25 +188,85 @@ function buildRegistrationBillHtml(reg) {
       <p><strong>Total:</strong> ${fmtLkr(amount)}</p>
       <p><strong>Status:</strong> ${escapeHtml(reg.status || '')}</p>
     </div>
-    <p style="color:#666;">Your bill PDF is attached.</p>`);
+    <p style="color:#666;">Your bill PDF is attached.</p>`, brand);
 }
 
-async function notifyBookingReminder(booking, userEmail) {
-  return sendEmail({ to: userEmail, subject: `Reminder — ${booking.venue_name || 'your booking'} tomorrow`, html: buildReminderHtml(booking) });
+function buildPlayerCancelledHtml(booking, refund, brand = DEFAULT_BRAND) {
+  const venueName = escapeHtml(booking.venue_name || '');
+  const courtName = escapeHtml(booking.court_name || '');
+  const refundAmount = Number(refund?.refund_amount || 0);
+  const refundLine = refundAmount > 0
+    ? `<p><strong>Refund:</strong> ${fmtLkr(refundAmount)} will be returned to your payment method.</p>`
+    : '<p style="color:#666;">No refund applies to this booking.</p>';
+  return shell(`
+    <h2 style="color:#b91c1c;">Booking cancelled — ${venueName}</h2>
+    <p>Your booking has been cancelled.</p>
+    <div style="background:#fef2f2;padding:16px;border-radius:12px;border:1px solid #ef4444;">
+      <p><strong>${venueName || 'Venue'}</strong> — ${courtName}</p>
+      <p><strong>Time:</strong> ${fmtWhen(booking.start_at)} — ${fmtWhen(booking.end_at)}</p>
+      ${refundLine}
+    </div>
+    <p style="color:#666;">If you did not cancel this booking, contact the venue.</p>`, brand);
 }
 
-async function notifySignupWelcome(userEmail, name) {
-  const greeting = name ? `Hi ${escapeHtml(name)},` : 'Hi,';
-  const html = buildWelcomeHtml().replace('<p>You\'re all set.', `<p>${greeting} You're all set.`);
-  return sendEmail({ to: userEmail, subject: 'Welcome to MySlot.LK', html });
+function buildOwnerBookingCancelledHtml(booking, brand = DEFAULT_BRAND) {
+  const venueName = escapeHtml(booking.venue_name || '');
+  const courtName = escapeHtml(booking.court_name || '');
+  const playerName = escapeHtml(booking.player_name || '');
+  return shell(`
+    <h2 style="color:#b45309;">Booking cancelled — ${venueName}</h2>
+    <p>A booking at your venue has been cancelled by the player.</p>
+    <div style="background:#fef2f2;padding:16px;border-radius:12px;border:1px solid #ef4444;">
+      <p><strong>${venueName || 'Venue'}</strong> — ${courtName}</p>
+      <p><strong>Time:</strong> ${fmtWhen(booking.start_at)} — ${fmtWhen(booking.end_at)}</p>
+      ${playerName ? `<p><strong>Player:</strong> ${playerName}</p>` : ''}
+    </div>
+    <p style="color:#666;">The slot is now free to rebook.</p>`, brand);
 }
 
-async function notifyVenueApproved(venue, ownerEmail) {
-  return sendEmail({ to: ownerEmail, subject: `Your venue "${venue.name}" is live!`, html: buildVenueApprovedHtml(venue) });
+function buildVenueCancelledHtml(booking, brand = DEFAULT_BRAND) {
+  const venueName = escapeHtml(booking.venue_name || '');
+  const courtName = escapeHtml(booking.court_name || '');
+  return shell(`
+    <h2 style="color:#b91c1c;">Booking cancelled by the venue</h2>
+    <p>Your booking at ${venueName} has been cancelled by the venue.</p>
+    <div style="background:#fef2f2;padding:16px;border-radius:12px;border:1px solid #ef4444;">
+      <p><strong>${venueName || 'Venue'}</strong> — ${courtName}</p>
+      <p><strong>Time:</strong> ${fmtWhen(booking.start_at)} — ${fmtWhen(booking.end_at)}</p>
+    </div>
+    <p style="color:#666;">Please contact the venue if you have questions.</p>`, brand);
 }
 
-async function notifyVenueRejected(venue, ownerEmail, reason) {
-  return sendEmail({ to: ownerEmail, subject: `Update on your venue "${venue.name}"`, html: buildVenueRejectedHtml(venue, reason) });
+function buildEventRegisteredHtml(reg, brand = DEFAULT_BRAND) {
+  const eventName = escapeHtml(reg.event_name || '');
+  return shell(`
+    <h2 style="color:#176036;">You're in — ${eventName}</h2>
+    <div style="background:#f0fdf4;padding:16px;border-radius:12px;border:1px solid #22c55e;">
+      <p><strong>Event:</strong> ${eventName}</p>
+      <p><strong>When:</strong> ${fmtWhen(reg.event_start)}${reg.event_end ? ` — ${fmtWhen(reg.event_end)}` : ''}</p>
+      ${reg.venue_name ? `<p><strong>Venue:</strong> ${escapeHtml(reg.venue_name)}</p>` : ''}
+    </div>
+    <p style="color:#666;">Your registration is confirmed. See you there!</p>`, brand);
+}
+
+function buildEventCancelledHtml(reg, brand = DEFAULT_BRAND) {
+  const eventName = escapeHtml(reg.event_name || '');
+  return shell(`
+    <h2 style="color:#b91c1c;">Event cancelled — ${eventName}</h2>
+    <p>The event you registered for has been cancelled.</p>
+    <div style="background:#fef2f2;padding:16px;border-radius:12px;border:1px solid #ef4444;">
+      <p><strong>Event:</strong> ${eventName}</p>
+      <p><strong>When:</strong> ${fmtWhen(reg.event_start)}</p>
+    </div>
+    <p style="color:#666;">Your payment will be refunded. Refunds are processed manually and may take a few days.</p>`, brand);
+}
+
+function buildEventCancelledOwnerHtml(event, brand = DEFAULT_BRAND) {
+  const eventName = escapeHtml(event.name || '');
+  return shell(`
+    <h2 style="color:#b91c1c;">Event cancelled — ${eventName}</h2>
+    <p>Your event has been cancelled and all registrants have been notified.</p>
+    <p style="color:#666;">Registrant payments are marked for manual refund.</p>`, brand);
 }
 
 function bankDetailsHtml(details) {
@@ -207,11 +282,11 @@ function bankDetailsHtml(details) {
     : '';
 }
 
-function buildOwnerWelcomeHtml(owner, temporaryPassword, plan, bankDetails) {
+function buildOwnerWelcomeHtml(owner, temporaryPassword, plan, bankDetails, brand = DEFAULT_BRAND) {
   const planLine = plan ? `${escapeHtml(plan.name)} — ${plan.price_lkr > 0 ? `LKR ${plan.price_lkr}` : 'Free'} (${plan.start_date} to ${plan.end_date})` : 'No plan attached';
   return shell(`
     <h2 style="color:#176036;">Your venue-owner account is ready</h2>
-    <p>Hi ${escapeHtml(owner.name || '')}, your MySlot.LK venue-owner account has been created.</p>
+    <p>Hi ${escapeHtml(owner.name || '')}, your ${escapeHtml(brand)} venue-owner account has been created.</p>
     <div style="background:#f0fdf4;padding:16px;border-radius:12px;border:1px solid #22c55e;">
       <p><strong>Sign-in email:</strong> ${escapeHtml(owner.email)}</p>
       <p><strong>Temporary password:</strong> ${escapeHtml(temporaryPassword)}</p>
@@ -220,10 +295,10 @@ function buildOwnerWelcomeHtml(owner, temporaryPassword, plan, bankDetails) {
     <p><strong>Plan:</strong> ${planLine}</p>
     <p style="color:#666;">The Owner Agreement is attached to this email and is also waiting for you in the console — please review it and accept before you start managing venues.</p>
     ${bankDetailsHtml(bankDetails)}
-    <p style="color:#666;">Sign in at the console to accept your agreement and list your first venue.</p>`);
+    <p style="color:#666;">Sign in at the console to accept your agreement and list your first venue.</p>`, brand);
 }
 
-function buildOwnerRenewalHtml(owner, plan, bankDetails) {
+function buildOwnerRenewalHtml(owner, plan, bankDetails, brand = DEFAULT_BRAND) {
   return shell(`
     <h2 style="color:#176036;">Your plan has been renewed</h2>
     <p>Hi ${escapeHtml(owner.name || '')}, a new plan term has been set up for your account.</p>
@@ -232,10 +307,10 @@ function buildOwnerRenewalHtml(owner, plan, bankDetails) {
     </div>
     <p style="color:#666;">A new Owner Agreement is attached and waiting for your acceptance in the console.</p>
     ${bankDetailsHtml(bankDetails)}
-    <p style="color:#666;">Renewal payment is handled off-platform — see the payment details above.</p>`);
+    <p style="color:#666;">Renewal payment is handled off-platform — see the payment details above.</p>`, brand);
 }
 
-function buildOwnerNudgeHtml(owner, plan, bankDetails) {
+function buildOwnerNudgeHtml(owner, plan, bankDetails, brand = DEFAULT_BRAND) {
   const daysLeft = plan && plan.end_date
     ? Math.max(0, Math.ceil((new Date(`${plan.end_date}T23:59:59+05:30`) - new Date()) / (24 * 3600 * 1000)))
     : null;
@@ -243,68 +318,28 @@ function buildOwnerNudgeHtml(owner, plan, bankDetails) {
     <h2 style="color:#b45309;">Your plan is ending soon</h2>
     <p>Hi ${escapeHtml(owner.name || '')}, your current plan${plan ? ` (${escapeHtml(plan.name)})` : ''}${daysLeft !== null ? ` ends on ${escapeHtml(plan.end_date)} (${daysLeft} day${daysLeft === 1 ? '' : 's'})` : ' is ending'}. Reach out to the platform team to renew.</p>
     ${bankDetailsHtml(bankDetails)}
-    <p style="color:#666;">Your venue stays live while you sort out the renewal.</p>`);
-}
-
-async function notifyOwnerWelcome(owner, temporaryPassword, plan, agreement, bankDetails) {
-  let attachment;
-  if (agreement) {
-    try {
-      const { renderAgreementPdf } = require('./agreementService');
-      const pdf = await renderAgreementPdf(agreement, plan);
-      attachment = { filename: `owner-agreement-${owner.email.split('@')[0]}.pdf`, content: pdf, contentType: 'application/pdf' };
-    } catch (err) {
-      logger.error(`Agreement PDF failed: ${err.message}`);
-    }
-  }
-  return sendEmail({
-    to: owner.email,
-    subject: 'Your venue-owner account is ready',
-    html: buildOwnerWelcomeHtml(owner, temporaryPassword, plan, bankDetails),
-    attachment
-  });
-}
-
-async function notifyOwnerRenewal(owner, plan, agreement, bankDetails) {
-  let attachment;
-  if (agreement) {
-    try {
-      const { renderAgreementPdf } = require('./agreementService');
-      const pdf = await renderAgreementPdf(agreement, plan);
-      attachment = { filename: `owner-agreement-${owner.email.split('@')[0]}.pdf`, content: pdf, contentType: 'application/pdf' };
-    } catch (err) {
-      logger.error(`Agreement PDF failed: ${err.message}`);
-    }
-  }
-  return sendEmail({
-    to: owner.email,
-    subject: 'Your plan has been renewed',
-    html: buildOwnerRenewalHtml(owner, plan, bankDetails),
-    attachment
-  });
-}
-
-async function notifyOwnerNudge(owner, plan, bankDetails) {
-  return sendEmail({
-    to: owner.email,
-    subject: 'Your plan is ending soon',
-    html: buildOwnerNudgeHtml(owner, plan, bankDetails)
-  });
+    <p style="color:#666;">Your venue stays live while you sort out the renewal.</p>`, brand);
 }
 
 module.exports = {
   sendEmail,
-  notifyBookingConfirmed,
-  notifyBookingReminder,
-  notifySignupWelcome,
-  notifyVenueApproved,
-  notifyVenueRejected,
-  notifyOwnerWelcome,
-  notifyOwnerRenewal,
-  notifyOwnerNudge,
   escapeHtml,
+  shell,
   buildBookingHtml,
+  buildOwnerBookingHtml,
+  buildReminderHtml,
+  buildWelcomeHtml,
+  buildVenueApprovedHtml,
+  buildVenueRejectedHtml,
   buildBillHtml,
   buildRegistrationBillHtml,
-  shell
+  buildPlayerCancelledHtml,
+  buildOwnerBookingCancelledHtml,
+  buildVenueCancelledHtml,
+  buildEventRegisteredHtml,
+  buildEventCancelledHtml,
+  buildEventCancelledOwnerHtml,
+  buildOwnerWelcomeHtml,
+  buildOwnerRenewalHtml,
+  buildOwnerNudgeHtml
 };

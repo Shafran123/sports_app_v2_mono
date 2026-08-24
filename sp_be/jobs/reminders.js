@@ -1,5 +1,5 @@
 const pool = require('../db');
-const emailService = require('../utils/emailService');
+const notificationCatalog = require('../utils/notificationCatalog');
 const logger = require('../utils/logger');
 
 const INTERVAL_MINUTES = 60;
@@ -24,17 +24,10 @@ async function runReminderJob() {
 
     for (const booking of rows) {
       if (!booking.user_email) continue;
-      emailService
-        .notifyBookingReminder(booking, booking.user_email)
-        .then((result) => {
-          if (!result || !result.success) return;
-          return pool
-            .query(`update bookings set reminder_sent_at = now() where id = $1`, [booking.id])
-            .catch(() => {});
-        })
-        .catch((err) => {
-          logger.error(`Reminder email failed for ${booking.id}: ${err.message}`);
-        });
+      const results = await notificationCatalog.dispatch('booking.reminder', { booking }, { awaitTransports: true });
+      const emailOk = results.some((r) => r.channel === 'email' && r.status === 'sent');
+      if (!emailOk) continue;
+      await pool.query(`update bookings set reminder_sent_at = now() where id = $1`, [booking.id]).catch(() => {});
     }
   } catch (error) {
     logger.error(`Reminder job error: ${error.message}`);

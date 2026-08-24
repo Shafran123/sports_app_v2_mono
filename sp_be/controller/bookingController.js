@@ -6,7 +6,7 @@ const { mintQrToken, requestBaseUrl } = require('../utils/tokens');
 const { stripBookingSecrets, stripBookingSecretsList } = require('../utils/scrub');
 const cancellationService = require('../services/cancellation');
 const { publishBookingEvent } = require('../utils/publish');
-const { notifyBookingConfirmed } = require('../utils/notify');
+const notificationCatalog = require('../utils/notificationCatalog');
 const { getFlag, getTaxRate, applyInclusiveTax } = require('../utils/featureFlags');
 const billService = require('../utils/billService');
 
@@ -214,7 +214,7 @@ const dayOfWeek = dayOfWeekOfColombo(start_at);
         );
         await client.query('commit');
         await publishBookingEvent('booking.created', bookingRows[0].id);
-        void notifyBookingConfirmed(bookingRows[0].id);
+        await notificationCatalog.dispatchBooking('booking.confirmed', bookingRows[0].id);
         return ok(res, 201, { booking: bookingRows[0], amount, currency: 'LKR' });
       } catch (error) {
         await client.query('rollback').catch(() => {});
@@ -412,6 +412,9 @@ exports.cancelBooking = async (req, res) => {
     }
     await client.query('commit');
     await publishBookingEvent('booking.cancelled', req.params.id);
+    await notificationCatalog.dispatchBooking('booking.cancelled.player', req.params.id, {
+      refund: { refund_amount: result.refund_amount, refund_pct: result.refund_pct }
+    });
     ok(res, 200, result);
   } catch (error) {
     await client.query('rollback').catch(() => {});

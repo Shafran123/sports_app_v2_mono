@@ -318,7 +318,8 @@ export const AdminConfigSchema = z.object({
   flags: z.array(FeatureFlagDefSchema),
   tax_rate: z.number(),
   brand_name: z.string(),
-  bank_details: z.record(z.string(), z.string()).optional()
+  bank_details: z.record(z.string(), z.string()).optional(),
+  sms_events: z.array(z.string()).nullable().optional()
 });
 export type AdminConfig = z.infer<typeof AdminConfigSchema>;
 

@@ -36,9 +36,8 @@ async function upsertUser(firebaseUid, email, name, { phone = null, welcome = fa
   );
   const user = rows[0];
   if (welcome && user.inserted && user.email) {
-    const emailService = require('../utils/emailService');
-    const logger = require('../utils/logger');
-    emailService.notifySignupWelcome(user.email, user.name).catch((err) => {
+    const notificationCatalog = require('../utils/notificationCatalog');
+    notificationCatalog.dispatch('signup.welcome', { user }).catch((err) => {
       logger.error(`Signup welcome email failed: ${err.message}`);
     });
   }
