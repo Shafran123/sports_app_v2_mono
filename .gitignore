@@ -32,6 +32,13 @@ sports-app-20029-firebase*.json
 !/apps/user/vercel.json
 !/apps/admin/vercel.json
 !/apps/landing/vercel.json
+# each app's package.json + tsconfig are required by Vercel's framework detection + path alias resolution
+!/apps/user/package.json
+!/apps/admin/package.json
+!/apps/landing/package.json
+!/apps/user/tsconfig.json
+!/apps/admin/tsconfig.json
+!/apps/landing/tsconfig.json
 
 # backend local uploads (persist on the Railway volume, not in git)
 /sp_be/uploads/

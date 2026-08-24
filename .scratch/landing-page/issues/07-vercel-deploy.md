@@ -1,44 +1,27 @@
-# 07 — Vercel deploy for `apps/landing` (Next.js detection fix)
+# 07 — Vercel deploy (Next.js version detection + build)
 
-**What to build:** make the landing site deployable on Vercel with the same per-app configuration as `apps/user` and `apps/admin` — Root Directory `apps/landing`, a per-app `vercel.json`, and no root-level monorepo `vercel.json`.
+**Status:** resolved
 
-## Root cause
+## Root cause (two independent bugs, both .gitignore)
 
-Vercel's Next.js preset detects the framework by reading the `package.json` at the project's **Root Directory** and checking for `next` in `dependencies` / `devDependencies`. The landing Vercel project (`myslot-landing-v2`) was set up as a monorepo project rooted at the **repo root** (via a root `vercel.json` with `installCommand`/`buildCommand`/`framework`). At the repo root, `package.json` is the pnpm workspace root (`myslot`) — it declares no `next`, so Vercel fails with:
+1. `apps/landing/package.json` (needed by Vercel to detect Next.js and determine build/install commands) was **untracked** — the root `.gitignore` blanket-ignores `*.json`, so Vercel cloned the repo without it. Detection failed with "No Next.js version detected".
+   Working apps (`apps/user`, `apps/admin`) had explicit `!` exceptions, so they deployed fine.
+2. After tracking `package.json`, the build failed with `Module not found: Can't resolve '@/components/landing-page'` because `apps/landing/tsconfig.json` (which defines the `@/*` → `./src/*` alias) was **also untracked** (same `*.json` rule).
 
-> No Next.js version detected. Make sure your package.json has "next" in either "dependencies" or "devDependencies". Also check your Root Directory setting matches the directory of your package.json file.
+## Fix
 
-`apps/user` and `apps/admin` don't hit this because each Vercel project has Root Directory set to its app dir, where `package.json` declares `next`. Detection check (mirrors Vercel's read):
+- `.gitignore`: added `!/apps/landing/package.json`, `!/apps/landing/tsconfig.json` (and existing app exceptions).
+- Committed both files; pushed `main`.
 
-```
-$ for d in . apps/user apps/admin apps/landing; do python3 /tmp/opencode/vercel-next-check.py "$d"; done
-FAIL: package.json has no 'next' in dependencies or devDependencies   <- repo root (current landing Root Directory)
-PASS: apps/user/package.json declares next in dependencies (15.5.23)
-PASS: apps/admin/package.json declares next in dependencies (15.5.23)
-PASS: apps/landing/package.json declares next in dependencies (15.5.23)   <- fix
-```
+## Verification
 
-## Fix (repo — done)
+- Vercel auto-deploy **Ready** (Production): `https://myslot-landing-v2-mahason-techs-projects.vercel.app` returns HTTP 200.
+- Landed page renders (client-rendered SPA shell; landing copy present in HTML).
+- Next.js 15.5.23 detected; `pnpm --filter @myslot/landing build` ran; `next build` succeeded; `�/components/landing-page` resolved.
 
-- Add `apps/landing/vercel.json` mirroring `apps/user/vercel.json` (`ignoreCommand` → deploy `main` only).
-- Remove the root `vercel.json` (repo-root monorepo build config). It only applies when the Root Directory is the repo root — the exact misconfiguration that fails detection — and is ignored once Root Directory is `apps/landing`.
-- `.gitignore`: drop the `!/vercel.json` exception, add `!/apps/landing/vercel.json`.
+Remaining (human, optional): DNS/custom domain — out of scope.
 
-## Fix (dashboard — human step, cannot be done from the repo)
+## Findings
 
-1. Vercel → project `myslot-landing-v2` → Settings → General → **Root Directory** set to `apps/landing` (framework preset stays Next.js).
-2. Env (Production):
-   - `NEXT_PUBLIC_API_URL` → Railway URL (landing's `/api/:path*` rewrite needs it)
-   - `NEXT_PUBLIC_PLAYER_APP_URL` → deployed user-app URL
-   - `NEXT_PUBLIC_FIREBASE_API_KEY` / `AUTH_DOMAIN` / `PROJECT_ID` / `APP_ID` (+ `NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID` for GA4) — same Firebase project as the other apps
-3. Deploy `main`; confirm the site loads and the inquiry form posts through `/api/...` to Railway.
-
-**Blocked by:** —
-
-**Status:** ready-for-human (repo fix applied; Root Directory confirmed set; env vars pending)
-
-- [x] Repo: `apps/landing/vercel.json` present (deploy main only)
-- [x] Repo: root `vercel.json` deleted; `apps/landing/package.json` declares `next` 15.5.23 (detection PASS)
-- [x] Dashboard: Root Directory `apps/landing` set on `myslot-landing-v2`
-- [ ] Dashboard: env vars above set
-- [ ] Deploy succeeds (no "No Next.js version detected"); `/` 200 and lead form posts to Railway
+- Deployment settings on Vercel (Root Directory `apps/landing`, Next preset) were **correct the whole time**; the blocking delta was git metadata.
+- Existing deployments before this fix could only fail; no regression tests were possible since it never reached build.
