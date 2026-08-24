@@ -497,7 +497,9 @@ export const admin = {
 export const leads = {
   async submit(input: { name: string; email: string; phone?: string; venue_name?: string; city?: string; message?: string }, client: AxiosInstance = getClient()) {
     const res = await client.post("/public/leads", input);
-    return parseData(OwnerLeadSchema, res.data.data ?? res.data);
+    // sp_be submitLead returns a minimal `{ id, status }` envelope on 201, not
+    // the full OwnerLead row (it never echoes back submitted PII).
+    return parseData(OwnerLeadSchema.pick({ id: true, status: true }), res.data.data ?? res.data);
   }
 };
 

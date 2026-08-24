@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AxiosInstance } from "axios";
-import { venues, bookings, events, notifications, auth, business, admin, uploads, featureFlags, ownerOnboarding } from "./index";
+import { venues, bookings, events, notifications, auth, business, admin, uploads, featureFlags, ownerOnboarding, leads } from "./index";
 
 function mockClient(handler: (method: string, url: string, opts?: unknown) => unknown): AxiosInstance {
   return {
@@ -254,6 +254,18 @@ describe("featureFlags", () => {
     const flags = await featureFlags.get(client);
     expect(flags.events_discovery_state).toBe("coming_soon");
     expect(flags.payhere_enabled).toBe(false);
+  });
+});
+
+describe("leads.submit", () => {
+  it("accepts the 201 response returned by the live public/leads endpoint", async () => {
+    // sp_be/controller/leadsController.js `submitLead` returns `{ id, status }`
+    // wrapped in `{ success, data }` on 201 — not a full OwnerLead.
+    const post = vi.fn(async () => ({ data: { success: true, data: { id: "lead-1", status: "new" } } }));
+    const client = { get: vi.fn(), post, patch: vi.fn() } as unknown as AxiosInstance;
+    const result = await leads.submit({ name: "A", email: "a@b.com" }, client);
+    expect(post).toHaveBeenCalledWith("/public/leads", { name: "A", email: "a@b.com" });
+    expect(result.id).toBe("lead-1");
   });
 });
 
