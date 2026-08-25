@@ -5,7 +5,7 @@
 const pool = require('../db');
 const { ok, fail } = require('../utils/response');
 const logger = require('../utils/logger');
-const { sanitizeBrand, sanitizeDomains } = require('../utils/widget');
+const { sanitizeBrand, sanitizeDomains, slugify, mintWidgetKey } = require('../utils/widget');
 
 async function verifyOwnership(client, venueId, userId) {
   const { rows } = await client.query(
@@ -70,6 +70,28 @@ exports.updateWidgetSettings = async (req, res) => {
       return fail(res, 400, validationError.code, validationError.message);
     }
 
+    // Self-heal venues created before the off-platform feature (ADR-0028):
+    // mint a key/slug when missing so the embed snippet always carries a real
+    // identifier and the branded page always has a URL.
+    const newKey = venue.widget_key || mintWidgetKey();
+    let newSlug = venue.slug;
+    if (!newSlug) {
+      const base = slugify(venue.name);
+      let candidate = base;
+      let n = 1;
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { rows } = await client.query(
+          `select 1 from venues where slug = $1 and id <> $2 limit 1`,
+          [candidate, venue.id]
+        );
+        if (rows.length === 0) break;
+        n += 1;
+        candidate = `${base}-${n}`;
+      }
+      newSlug = candidate;
+    }
+
     await client.query('begin');
 
     const { rows: updated } = await client.query(
@@ -77,6 +99,8 @@ exports.updateWidgetSettings = async (req, res) => {
          widget_enabled = coalesce($2, widget_enabled),
          allowed_domains = coalesce($3::jsonb, allowed_domains),
          brand = coalesce($4::jsonb, brand),
+         widget_key = coalesce($5, widget_key),
+         slug = coalesce($6, slug),
          updated_at = now()
        where id = $1
        returning widget_enabled, allowed_domains, brand`,
@@ -84,7 +108,9 @@ exports.updateWidgetSettings = async (req, res) => {
         venue.id,
         req.body.widget_enabled !== undefined ? !!req.body.widget_enabled : null,
         domains !== null ? JSON.stringify(domains) : null,
-        brand !== null ? JSON.stringify(brand) : null
+        brand !== null ? JSON.stringify(brand) : null,
+        newKey,
+        newSlug
       ]
     );
 
@@ -92,8 +118,8 @@ exports.updateWidgetSettings = async (req, res) => {
 
     ok(res, 200, {
       venue_id: venue.id,
-      slug: venue.slug,
-      widget_key: venue.widget_key,
+      slug: newSlug,
+      widget_key: newKey,
       widget_enabled: updated[0].widget_enabled,
       allowed_domains: updated[0].allowed_domains,
       brand: updated[0].brand

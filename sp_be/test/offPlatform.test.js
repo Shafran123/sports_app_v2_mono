@@ -398,6 +398,22 @@ describe('branded page + widget gating (tickets 06, 07)', () => {
     expect(enable.status).toBe(400);
     expect(enable.body.error.code).toBe('WIDGET_APPROVAL_REQUIRED');
   });
+
+  it('self-heals venues created before the feature: missing key/slug are minted on save', async () => {
+    // Simulate a pre-feature venue (NULL widget_key + slug).
+    await pool.query(
+      `update venues set widget_key = null, slug = null where id = $1`,
+      [VENUE_ID]
+    );
+    const patch = await request(app)
+      .patch(`/api/v1/business/venues/${VENUE_ID}/widget`)
+      .set('Authorization', `Bearer ${OWNER_TOKEN}`)
+      .send({ widget_enabled: false });
+    expect(patch.status).toBe(200);
+    expect(patch.body.data.widget_key).toMatch(/^[0-9a-f]{32}$/);
+    expect(patch.body.data.slug).toBeTruthy();
+    expect(patch.body.data.slug).not.toBeNull();
+  });
 });
 
 describe('public QR delivery (ticket 05)', () => {
