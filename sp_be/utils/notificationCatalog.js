@@ -338,6 +338,65 @@ const MESSAGES = {
     }
   },
 
+  'site.request.status': {
+    email: ['owner'],
+    inApp: ['owner'],
+    recipients: (payload) => (payload.owner?.email ? [{ userId: payload.owner.id, email: payload.owner.email }] : []),
+    buildInApp: (ctx) => {
+      const r = ctx.payload.request || {};
+      return {
+        type: 'site_request_status',
+        title: r.status === 'live' ? 'Your dedicated site is live' : 'Site request update',
+        body: `${r.hostname || 'Your site'} — ${r.status === 'rejected' ? r.rejection_reason || 'rejected' : r.status}.`
+      };
+    },
+    buildEmail: (ctx) => {
+      const r = ctx.payload.request || {};
+      const business = ctx.payload.business?.name || 'your business';
+      const hostname = r.hostname || '';
+      const statusLabels = {
+        requested: `Your request for ${hostname} is in review.`,
+        approved: `Great news — ${hostname} is approved. Add the DNS record below, then confirm in your console.`,
+        dns_pending: `We're watching for your DNS record on ${hostname}.`,
+        verifying: `DNS verified — we're completing the last steps.`,
+        live: `${hostname} is live! Your dedicated site is ready — share it with the world.`,
+        rejected: `Your request for ${hostname} was not approved`
+      };
+      const statusText = statusLabels[r.status] || `Your site request for ${hostname} moved to "${r.status}".`;
+
+      let dnsBlock = '';
+      if (r.status === 'approved' && r.dns_name && r.dns_value) {
+        dnsBlock = `
+          <div class="ms-card" style="margin:18px 0;padding:16px;border-radius:16px;background:#fafaf7;border:1px solid #ececea;">
+            <p class="ms-ink" style="margin:0 0 6px;font-weight:800;">Add this DNS record on <span style="font-family:monospace">${emailTemplates.escapeHtml(r.dns_name)}</span></p>
+            <p class="ms-muted" style="margin:0 0 8px;color:#8a8a85;font-size:12px;">Type: <span style="font-family:monospace">${emailTemplates.escapeHtml(r.dns_type)}</span> — Value: <span style="font-family:monospace">${emailTemplates.escapeHtml(r.dns_value)}</span></p>
+            <p class="ms-muted" style="margin:0;color:#8a8a85;font-size:12px;">Once added, click "I've added the record" in your console and we'll verify automatically.</p>
+          </div>`;
+      }
+
+      let rejection = '';
+      if (r.status === 'rejected' && r.rejection_reason) {
+        rejection = `<p class="ms-ink2" style="margin:8px 0 0;font-size:14px;">Reason: ${emailTemplates.escapeHtml(r.rejection_reason)}</p>
+          <p class="ms-ink2" style="margin:8px 0 0;font-size:14px;">You can edit your request and submit again — find it under <strong>Widget &amp; site</strong> in your console.</p>`;
+      }
+
+      const html = emailTemplates.shell({
+        brand: ctx.brand,
+        preheader: statusText,
+        content: `
+          <h1 class="ms-ink" style="margin:0 0 8px;color:#1c1c1a;font-size:22px;font-weight:800;line-height:1.25;">${ctx.payload.business?.name ? `<span style="color:#8a8a85;font-size:14px;font-weight:600;letter-spacing:.04em;">${emailTemplates.escapeHtml(ctx.payload.business.name).toUpperCase()}</span><br/>` : ''}${statusText}</h1>
+          ${dnsBlock}
+          ${rejection}
+          <p class="ms-muted" style="margin:16px 0 0;color:#8a8a85;font-size:13px;">Track your request live under <strong>Widget &amp; site → Dedicated site</strong> in your console.</p>`,
+        plainText: `${statusText}${dnsBlock ? `\n\nDNS record to add on ${r.dns_name}:\nType: ${r.dns_type}\nValue: ${r.dns_value}` : ''}${rejection ? `\n\n${rejection.replace(/<[^>]+>/g, '')}` : ''}`
+      });
+      const subject = hostname
+        ? `${hostname} — ${{ requested: 'site request submitted', approved: 'add your DNS record', dns_pending: 'DNS record pending', verifying: 'verifying your site', live: 'your dedicated site is live', rejected: 'site request not approved' }[r.status] || 'site update'}`
+        : 'Site request update';
+      return { subject, html, text: html };
+    }
+  },
+
   'owner.welcome': {
     email: ['owner'],
     recipients: (payload) => (payload.owner?.email ? [{ userId: payload.owner.id, email: payload.owner.email }] : []),

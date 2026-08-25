@@ -27,6 +27,8 @@ const ownerOnboardingRoute = require('./routes/ownerOnboarding');
 const publicLeadsRoute = require('./routes/publicLeads');
 const publicWidgetRoute = require('./routes/publicWidget');
 const publicQrRoute = require('./routes/publicQr');
+const publicSiteRoute = require('./routes/publicSite');
+const adminSitesRoute = require('./routes/adminSites');
 const { requireRole } = require('./middleware/requireRole');
 const { requireOnboarded } = require('./middleware/requireOnboarded');
 const { authenticate } = require('./middleware/authenticate');
@@ -50,9 +52,12 @@ app.use(express.urlencoded({ extended: true }));
 app.use(makeRateLimiter({ windowMs: 60 * 1000, limit: 300 }));
 
 // Fail closed: no wildcard fallback. Missing FRONTEND_URL is a boot error
-// (see config/env.js) — tests set it in setupFiles.
+// (see config/env.js) — tests set it in setupFiles. REST CORS admits the
+// platform origin plus every live Dedicated Site hostname (DB-driven,
+// ADR-0029), so owner domains are trusted without a redeploy.
+const { corsOrigin } = require('./utils/origins');
 const corsOptions = {
-  origin: process.env.FRONTEND_URL,
+  origin: corsOrigin(process.env),
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
   credentials: true
@@ -82,10 +87,12 @@ app.use('/api/v1/admin/players', authenticate, requireRole('admin'), adminWriteL
 app.use('/api/v1/admin/config', authenticate, requireRole('admin'), adminWriteLimiter, adminConfigRoute);
 app.use('/api/v1/admin/leads', authenticate, requireRole('admin'), adminWriteLimiter, adminLeadsRoute);
 app.use('/api/v1/admin/owners', authenticate, requireRole('admin'), adminWriteLimiter, adminOwnersRoute);
+app.use('/api/v1/admin/sites', authenticate, requireRole('admin'), adminWriteLimiter, adminSitesRoute);
 app.use('/api/v1/owner-onboarding', authenticate, requireRole('venue_owner', 'admin'), ownerOnboardingRoute);
 app.use('/api/v1/public', publicConfigRoute);
 app.use('/api/v1/public/leads', makeRateLimiter({ windowMs: 60 * 1000, limit: 10 }), publicLeadsRoute);
 app.use('/api/v1/public/widget', publicWidgetRoute);
+app.use('/api/v1/public/site', publicSiteRoute);
 app.use('/api/v1/public', publicQrRoute);
 app.use('/api/v1/notifications', authenticate, notificationsRoute);
 app.use('/api/v1/events', eventsRoute);

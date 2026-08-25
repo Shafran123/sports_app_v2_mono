@@ -129,7 +129,8 @@ export type VenueHours = z.infer<typeof VenueHoursSchema>;
 export const BusinessInfoSchema = z.object({
   id: z.string(),
   name: z.string(),
-  brand: BrandSchema
+  brand: BrandSchema,
+  site_hostname: z.string().nullable().optional()
 });
 export type BusinessInfo = z.infer<typeof BusinessInfoSchema>;
 
@@ -145,6 +146,74 @@ export const BusinessProfileSchema = BusinessInfoSchema.extend({
   )
 });
 export type BusinessProfile = z.infer<typeof BusinessProfileSchema>;
+
+/* ---------- Dedicated Sites (ADR-0029) ---------- */
+
+export const SITE_REQUEST_STATUSES = ["requested", "approved", "dns_pending", "verifying", "live", "rejected"] as const;
+
+export const SiteChecklistItemSchema = z.object({
+  key: z.string(),
+  label: z.string(),
+  done: z.boolean()
+});
+export type SiteChecklistItem = z.infer<typeof SiteChecklistItemSchema>;
+
+export const SiteRequestSchema = z.object({
+  id: z.string(),
+  business_id: z.string(),
+  hostname: z.string(),
+  hostname_kind: z.enum(["custom", "subdomain"]),
+  status: z.enum(SITE_REQUEST_STATUSES),
+  dns_type: z.string().nullable(),
+  dns_name: z.string().nullable(),
+  dns_value: z.string().nullable(),
+  rejection_reason: z.string().nullable(),
+  checklist: z.array(SiteChecklistItemSchema),
+  created_at: z.string(),
+  updated_at: z.string(),
+  live_at: z.string().nullable(),
+  // admin queue extras
+  business_name: z.string().optional(),
+  owner_email: z.string().nullable().optional(),
+  owner_name: z.string().nullable().optional(),
+  venue_count: z.number().optional(),
+  display_hostname: z.string().nullable().optional(),
+  suggested_subdomain: z.string().nullable().optional()
+});
+export type SiteRequest = z.infer<typeof SiteRequestSchema>;
+
+export const SiteRequestInputSchema = z.object({
+  hostname: z.string(),
+  hostname_kind: z.enum(["custom", "subdomain"])
+});
+export type SiteRequestInput = z.infer<typeof SiteRequestInputSchema>;
+
+// Owner GET /business/site-request: the full request when one exists, or just
+// the suggested subdomain when not — both shapes flow through this envelope.
+export const SiteRequestEnvelopeSchema = SiteRequestSchema.partial().extend({
+  suggested_subdomain: z.string().nullable().optional()
+});
+export type SiteRequestEnvelope = z.infer<typeof SiteRequestEnvelopeSchema>;
+
+// The public site payload: a live hostname's Business + every approved venue
+// (Private Venues included — the site is the Business's own storefront).
+export const SiteVenueSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  slug: z.string().nullable(),
+  city: z.string().nullable(),
+  address: z.string().nullable(),
+  photos: z.array(z.string()),
+  sports: z.array(z.string()),
+  visibility: z.enum(["public", "private"]).optional()
+});
+export type SiteVenue = z.infer<typeof SiteVenueSchema>;
+
+export const SiteConfigSchema = z.object({
+  business: BusinessInfoSchema,
+  venues: z.array(SiteVenueSchema)
+});
+export type SiteConfig = z.infer<typeof SiteConfigSchema>;
 
 export const WidgetInstanceSchema = z.object({
   id: z.string(),

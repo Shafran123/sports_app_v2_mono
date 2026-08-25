@@ -4,6 +4,7 @@ const logger = require('../utils/logger');
 const storage = require('../utils/storage');
 const { slugify } = require('../utils/widget');
 const { ensureForOwner } = require('../services/businesses');
+const siteDomains = require('../services/siteDomains');
 const { buildVenueDetail } = require('../services/venuePayload');
 
 // Derive a unique, URL-safe slug for a venue's branded page. On collision the
@@ -228,9 +229,22 @@ exports.listVenues = async (req, res) => {
 exports.getVenue = async (req, res) => {
   try {
     const { id } = req.params;
+    const { site_hostname } = req.query;
+
+    // Dedicated Site context (ADR-0029): a venue on its own Business's live
+    // site is served even when marketplace-private — the site is the venue's
+    // storefront. The hostname must be a LIVE site of the venue's Business.
+    let visibilityGate = "and v.visibility = 'public'";
+    if (site_hostname) {
+      const scope = await siteDomains.validateSiteHostname(pool, id, String(site_hostname));
+      if (!scope.ok) {
+        return fail(res, scope.error.status, scope.error.code, scope.error.message);
+      }
+      visibilityGate = "";
+    }
 
     const { rows } = await pool.query(
-      `select v.* from venues v where v.id = $1 and v.status = 'approved' and v.visibility = 'public'`,
+      `select v.* from venues v where v.id = $1 and v.status = 'approved' ${visibilityGate}`,
       [id]
     );
 
@@ -292,9 +306,15 @@ exports.getVenueBySlug = async (req, res) => {
        from venues v
        join businesses b on b.id = v.business_id
        where v.slug = $1 and v.status = 'approved'
-         and exists (
-           select 1 from widget_instances wi
-           where wi.business_id = v.business_id and wi.enabled
+         and (
+           exists (
+             select 1 from widget_instances wi
+             where wi.business_id = v.business_id and wi.enabled
+           )
+           or exists (
+             select 1 from site_domain_requests sr
+             where sr.business_id = v.business_id and sr.status = 'live'
+           )
          )`,
       [slug]
     );
@@ -305,9 +325,22 @@ exports.getVenueBySlug = async (req, res) => {
 
     const detail = await buildVenueDetail(venue);
     const { owner_id, business_id, business_name, business_brand, ...rest } = detail;
+    // site_hostname: the Business's LIVE Dedicated Site host (ADR-0029) — a
+    // site business's myslot.lk/<slug> page redirects to the site, else null.
+    const siteHost = await pool.query(
+      `select hostname from site_domain_requests
+       where business_id = $1 and status = 'live'
+       order by created_at desc limit 1`,
+      [venue.business_id]
+    );
     ok(res, 200, {
       ...rest,
-      business: { id: business_id, name: business_name, brand: business_brand }
+      business: {
+        id: business_id,
+        name: business_name,
+        brand: business_brand,
+        site_hostname: siteHost.rows[0]?.hostname || null
+      }
     });
   } catch (error) {
     logger.error(`Error fetching venue by slug: ${error.message}`);

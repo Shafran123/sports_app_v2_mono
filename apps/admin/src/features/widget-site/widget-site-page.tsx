@@ -25,6 +25,7 @@ import {
 } from "@myslot/ui";
 import { Copy, Eye, Globe, Plus, Trash2, X } from "lucide-react";
 import type { BusinessProfile, WidgetInstance, WidgetInstanceInput } from "@myslot/types";
+import { SiteRequestSection } from "./site-request-section";
 
 const blankForm = {
   name: "",
@@ -80,6 +81,8 @@ export function WidgetSitePage() {
       </div>
 
       <BusinessEditor profile={profile} appOrigin={appOrigin} onSaved={invalidate} />
+
+      <SiteRequestSection />
 
       <Card className="p-5 md:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">

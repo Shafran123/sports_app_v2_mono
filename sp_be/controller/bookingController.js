@@ -13,6 +13,7 @@ const { colomboDate, colomboTime } = require('../utils/colombo');
 const { windowsForDay, effectiveAdvanceDays } = require('../services/venueEngine');
 const pricingEngine = require('../services/pricingEngine');
 const { validateWidgetScope } = require('../services/widgetInstances');
+const siteDomains = require('../services/siteDomains');
 
 const ACTIVE_BOOKING_STATES = ['confirmed', 'checked_in', 'completed', 'no_show'];
 
@@ -136,6 +137,17 @@ exports.checkout = async (req, res) => {
       }
     }
 
+    // Dedicated Site bookings (ADR-0029): a presented site_hostname must be a
+    // LIVE site of the court's own Business — one Business's site can never
+    // book another Business's venue, and a dead/stale host never books.
+    const siteHostname = String(req.body.site_hostname || '').trim();
+    if (siteHostname) {
+      const siteScope = await siteDomains.validateSiteHostname(client, court.venue_id, siteHostname);
+      if (siteScope.error) {
+        return fail(res, siteScope.error.status, siteScope.error.code, siteScope.error.message);
+      }
+    }
+
     const now = new Date();
     if (start < now) {
       return fail(res, 400, 'BOOKING_SLOT_UNAVAILABLE', 'This slot is in the past');
@@ -211,10 +223,10 @@ exports.checkout = async (req, res) => {
       await client.query('begin');
       try {
         const { rows: bookingRows } = await client.query(
-          `insert into bookings (court_id, user_id, start_at, end_at, price_per_slot, total_price, tax_rate, tax_amount, venue_tax_rate, venue_tax_amount, status, payment_method, player_name, player_phone, qr_token, idempotency_key, subtotal_amount, discount_amount)
-           values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'confirmed', 'cash', $11, $12, $13, $14, $15, $16)
+          `insert into bookings (court_id, user_id, start_at, end_at, price_per_slot, total_price, tax_rate, tax_amount, venue_tax_rate, venue_tax_amount, status, payment_method, player_name, player_phone, qr_token, idempotency_key, subtotal_amount, discount_amount, site_hostname)
+           values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'confirmed', 'cash', $11, $12, $13, $14, $15, $16, $17)
            returning *`,
-          [court_id, req.user.id, start, end, pricing.slots[0]?.base_price ?? court.price_per_slot, amount, split.platformRate, split.platformTax, split.venueRate, split.venueTax, req.user.name, req.user.phone, mintQrToken(), idempotency_key, pricing.subtotal, pricing.discount]
+          [court_id, req.user.id, start, end, pricing.slots[0]?.base_price ?? court.price_per_slot, amount, split.platformRate, split.platformTax, split.venueRate, split.venueTax, req.user.name, req.user.phone, mintQrToken(), idempotency_key, pricing.subtotal, pricing.discount, siteHostname || null]
         );
         await client.query('commit');
         await publishBookingEvent('booking.created', bookingRows[0].id);

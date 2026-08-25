@@ -41,9 +41,13 @@ import {
   WidgetInstanceSchema,
   WidgetInstanceExtSchema,
   BusinessInfoSchema,
-  BusinessProfileSchema
+  BusinessProfileSchema,
+  SiteRequestSchema,
+  SiteRequestEnvelopeSchema,
+  SiteRequestInputSchema,
+  SiteConfigSchema
 } from "@myslot/types";
-import type { OwnerAgreement, OwnerPlan, VenueBrand, WidgetInstanceInput } from "@myslot/types";
+import type { OwnerAgreement, OwnerPlan, VenueBrand, WidgetInstanceInput, SiteRequestInput } from "@myslot/types";
 export { TOKEN_KEY } from "./client";
 export { toApiFailure, getClient, setClient, createClient, type ApiFailure } from "./client";
 export { parseData, parseList, parsePaginated } from "./parse";
@@ -68,8 +72,9 @@ export const venues = {
     const res = await client.get("/venues", { params: query });
     return parsePaginated(VenueSchema, res.data);
   },
-  async detail(id: string, client: AxiosInstance = getClient()) {
-    const res = await client.get(`/venues/${id}`);
+  async detail(id: string, siteHostnameOrClient?: string | AxiosInstance, client: AxiosInstance = getClient()) {
+    const c = typeof siteHostnameOrClient === "string" ? client : (siteHostnameOrClient ?? client);
+    const res = await c.get(`/venues/${id}`, { params: typeof siteHostnameOrClient === "string" ? { site_hostname: siteHostnameOrClient } : {} });
     return parseData(VenueDetailSchema, res.data.data ?? res.data);
   },
   // Branded venue page lookup (myslot.lk/<slug>) — public storefront payload.
@@ -175,6 +180,7 @@ export const bookings = {
       payment_method?: "online" | "cash";
       player_phone?: string;
       widget_instance_key?: string;
+      site_hostname?: string;
     },
     client: AxiosInstance = getClient()
   ) {
@@ -285,6 +291,15 @@ export const widget = {
       params: opts.origin ? { origin: opts.origin } : {}
     });
     return parseData(WidgetInstanceConfigSchema, res.data.data ?? res.data);
+  }
+};
+
+// Public Dedicated Site resolution (ADR-0029): "is THIS hostname a live site
+// and whose is it?" — used by the user app's host-based rendering.
+export const site = {
+  async config(host: string, client: AxiosInstance = getClient()) {
+    const res = await client.get("/public/site/by-hostname", { params: { host } });
+    return parseData(SiteConfigSchema, res.data.data ?? res.data);
   }
 };
 
@@ -510,6 +525,19 @@ export const business = {
   async deleteWidgetInstance(id: string, client: AxiosInstance = getClient()) {
     const res = await client.delete(`/business/widget-instances/${id}`);
     return res.data;
+  },
+  // Dedicated Site request (ADR-0029): owner's own hostname workflow.
+  async siteRequest(client: AxiosInstance = getClient()) {
+    const res = await client.get("/business/site-request");
+    return parseData(SiteRequestEnvelopeSchema, res.data.data ?? res.data);
+  },
+  async createSiteRequest(input: SiteRequestInput, client: AxiosInstance = getClient()) {
+    const res = await client.post("/business/site-request", input);
+    return parseData(SiteRequestSchema, res.data.data ?? res.data);
+  },
+  async siteDnsAdded(client: AxiosInstance = getClient()) {
+    const res = await client.post("/business/site-request/dns-added");
+    return parseData(SiteRequestSchema, res.data.data ?? res.data);
   }
 };
 
@@ -666,6 +694,31 @@ export const admin = {
   async nudgeOwner(id: string, client: AxiosInstance = getClient()) {
     const res = await client.post(`/admin/owners/${id}/nudge`);
     return parseData(NudgeResultSchema, res.data.data ?? res.data);
+  },
+  // Dedicated Site requests queue (ADR-0029): staff run the hostname workflow.
+  async siteRequests(client: AxiosInstance = getClient()) {
+    const res = await client.get("/admin/sites");
+    return parseList(SiteRequestSchema, res.data.data ?? res.data);
+  },
+  async approveSiteRequest(id: string, client: AxiosInstance = getClient()) {
+    const res = await client.post(`/admin/sites/${id}/approve`);
+    return parseData(SiteRequestSchema, res.data.data ?? res.data);
+  },
+  async rejectSiteRequest(id: string, reason: string, client: AxiosInstance = getClient()) {
+    const res = await client.post(`/admin/sites/${id}/reject`, { reason });
+    return parseData(SiteRequestSchema, res.data.data ?? res.data);
+  },
+  async verifySiteRequest(id: string, client: AxiosInstance = getClient()) {
+    const res = await client.post(`/admin/sites/${id}/verify`);
+    return parseData(SiteRequestSchema, res.data.data ?? res.data);
+  },
+  async markSiteLive(id: string, client: AxiosInstance = getClient()) {
+    const res = await client.post(`/admin/sites/${id}/mark-live`);
+    return parseData(SiteRequestSchema, res.data.data ?? res.data);
+  },
+  async setSiteChecklist(id: string, key: string, done: boolean, client: AxiosInstance = getClient()) {
+    const res = await client.patch(`/admin/sites/${id}/checklist`, { key, done });
+    return parseData(SiteRequestSchema, res.data.data ?? res.data);
   }
 };
 

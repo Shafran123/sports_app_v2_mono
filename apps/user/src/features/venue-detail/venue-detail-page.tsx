@@ -7,6 +7,7 @@ import { Card, ErrorState, SelectSheet, Skeleton, SkeletonCard } from "@myslot/u
 import { cn, dayjs, firstSportSlug, formatDuration, formatLkr, toDateKey } from "@myslot/utils";
 import type { CourtAvailability, Slot } from "@myslot/types";
 import { useAuth } from "@/context/auth";
+import { currentHostname, isSiteHost } from "@/lib/site-host";
 import { VerifiedPhonePrompt } from "@/features/verify-phone/verified-phone-prompt";
 import { VerifyPhoneModal } from "@/features/verify-phone/verify-phone-modal";
 import { Gallery } from "./gallery";
@@ -57,7 +58,9 @@ export function VenueDetailPage({ venueId }: { venueId: string }) {
 
   const venueQuery = useQuery({
     queryKey: ["venue-detail", venueId],
-    queryFn: () => venues.detail(venueId)
+    // A Dedicated Site host carries its hostname so private venues of the
+    // site's Business still serve (the site is their storefront, ADR-0029).
+    queryFn: () => venues.detail(venueId, isSiteHost(flags?.app_url) ? currentHostname() ?? undefined : undefined)
   });
   const availabilityQuery = useAvailability(venueId, date);
 

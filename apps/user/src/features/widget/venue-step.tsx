@@ -9,12 +9,21 @@ import { Building2 } from "lucide-react";
 import { cn } from "@myslot/utils";
 import type { WidgetVenue } from "@myslot/types";
 
+// The venue picker's row shape: whichever storefront supplies the venue list
+// (the widget's WidgetVenue or a Dedicated Site's SiteVenue) must present at
+// least these fields.
+type VenueStepVenue = Pick<WidgetVenue, "id" | "name"> & {
+  photos?: string[];
+  sports?: string[];
+  city?: string | null;
+};
+
 export function VenueStep({
   venues,
   selectedId,
   onSelect
 }: {
-  venues: WidgetVenue[];
+  venues: VenueStepVenue[];
   selectedId: string | null;
   onSelect: (venueId: string) => void;
 }) {

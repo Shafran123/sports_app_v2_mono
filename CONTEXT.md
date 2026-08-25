@@ -37,7 +37,7 @@ A permanent admin action that revokes the owner's console access and makes all o
 _Avoid_: delete, terminate
 
 **Private Venue**:
-A Venue that is bookable but not discoverable — absent from browse, search, and any in-app surface. Reached only through its own booking widget and its branded venue page (and by its Venue Owner in the console). Governed by a visibility flag the Admin sets when provisioning the venue.
+A Venue that is bookable but not discoverable in marketplace discovery — absent from browse and search. When its Business runs a **Dedicated Site**, the Venue appears on that site and may surface in the in-app storefront as a link out to the site; with no site, it is reached only through its own **Booking Widget** (and by its Venue Owner in the console). Governed by a visibility flag the Admin sets when provisioning the venue.
 _Avoid_: hidden listing, private listing, ghost venue
 
 **Booking Widget**:
@@ -47,8 +47,20 @@ _Avoid_: embed widget, booking iframe, widget (bare)
 
 **Branded Venue Page**:
 A white-labeled, public storefront page for a Venue — Business brand (colors, logo, tagline), venue name, photos, about text, court list with live prices, opening hours, and the booking flow — served by the platform at its own URL (`myslot.lk/<slug>`), for venues that want to sell off-platform under their own brand. Brand tokens are Owner-configurable on the **Business** (with platform defaults); prices always render from the venue's Court and Variable Pricing config (never re-entered on the page). Public and indexable on the open web. Offered to any venue; a Private Venue's only public surface.
-_Note_: A single **portfolio page** presenting several Venues under one Business is a v2 capability; the MVP is one Venue per page URL.
+_Note_: SUPERSEDED for businesses that run a **Dedicated Site** — the site serves their venue pages on the Business's own **Site Hostname**; `myslot.lk/<slug>` remains only as the platform-hosted fallback for businesses without a live site. A single **portfolio page** presenting several Venues under one Business lives in the Dedicated Site, not here; the MVP is one Venue per page URL.
 _Avoid_: venue landing page, microsite, storefront
+
+**Dedicated Site**:
+A Business's white-labeled, multi-venue website served on the Business's own **Site Hostname** — the owner's domain (`abc.lk`, apex plus `www.` as one) or a platform subdomain (`<brand-slug>.myslot.lk`). One per Business. Not an iframe: it renders the full app booking flow (sign-in, checkout, holds, QR, payments per the venue's own capability) wrapped in Business brand chrome and site-level presentation (hero, intro, contact, footer) instead of the marketplace shell. Serves a portfolio root listing the Business's venues — a first-visit "pick a venue" popup appears when the Business has 2+ approved venues — and one page per venue at `/<slug>`, with a persistent "Switch venue" control on every venue page. Owner-hosted hostnames are indexable; platform subdomains are noindex. When the Owner Plan lapses past its grace period, the site serves a branded offline slate while confirmed bookings play out.
+_Avoid_: microsite, dedicated page, site (bare)
+
+**Site Hostname**:
+The hostname on which a Business's **Dedicated Site** is served — exactly one per Business. Either the owner's own hostname (`abc.lk`, apex and `www.` treated as one and configured together) or a platform-proposed `<brand-slug>.myslot.lk` subdomain (uniqueness-checked). Provisioned through a **Site Domain Request**; while live it is a runtime-trusted origin for the site's surfaces.
+_Avoid_: domain (bare), custom domain, host
+
+**Site Domain Request**:
+The owner-initiated, admin-workflow request that provisions a Business's **Site Hostname**. States: requested → approved → dns-pending → verifying → live, or rejected. The owner submits the hostname they want (a `myslot.lk` subdomain or their own host); staff approve, hand over the DNS record to add, and the system verifies it — automated polling plus an owner "I've added it" re-check. Staff-only manual steps (auth-provider authorized domain, hosting-domain configuration) are a checklist inside the request. Rejection carries a reason and the owner may edit and re-request. The owner watches live status in their console; every state change also goes out as an **Email Notification**.
+_Avoid_: site request, dns request, hosting ticket
 
 **Court**:
 A bookable playing area within a Venue (badminton court, football turf, cricket nets). Has a sport, capacity, a base price per slot, and a configurable slot duration. The base price is what a slot costs when no Variable Pricing rule applies.

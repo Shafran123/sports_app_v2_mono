@@ -9,6 +9,7 @@ import { bookings, featureFlags, toApiFailure, venues } from "@myslot/api";
 import { Badge, Button, Card, CardContent, CountdownPill, ErrorState, Skeleton } from "@myslot/ui";
 import { formatDateLong, formatDuration, formatLkr, formatTime12, uuidV4 } from "@myslot/utils";
 import { useAuth } from "@/context/auth";
+import { currentHostname, isSiteHost } from "@/lib/site-host";
 import { submitPayHere } from "@myslot/api";
 import { VerifyPhoneModal } from "@/features/verify-phone/verify-phone-modal";
 import type { VenueOffer } from "@myslot/types";
@@ -81,7 +82,11 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
         end_at: endAt,
         idempotency_key: checkoutKey,
         payment_method: effectiveMethod,
-        player_phone: user?.phone ?? undefined
+        player_phone: user?.phone ?? undefined,
+        // Dedicated Site context (ADR-0029): bookings made on a live site host
+        // carry the hostname (the server validates it is the venue's own live
+        // site and stores it for allowance/reporting context).
+        site_hostname: isSiteHost(flags?.app_url) ? currentHostname() ?? undefined : undefined
       })
   });
 

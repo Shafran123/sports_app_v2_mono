@@ -3,6 +3,7 @@ const businessController = require('../controller/businessController');
 const businessSettingsController = require('../controller/businessSettingsController');
 const businessProfileController = require('../controller/businessProfileController');
 const widgetInstanceController = require('../controller/widgetInstanceController');
+const siteDomainController = require('../controller/siteDomainController');
 const { makeRateLimiter } = require('../middleware/rateLimit');
 
 const router = express.Router();
@@ -35,6 +36,9 @@ router.post('/widget-instances', writeLimiter, widgetInstanceController.create);
 router.get('/widget-instances/:id', widgetInstanceController.get);
 router.patch('/widget-instances/:id', writeLimiter, widgetInstanceController.update);
 router.delete('/widget-instances/:id', writeLimiter, widgetInstanceController.remove);
+router.get('/site-request', siteDomainController.getMine);
+router.post('/site-request', writeLimiter, siteDomainController.request);
+router.post('/site-request/dns-added', writeLimiter, siteDomainController.dnsAdded);
 router.get('/bookings', businessController.listBookings);
 router.get('/overview', businessController.overview);
 router.get('/reports', businessController.reports);

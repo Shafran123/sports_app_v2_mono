@@ -59,6 +59,7 @@ const ADMIN_NAV = [
       { href: "/admin-venues", label: "Venues", icon: Building2 },
       { href: "/leads", label: "Leads", icon: Inbox },
       { href: "/owners", label: "Owners", icon: StoreIcon },
+      { href: "/sites", label: "Sites", icon: Globe },
       { href: "/events", label: "Events", icon: Ticket },
       { href: "/sports", label: "Sports", icon: Trophy },
       { href: "/players", label: "Players", icon: Users },
