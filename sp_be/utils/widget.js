@@ -21,9 +21,9 @@ function slugify(name) {
   return slug || `venue-${crypto.randomBytes(3).toString('hex')}`;
 }
 
-// A stable embed key is public (it only identifies the venue); uniqueness is
-// what matters, never secrecy. 32 hex chars is plenty for a namespace of
-// thousands of venues without collisions.
+// A stable embed key is public (it only identifies the widget instance);
+// uniqueness is what matters, never secrecy. 32 hex chars is plenty for a
+// namespace of thousands of instances without collisions.
 function mintWidgetKey() {
   return crypto.randomBytes(16).toString('hex');
 }
@@ -112,12 +112,12 @@ function sanitizeDomains(domains) {
   return [...new Set(out)];
 }
 
-// An embed request is authorized when its parent origin (how the venue's
+// An embed request is authorized when its parent origin (how the business's
 // actual website frames the widget) matches an allowlist entry. An entry
 // without a port matches the hostname on any port; an entry WITH a port (e.g.
 // `localhost:5173`) must match both, so local testing is precise.
-function isHostAllowed(venue, origin) {
-  if (!venue || !Array.isArray(venue.allowed_domains) || venue.allowed_domains.length === 0) return false;
+function isHostAllowed(holder, origin) {
+  if (!holder || !Array.isArray(holder.allowed_domains) || holder.allowed_domains.length === 0) return false;
   let url;
   try {
     url = new URL(String(origin || '').includes('://') ? origin : `https://${origin}`);
@@ -126,7 +126,7 @@ function isHostAllowed(venue, origin) {
   }
   const host = url.hostname.toLowerCase();
   const port = url.port || null;
-  for (const entry of venue.allowed_domains) {
+  for (const entry of holder.allowed_domains) {
     const [entryHost, entryPort = null] = String(entry).split(':');
     if (entryHost !== host) continue;
     if (entryPort === null || entryPort === port) return true;

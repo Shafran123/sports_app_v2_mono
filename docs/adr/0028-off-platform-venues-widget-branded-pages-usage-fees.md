@@ -31,3 +31,15 @@ The marketplace model (discoverable venues, PayHere on the platform merchant, ad
 - Data: venue visibility flag, widget/embed key + domain allowlist, per-venue brand tokens (colors, logo, tagline, photos, about), plan allowance/overflow fields, agreement versioning.
 - The landing app (`myslot.lk/<slug>`) and a no-chrome widget route render from the same booking engine; no new booking stack.
 - v2 trails recorded separately: owner-gateway abstraction (P1/P2), portfolio pages, custom domains.
+
+## Amendment (v1.5, 2026-08-25) — widget scope moves from Venue to Business
+
+Field feedback after P0 shipped: the widget serves the **owner's audience**, not the venue's, and the future own-domain/portfolio trail needs a Business-shaped anchor. This amendment supersedes the per-venue widget design (venue-level `widget_key`, `allowed_domains`, `brand`, `widget_enabled` are dropped in migration 0021):
+
+- **Business**: a new one-per-Owner entity (schema N, MVP 1) that owns the Brand tokens (colors, logo, tagline) and aggregates the Owner's Venues. The Owner account manages it; the Business is the public brand.
+- **Widget Instance**: a Business-owned embeddable booking surface, many per Business. Each has its own **Embed Key**, required name, **Default Venue**, a "let customers choose venue" toggle, per-instance domain allowlist, and enabled state. Owners create one instance per venue/marketing page — e.g. three venues → three embeds, each pinned or free-choice.
+- **Venue selection**: toggle ON → selector shows (Default Venue preselected); OFF → only the Default Venue, enforced server-side at checkout (the instance key travels with the booking), never just in the UI. Eligible venues = all approved venues of the Business, Private included. A stale Default Venue degrades to selector-on, never a dead embed.
+- **Branded Venue Page** (`myslot.lk/<slug>`): stays per-venue URL + venue content, but its chrome renders **Business** brand; the portfolio page remains v2.
+- **Console**: per-venue "Widget & page" tab is replaced by a top-level **Widget & site** page (business name/brand + instance list + per-instance defaults/domains/embed snippets).
+- Commercial model (plans, allowance, overflow, lapse) is unchanged and stays keyed to the Owner account.
+- Deliberately **not** decided now: multi-Business-per-Owner UI (schema-ready only), portfolio pages, custom domains, offline-instance key rotation.

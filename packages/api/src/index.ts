@@ -37,11 +37,15 @@ import {
   VenueDetailSchema,
   VenueSchema,
   WidgetConfigSchema,
-  WidgetSettingsSchema,
+  WidgetInstanceConfigSchema,
+  WidgetInstanceSchema,
+  WidgetInstanceExtSchema,
+  BusinessInfoSchema,
+  BusinessProfileSchema,
   WidgetVerifyConfirmSchema,
   WidgetVerifySendSchema
 } from "@myslot/types";
-import type { OwnerAgreement, OwnerPlan } from "@myslot/types";
+import type { OwnerAgreement, OwnerPlan, VenueBrand, WidgetInstanceInput } from "@myslot/types";
 export { TOKEN_KEY } from "./client";
 export { toApiFailure, getClient, setClient, createClient, type ApiFailure } from "./client";
 export { parseData, parseList, parsePaginated } from "./parse";
@@ -171,6 +175,7 @@ export const bookings = {
       idempotency_key: string;
       payment_method?: "online" | "cash";
       player_phone?: string;
+      widget_instance_key?: string;
     },
     client: AxiosInstance = getClient()
   ) {
@@ -267,7 +272,7 @@ export const widget = {
     const res = await client.get(`/public/widget/${key}/config`, {
       params: opts.origin ? { origin: opts.origin } : {}
     });
-    return parseData(WidgetConfigSchema, res.data.data ?? res.data);
+    return parseData(WidgetInstanceConfigSchema, res.data.data ?? res.data);
   },
   async phoneSend(key: string, phone: string, client: AxiosInstance = getClient()) {
     const res = await client.post(`/public/widget/${key}/phone/send`, { phone });
@@ -275,6 +280,16 @@ export const widget = {
   },
   async phoneConfirm(key: string, phone: string, code: string, client: AxiosInstance = getClient()) {
     const res = await client.post(`/public/widget/${key}/phone/confirm`, { phone, code });
+    return parseData(WidgetVerifyConfirmSchema, res.data.data ?? res.data);
+  },
+  // Keyless identity for the branded page (per-venue, no instance): the OTP
+  // challenge itself is the security boundary; the server accepts both forms.
+  async phoneSendKeyless(phone: string, client: AxiosInstance = getClient()) {
+    const res = await client.post("/public/widget/phone/send", { phone });
+    return parseData(WidgetVerifySendSchema, res.data.data ?? res.data);
+  },
+  async phoneConfirmKeyless(phone: string, code: string, client: AxiosInstance = getClient()) {
+    const res = await client.post("/public/widget/phone/confirm", { phone, code });
     return parseData(WidgetVerifyConfirmSchema, res.data.data ?? res.data);
   }
 };
@@ -455,27 +470,44 @@ export const business = {
     const res = await client.delete(`/business/courts/${courtId}/blocks/${blockId}`);
     return res.data;
   },
-  // Booking Widget & Branded page settings (owner self-serve, ADR-0028).
-  async widgetSettings(venueId: string, client: AxiosInstance = getClient()) {
-    const res = await client.get(`/business/venues/${venueId}/widget`);
-    return parseData(WidgetSettingsSchema, res.data.data ?? res.data);
+  // Business profile + widget instances (owner self-serve, ADR-0028 v1.5).
+  async me(client: AxiosInstance = getClient()) {
+    const res = await client.get("/business/me");
+    return parseData(BusinessProfileSchema, res.data.data ?? res.data);
   },
-  async updateWidgetSettings(
-    venueId: string,
-    input: Partial<{
-      widget_enabled: boolean;
-      allowed_domains: string[];
-      brand: {
-        colors?: { primary?: string; accent?: string };
-        logo_url?: string;
-        tagline?: string;
-        about?: string;
-      };
-    }>,
+  async updateMe(
+    input: { name?: string; brand?: Partial<VenueBrand> },
     client: AxiosInstance = getClient()
   ) {
-    const res = await client.patch(`/business/venues/${venueId}/widget`, input);
-    return parseData(WidgetSettingsSchema, res.data.data ?? res.data);
+    const res = await client.patch("/business/me", input);
+    return parseData(BusinessInfoSchema, res.data.data ?? res.data);
+  },
+  async widgetInstances(client: AxiosInstance = getClient()) {
+    const res = await client.get("/business/widget-instances");
+    return parseList(WidgetInstanceSchema, res.data.data ?? res.data);
+  },
+  async widgetInstance(id: string, client: AxiosInstance = getClient()) {
+    const res = await client.get(`/business/widget-instances/${id}`);
+    return WidgetInstanceExtSchema.parse(res.data.data ?? res.data);
+  },
+  async createWidgetInstance(
+    input: WidgetInstanceInput & { name: string },
+    client: AxiosInstance = getClient()
+  ) {
+    const res = await client.post("/business/widget-instances", input);
+    return parseData(WidgetInstanceSchema, res.data.data ?? res.data);
+  },
+  async updateWidgetInstance(
+    id: string,
+    input: WidgetInstanceInput,
+    client: AxiosInstance = getClient()
+  ) {
+    const res = await client.patch(`/business/widget-instances/${id}`, input);
+    return parseData(WidgetInstanceSchema, res.data.data ?? res.data);
+  },
+  async deleteWidgetInstance(id: string, client: AxiosInstance = getClient()) {
+    const res = await client.delete(`/business/widget-instances/${id}`);
+    return res.data;
   }
 };
 

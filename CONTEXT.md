@@ -8,8 +8,24 @@ A multi-sided marketplace where players book courts at venues, venue owners run 
 The admin-configurable display name of the platform (default "MySlot.LK"), shown to Players and Venue Owners on config-driven surfaces. Distinct from the internal package namespace and from the transactional email from-address, which are code-baked.
 _Avoid_: product name, brand (bare)
 
+**Business**:
+The Venue Owner's public brand and portfolio — the entity that owns the Brand tokens and the Booking Widget Instances. Every Venue belongs to a Business, and a Business is owned by exactly one Venue Owner; a Business aggregates all of that Owner's Venues. Distinct from the **Venue Owner** (the account that manages it) and from the platform **Brand Name** (the platform's own display name).
+_Avoid_: brand (bare), company, organization, storefront
+
+**Widget Instance**:
+One embeddable booking surface published by a **Business** — carries its own **Embed Key**, a **Default Venue**, a "let customers choose venue" toggle, an allowed-domains list, and an enabled state. A Business may publish several Instances (e.g. one per Venue, or one per marketing page), each pinned to a different Default Venue. Every Instance renders the Business's Brand tokens. Distinct from the Booking Widget capability (the Instance is one deployment of it).
+_Avoid_: widget (bare)
+
+**Default Venue**:
+The Venue a Widget Instance opens with — preselected in the venue step, and the only bookable Venue when the Instance's venue-choice toggle is off. Must be an approved Venue of the Instance's Business.
+_Avoid_: pinned venue, primary venue
+
+**Embed Key**:
+The unique identifier of a Widget Instance, used in the embed URL (`/embed/<key>`) and to resolve the Instance's config and scope. Replaces the old per-venue widget key.
+_Avoid_: widget key, widget_key (API name)
+
 **Venue**:
-A sports facility that lists courts for hire. Has an owner, address, photos, opening windows, a cancellation policy, and an advance-booking horizon. Lifecycle: pending → approved → (rejected / suspended / banned / archived).
+A sports facility that lists courts for hire. Belongs to a **Business** (which a Venue Owner account manages), and has an address, photos, opening windows, a cancellation policy, and an advance-booking horizon. Lifecycle: pending → approved → (rejected / suspended / banned / archived).
 _Avoid_: Yard, facility, arena
 
 **Venue Suspension**:
@@ -25,12 +41,12 @@ A Venue that is bookable but not discoverable — absent from browse, search, an
 _Avoid_: hidden listing, private listing, ghost venue
 
 **Booking Widget**:
-The embeddable booking interface a Venue Owner publishes on their own website (iframe) to sell the Venue's courts to their own audience. Keyed by a stable per-venue embed id so the widget always books that Venue and no other; tied to a domain allowlist (Owner self-serve) so it only renders where the Owner has authorized it. Offered to any Venue; required for a Private Venue (its only public surface). The buyer verifies a phone (or signs in with a Player account) and books — online payment optional per the Owner's choice, otherwise cash at the venue. The widget exposes the venue's full booking engine (all courts, availability, Variable Pricing, Offers, Closed Dates). When online payments land (P2), the widget uses **embedded checkout** (hosted payment fields inside the iframe), not a redirect, so the flow stays in the iframe and lands back on its success screen.
+The embeddable booking interface a Venue Owner publishes on their own website (iframe) to sell their Venues' courts to their own audience. Delivered as one or more **Widget Instances** per **Business**, each keyed by its own **Embed Key** and pinned to a **Default Venue** — so one embed always books the intended Venue, or lets the customer choose from the Business's approved Venues; tied to a per-Instance domain allowlist (Owner self-serve) so it only renders where the Owner authorized it. Offered to any Business; required for a Private Venue (that Venue's only public surface). The buyer verifies a phone (or signs in with a Player account) and books — online payment optional per the Owner's choice, otherwise cash at the venue. The widget exposes the Business's full booking engine (all courts, availability, Variable Pricing, Offers, Closed Dates). When online payments land (P2), the widget uses **embedded checkout** (hosted payment fields inside the iframe), not a redirect, so the flow stays in the iframe and lands back on its success screen.
 _Avoid_: embed widget, booking iframe, widget (bare)
 
 **Branded Venue Page**:
-A white-labeled, public storefront page for a Venue — venue name, brand colors, logo, tagline, photos, about text, court list with live prices, opening hours, and the booking flow — served by the platform at its own URL (`myslot.lk/<slug>`), for venues that want to sell off-platform under their own brand. Owner-configurable brand tokens (colors, logo, tagline, photos, about) with platform defaults; prices always render from the venue's Court and Variable Pricing config (never re-entered on the page). Public and indexable on the open web. Offered to any Venue; a Private Venue's only public surface.
-_Note_: A single **portfolio page** presenting several Venues under one owner is a v2 capability; the MVP is one Venue per page URL.
+A white-labeled, public storefront page for a Venue — Business brand (colors, logo, tagline), venue name, photos, about text, court list with live prices, opening hours, and the booking flow — served by the platform at its own URL (`myslot.lk/<slug>`), for venues that want to sell off-platform under their own brand. Brand tokens are Owner-configurable on the **Business** (with platform defaults); prices always render from the venue's Court and Variable Pricing config (never re-entered on the page). Public and indexable on the open web. Offered to any venue; a Private Venue's only public surface.
+_Note_: A single **portfolio page** presenting several Venues under one Business is a v2 capability; the MVP is one Venue per page URL.
 _Avoid_: venue landing page, microsite, storefront
 
 **Court**:
@@ -114,7 +130,7 @@ A permanent admin action that revokes the Player's sign-in entirely. Distinct fr
 _Avoid_: delete account, deactivate
 
 **Venue Owner**:
-An operator account that manages one or more Venues, created through the Owner Onboarding flow (an Admin provisions it, attaches an Owner Plan, and drafts an Owner Agreement). Console access and venue creation are gated on accepting the current Owner Agreement.
+An operator account that manages one or more Venues (grouped under a single **Business**), created through the Owner Onboarding flow (an Admin provisions it, attaches an Owner Plan, and drafts an Owner Agreement). Console access and venue creation are gated on accepting the current Owner Agreement.
 _Avoid_: partner, vendor, host
 
 **Owner Lead**:

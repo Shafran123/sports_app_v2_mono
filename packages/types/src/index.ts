@@ -122,18 +122,50 @@ export const VenueHoursSchema = z.object({
 });
 export type VenueHours = z.infer<typeof VenueHoursSchema>;
 
-/* ---------- Off-platform venues: brand + widget (ADR-0028) ---------- */
+/* ---------- Off-platform venues: business + widget instances (ADR-0028) ---------- */
 
-export const WidgetSettingsSchema = z.object({
-  venue_id: z.string(),
-  slug: z.string().nullable(),
-  widget_key: z.string().nullable(),
-  widget_enabled: z.boolean(),
-  allowed_domains: z.array(z.string()),
-  brand: BrandSchema,
-  visibility: z.enum(["public", "private"])
+export const BusinessInfoSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  brand: BrandSchema
 });
-export type WidgetSettings = z.infer<typeof WidgetSettingsSchema>;
+export type BusinessInfo = z.infer<typeof BusinessInfoSchema>;
+
+export const BusinessProfileSchema = BusinessInfoSchema.extend({
+  venues: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      status: z.string(),
+      visibility: z.enum(["public", "private"]),
+      slug: z.string().nullable()
+    })
+  )
+});
+export type BusinessProfile = z.infer<typeof BusinessProfileSchema>;
+
+export const WidgetInstanceSchema = z.object({
+  id: z.string(),
+  business_id: z.string(),
+  name: z.string(),
+  embed_key: z.string(),
+  default_venue_id: z.string().nullable(),
+  default_venue_name: z.string().nullable().optional(),
+  default_venue_status: z.string().nullable().optional(),
+  allow_venue_choice: z.boolean(),
+  allowed_domains: z.array(z.string()),
+  enabled: z.boolean()
+});
+export type WidgetInstance = z.infer<typeof WidgetInstanceSchema>;
+
+export const WidgetInstanceInputSchema = z.object({
+  name: z.string().max(60).optional(),
+  default_venue_id: z.string().nullable().optional(),
+  allow_venue_choice: z.boolean().optional(),
+  allowed_domains: z.array(z.string()).max(10).optional(),
+  enabled: z.boolean().optional()
+});
+export type WidgetInstanceInput = z.infer<typeof WidgetInstanceInputSchema>;
 
 export const WidgetVerifySendSchema = z.object({
   sent: z.boolean(),
@@ -154,13 +186,37 @@ export const VenueDetailSchema = VenueSchema.extend({
 });
 export type VenueDetail = z.infer<typeof VenueDetailSchema>;
 
+// The branded page payload: a venue's public detail plus its Business (brand
+// tokens). No widget internals — this page is per-venue by design.
 export const WidgetConfigSchema = VenueDetailSchema.extend({
-  brand: BrandSchema.optional(),
-  visibility: z.enum(["public", "private"]).optional(),
-  widget_enabled: z.boolean().optional(),
-  widget_key: z.string().nullable().optional()
+  slug: z.string().nullable().optional(),
+  business: BusinessInfoSchema.optional()
 });
 export type WidgetConfig = z.infer<typeof WidgetConfigSchema>;
+
+export const WidgetVenueSchema = VenueDetailSchema.extend({
+  slug: z.string().nullable().optional()
+});
+export type WidgetVenue = z.infer<typeof WidgetVenueSchema>;
+
+// The embed config: business brand + instance defaults + every eligible venue.
+export const WidgetInstanceConfigSchema = z.object({
+  business: BusinessInfoSchema,
+  instance: z.object({
+    id: z.string(),
+    name: z.string(),
+    default_venue_id: z.string().nullable(),
+    allow_venue_choice: z.boolean()
+  }),
+  venues: z.array(WidgetVenueSchema)
+});
+export type WidgetInstanceConfig = z.infer<typeof WidgetInstanceConfigSchema>;
+
+// Instance + its eligible venues — the payload for the console editor.
+export const WidgetInstanceExtSchema = WidgetInstanceSchema.extend({
+  venues: z.array(WidgetVenueSchema)
+});
+export type WidgetInstanceExt = z.infer<typeof WidgetInstanceExtSchema>;
 
 /* ---------- Availability ---------- */
 

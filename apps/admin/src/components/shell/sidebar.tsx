@@ -7,6 +7,7 @@ import {
   Building2,
   CalendarDays,
   FileText,
+  Globe,
   Inbox,
   LayoutDashboard,
   LogOut,
@@ -35,8 +36,9 @@ const OWNER_NAV = [
       { href: "/front-desk", label: "Front desk", icon: StoreIcon },
       { href: "/bookings", label: "Bookings", icon: CalendarDays },
       { href: "/venues", label: "Venues", icon: Building2 },
+      { href: "/widget-and-site", label: "Widget & site", icon: Globe },
       { href: "/calendar", label: "Calendar", icon: CalendarDays },
-{ href: "/events", label: "Events", icon: Ticket },
+      { href: "/events", label: "Events", icon: Ticket },
       { href: "/plan", label: "Plan & agreement", icon: FileText }
     ]
   }

@@ -4,6 +4,9 @@
 // slots, a cash checkout, and a QR success screen that is also the terminal
 // step online-payment redirects will later return to. Identity is unified:
 // verified players skip the step, phone-only visitors verify first.
+// Scoped per Widget Instance (ADR-0028 v1.5): instanceKey is sent on checkout
+// so the server enforces the instance's venue scope; the branded page books
+// without an instance key.
 
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -27,7 +30,7 @@ import { WidgetIdentity } from "./widget-identity";
 
 type Stage = "identity" | "pick" | "booked";
 
-export function BookPanel({ config, widgetKey }: { config: WidgetConfig; widgetKey: string }) {
+export function BookPanel({ venue, instanceKey }: { venue: WidgetConfig; instanceKey?: string }) {
   const { user } = useAuth();
   const [stage, setStage] = useState<Stage>("identity");
   const [date, setDate] = useState(() => toDateKey(new Date()));
@@ -41,7 +44,7 @@ export function BookPanel({ config, widgetKey }: { config: WidgetConfig; widgetK
     if (stage === "identity" && verified) setStage("pick");
   }, [verified, stage]);
 
-  const availabilityQuery = useAvailability(config.id, date);
+  const availabilityQuery = useAvailability(venue.id, date);
   const summary = summarizeSelection(selected, availabilityQuery.data);
   const venueOffer = availabilityQuery.data?.venue_offer ?? null;
   const displayTotal = useMemo(() => applyVenueOffer(summary.total, venueOffer).total, [summary.total, venueOffer]);
@@ -54,7 +57,8 @@ export function BookPanel({ config, widgetKey }: { config: WidgetConfig; widgetK
         end_at: summary.endAt!,
         idempotency_key: checkoutKey,
         payment_method: "cash",
-        player_phone: user?.phone ?? undefined
+        player_phone: user?.phone ?? undefined,
+        widget_instance_key: instanceKey
       })
   });
 
@@ -72,7 +76,7 @@ export function BookPanel({ config, widgetKey }: { config: WidgetConfig; widgetK
   };
 
   if (stage === "identity") {
-    return <WidgetIdentity widgetKey={widgetKey} onDone={() => setStage("pick")} />;
+    return <WidgetIdentity widgetKey={instanceKey} onDone={() => setStage("pick")} />;
   }
 
   if (stage === "booked" && checkout.data?.booking) {
@@ -80,7 +84,7 @@ export function BookPanel({ config, widgetKey }: { config: WidgetConfig; widgetK
   }
 
   const courts = availabilityQuery.data?.courts ?? [];
-  const acceptsCash = !!config.accepts_cash;
+  const acceptsCash = !!venue.accepts_cash;
 
   return (
     <div className="space-y-4">
@@ -110,7 +114,7 @@ export function BookPanel({ config, widgetKey }: { config: WidgetConfig; widgetK
             id="bp-date"
             type="date"
             min={toDateKey(new Date())}
-            max={config.advance_days && config.advance_days > 0 ? dayjs(toDateKey(new Date())).add(config.advance_days - 1, "day").format("YYYY-MM-DD") : undefined}
+            max={venue.advance_days && venue.advance_days > 0 ? dayjs(toDateKey(new Date())).add(venue.advance_days - 1, "day").format("YYYY-MM-DD") : undefined}
             value={date}
             onChange={(e) => e.target.value && pickDate(e.target.value)}
             className="rounded-2xl border border-border bg-surface px-3 py-2 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-primary"
@@ -152,7 +156,7 @@ export function BookPanel({ config, widgetKey }: { config: WidgetConfig; widgetK
               key={court.court_id}
               court={court}
               date={date}
-              advanceDays={config.advance_days}
+              advanceDays={venue.advance_days}
               durationMin={durationMin}
               selected={selected}
               onToggle={(slot) =>

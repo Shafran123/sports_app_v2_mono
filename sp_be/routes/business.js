@@ -1,7 +1,8 @@
 const express = require('express');
 const businessController = require('../controller/businessController');
 const businessSettingsController = require('../controller/businessSettingsController');
-const widgetSettingsController = require('../controller/widgetSettingsController');
+const businessProfileController = require('../controller/businessProfileController');
+const widgetInstanceController = require('../controller/widgetInstanceController');
 const { makeRateLimiter } = require('../middleware/rateLimit');
 
 const router = express.Router();
@@ -27,8 +28,13 @@ router.delete('/offers/:id', writeLimiter, businessSettingsController.deleteOffe
 router.post('/courts/:id/blocks', businessController.createBlock);
 router.get('/courts/:id/blocks', businessController.listBlocks);
 router.delete('/courts/:id/blocks/:blockId', businessController.deleteBlock);
-router.get('/venues/:id/widget', widgetSettingsController.getWidgetSettings);
-router.patch('/venues/:id/widget', writeLimiter, widgetSettingsController.updateWidgetSettings);
+router.get('/me', businessProfileController.getMe);
+router.patch('/me', writeLimiter, businessProfileController.updateMe);
+router.get('/widget-instances', widgetInstanceController.list);
+router.post('/widget-instances', writeLimiter, widgetInstanceController.create);
+router.get('/widget-instances/:id', widgetInstanceController.get);
+router.patch('/widget-instances/:id', writeLimiter, widgetInstanceController.update);
+router.delete('/widget-instances/:id', writeLimiter, widgetInstanceController.remove);
 router.get('/bookings', businessController.listBookings);
 router.get('/overview', businessController.overview);
 router.get('/reports', businessController.reports);

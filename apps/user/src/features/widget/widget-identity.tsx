@@ -33,7 +33,7 @@ export function WidgetIdentity({
   widgetKey,
   onDone
 }: {
-  widgetKey: string;
+  widgetKey?: string;
   onDone: () => void;
 }) {
   const { user, setUser } = useAuth();
@@ -44,7 +44,12 @@ export function WidgetIdentity({
   const [sent, setSent] = useState(false);
 
   const send = useMutation({
-    mutationFn: () => widget.phoneSend(widgetKey, widgetPhone(phone) ?? phone),
+    mutationFn: () => {
+      const normalized = widgetPhone(phone) ?? phone;
+      return widgetKey
+        ? widget.phoneSend(widgetKey, normalized)
+        : widget.phoneSendKeyless(normalized);
+    },
     onSuccess: () => {
       setSent(true);
       setError("");
@@ -55,7 +60,10 @@ export function WidgetIdentity({
 
   const confirm = useMutation({
     mutationFn: async () => {
-      const res = await widget.phoneConfirm(widgetKey, widgetPhone(phone) ?? phone, code.trim());
+      const normalized = widgetPhone(phone) ?? phone;
+      const res = widgetKey
+        ? await widget.phoneConfirm(widgetKey, normalized, code.trim())
+        : await widget.phoneConfirmKeyless(normalized, code.trim());
       await loginWithCustomToken(res.token);
       // The AuthProvider's onAuthStateChanged will settle a moment later;
       // set the user now so the booking step unlocks without a reload.

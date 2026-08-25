@@ -1,0 +1,88 @@
+// Business model (ADR-0028 amendment v1.5): the owner's public brand and
+// venue portfolio. One Business per Venue Owner in the MVP (schema allows
+// more); it owns the brand tokens and the Widget Instances, and every Venue
+// belongs to exactly one Business via venues.business_id.
+
+const pool = require('../db');
+const { sanitizeBrand } = require('../utils/widget');
+
+// The approved venues a Business may sell through its widget surfaces:
+// every approved venue of the business, Private Venues included
+// (their widget is their only public surface); suspended / banned /
+// archived venues are excluded by their status.
+async function eligibleVenueRows(businessId, client = pool) {
+  const { rows } = await client.query(
+    `select * from venues where business_id = $1 and status = 'approved'
+     order by created_at`,
+    [businessId]
+  );
+  return rows;
+}
+
+async function getByOwnerId(ownerId, client = pool) {
+  const { rows } = await client.query(
+    `select * from businesses where owner_id = $1`,
+    [ownerId]
+  );
+  return rows[0] || null;
+}
+
+async function getById(id, client = pool) {
+  const { rows } = await client.query(`select * from businesses where id = $1`, [id]);
+  return rows[0] || null;
+}
+
+async function ownedBy(userId, businessId, client = pool) {
+  const { rows } = await client.query(
+    `select 1 from businesses where id = $1 and owner_id = $2`,
+    [businessId, userId]
+  );
+  return rows.length > 0;
+}
+
+// Ensure a Business exists for an owner (self-heal: venue creation and owner
+// provisioning both call this so a missing row can never dead-end the owner).
+async function ensureForOwner(ownerId, name, client = pool) {
+  const existing = await getByOwnerId(ownerId, client);
+  if (existing) return existing;
+  const { rows } = await client.query(
+    `insert into businesses (owner_id, name) values ($1, $2)
+     on conflict (owner_id) do update set updated_at = now()
+     returning *`,
+    [ownerId, name || 'My Business']
+  );
+  return rows[0];
+}
+
+// Validate + persist name/brand patches. brand is sanitized through the
+// shared token validator; unknown keys are dropped server-side.
+async function updateProfile(businessId, patch, client = pool) {
+  const { name, brand } = patch;
+  let cleanBrand = null;
+  if (brand !== undefined) {
+    try {
+      cleanBrand = sanitizeBrand(brand);
+    } catch (error) {
+      throw Object.assign(new Error(error.message), { code: error.code || 'WIDGET_VALIDATION' });
+    }
+  }
+  if (name !== undefined && (typeof name !== 'string' || name.trim().length === 0 || name.trim().length > 80)) {
+    throw Object.assign(new Error('Business name must be 1–80 characters'), { code: 'WIDGET_VALIDATION' });
+  }
+  const { rows } = await client.query(
+    `update businesses set
+       name = coalesce($2, name),
+       brand = coalesce($3::jsonb, brand),
+       updated_at = now()
+     where id = $1
+     returning *`,
+    [
+      businessId,
+      name !== undefined ? name.trim() : null,
+      cleanBrand !== null ? JSON.stringify(cleanBrand) : null
+    ]
+  );
+  return rows[0] || null;
+}
+
+module.exports = { getByOwnerId, getById, ownedBy, ensureForOwner, updateProfile, eligibleVenueRows };

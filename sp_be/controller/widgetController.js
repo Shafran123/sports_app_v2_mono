@@ -1,6 +1,12 @@
 // Public Booking Widget endpoints (ADR-0028). The widget lives in an iframe on
-// a venue's own website; these endpoints power the embed config fetch, the
+// a business's own website; these endpoints power the embed config fetch, the
 // unified phone-OTP identity step, and the public QR image for SMS delivery.
+//
+// Scope (ADR-0028 amendment v1.5): the embed key now resolves a Widget
+// Instance of a Business, not a venue. The config returns the business brand,
+// the instance's defaults (default venue + venue-choice toggle), and the
+// eligible venues (all approved venues of the business, Private included).
+// The allowlist is per instance; origin enforcement is unchanged.
 //
 // Identity model: the widget verifies a phone with the same HMAC'd OTP scheme
 // as the app; a phone that already belongs to a Player links to that account,
@@ -18,6 +24,9 @@ const { recordOutbound } = require('../utils/notificationCatalog');
 const { getBrandName } = require('../utils/featureFlags');
 const { initFirebase } = require('../config/firebase');
 const { isHostAllowed } = require('../utils/widget');
+const { instanceByEmbedKey, effectiveScope } = require('../services/widgetInstances');
+const { eligibleVenueRows } = require('../services/businesses');
+const { buildVenueDetail } = require('../services/venuePayload');
 
 const CODE_TTL_MINUTES = 10;
 const MAX_ATTEMPTS = 5;
@@ -55,76 +64,46 @@ async function findActiveOtp(phone) {
   return rows[0] || null;
 }
 
-// Load the venue a widget key points at. widget_enabled gates both the embed
-// and the branded page: off (or unapproved / unknown) reads as not found so
-// the endpoint never confirms a venue's existence to random callers.
-async function venueByWidgetKey(key) {
-  const { rows } = await pool.query(
-    `select v.* from venues v
-     where v.widget_key = $1 and v.status = 'approved' and v.widget_enabled`,
-    [key]
-  );
-  return rows[0] || null;
-}
-
-async function loadVenuePublicPayload(venue) {
-  const [courtsRes, sportsRes, hoursRes] = await Promise.all([
-    pool.query(
-      `select c.id, c.name, c.capacity, c.price_per_slot, c.slot_duration_min,
-              c.is_indoor, s.name as sport, s.slug as sport_slug
-       from courts c
-       left join sports s on s.id = c.sport_id
-       where c.venue_id = $1 and c.is_active
-       order by c.name`,
-      [venue.id]
-    ),
-    pool.query(
-      `select s.name, s.slug, s.icon
-       from venue_sports vs join sports s on s.id = vs.sport_id
-       where vs.venue_id = $1 order by s.name`,
-      [venue.id]
-    ),
-    pool.query(
-      `select day_of_week, open_time, close_time
-       from venue_hours where venue_id = $1 order by day_of_week`,
-      [venue.id]
-    )
-  ]);
-
-  // The widget_key is a public identifier (it rides inside an embed snippet's
-  // URL); only the owner identity and the allowlist are stripped.
-  const { owner_id, allowed_domains, ...publicVenue } = venue;
-  return {
-    ...publicVenue,
-    courts: courtsRes.rows,
-    sports: sportsRes.rows.map((s) => s.name),
-    hours: hoursRes.rows
-  };
-}
-
-// Public config for the embed page / branded page: venue, courts, hours,
-// brand tokens, availability base. No owner identity, no widget internals.
-// When the caller discloses its parent origin (?origin=), the embed is
-// validated against the venue's allowlist and denied off-blocks, so a stolen
-// embed key still cannot render on an unapproved website.
+// Public config for the embed page: business + instance defaults + every
+// eligible venue (with its courts, hours, brand-less public fields). The
+// origin allowlist is per instance. Effective scope degrades server-side:
+// a default venue that is no longer eligible reads as no-preselect and free
+// choice, so a stale default never dead-ends the embed.
 exports.getWidgetConfig = async (req, res) => {
   try {
     const { key } = req.params;
-    const venue = await venueByWidgetKey(key);
-    if (!venue) {
+    const instance = await instanceByEmbedKey(key);
+    if (!instance) {
       return fail(res, 404, 'WIDGET_NOT_FOUND', 'This booking widget is not available');
     }
 
     const origin = String(req.query.origin || '').trim();
-    // The embed page always discloses its parent origin (document.referrer);
-    // a request without one is a direct/open load (branded page behavior) and
-    // stays allowed. The allowlist only ever BLOCKS a disclosed footer.
-    if (origin && !isHostAllowed(venue, origin)) {
+    if (origin && !isHostAllowed(instance, origin)) {
       return fail(res, 403, 'WIDGET_DOMAIN_NOT_ALLOWED', 'This widget is not authorized on this website');
     }
 
-    const payload = await loadVenuePublicPayload(venue);
-    ok(res, 200, payload);
+    const eligible = await eligibleVenueRows(instance.business_id);
+    const scope = effectiveScope(instance, eligible.map((v) => v.id));
+    const venues = (await Promise.all(eligible.map((v) => buildVenueDetail(v)))).map(
+      // The business id is noise inside each venue when the response already
+      // carries it at the top level; strip it per venue.
+      ({ business_id, ...venue }) => venue
+    );
+
+    ok(res, 200, {
+      business: {
+        id: instance.business_id,
+        name: instance.business_name,
+        brand: instance.business_brand || {}
+      },
+      instance: {
+        id: instance.id,
+        name: instance.name,
+        default_venue_id: scope.default_venue_id,
+        allow_venue_choice: scope.allow_venue_choice
+      },
+      venues
+    });
   } catch (error) {
     logger.error(`Error fetching widget config: ${error.message}`);
     fail(res, 500, 'INTERNAL_SERVER_ERROR', 'Something went wrong');
@@ -133,10 +112,14 @@ exports.getWidgetConfig = async (req, res) => {
 
 exports.sendVerificationCode = async (req, res) => {
   try {
-    const { key } = req.params;
-    const venue = await venueByWidgetKey(key);
-    if (!venue) {
-      return fail(res, 404, 'WIDGET_NOT_FOUND', 'This booking widget is not available');
+    // Keyed calls must resolve to an enabled instance (strict); keyless calls
+    // (branded page) skip the gate — the OTP challenge is the boundary.
+    const key = String(req.params.key || '').trim();
+    if (key) {
+      const instance = await instanceByEmbedKey(key);
+      if (!instance) {
+        return fail(res, 404, 'WIDGET_NOT_FOUND', 'This booking widget is not available');
+      }
     }
 
     const rawPhone = String(req.body.phone || '').trim();
@@ -209,10 +192,12 @@ exports.sendVerificationCode = async (req, res) => {
 exports.confirmVerification = async (req, res) => {
   const client = await pool.connect();
   try {
-    const { key } = req.params;
-    const venue = await venueByWidgetKey(key);
-    if (!venue) {
-      return fail(res, 404, 'WIDGET_NOT_FOUND', 'This booking widget is not available');
+    const key = String(req.params.key || '').trim();
+    if (key) {
+      const instance = await instanceByEmbedKey(key);
+      if (!instance) {
+        return fail(res, 404, 'WIDGET_NOT_FOUND', 'This booking widget is not available');
+      }
     }
 
     const rawPhone = String(req.body.phone || '').trim();

@@ -46,7 +46,7 @@ vi.mock("qrcode", () => ({
 const baseConfig = {
   id: "venue-1",
   name: "Widget Court Club",
-  widget_key: "abc123",
+  slug: "widget-court-club",
   status: "approved" as const,
   description: null,
   address: "5 Ave",
@@ -61,7 +61,12 @@ const baseConfig = {
   advance_days: 14,
   sports: ["Badminton"],
   courts: [],
-  hours: []
+  hours: [],
+  business: {
+    id: "biz-1",
+    name: "Widget Court Club",
+    brand: { tagline: "Book direct" }
+  }
 };
 
 const availability = {
@@ -87,7 +92,7 @@ function renderPanel() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <BookPanel config={baseConfig} widgetKey="abc123" />
+      <BookPanel venue={baseConfig} instanceKey="abc123" />
     </QueryClientProvider>
   );
 }
@@ -169,7 +174,8 @@ describe("BookPanel", () => {
         end_at: "2026-08-26T11:00:00+05:30",
         idempotency_key: expect.any(String),
         payment_method: "cash",
-        player_phone: "+94771234567"
+        player_phone: "+94771234567",
+        widget_instance_key: "abc123"
       });
       expect(screen.getByText(/you're booked/i)).toBeInTheDocument();
     });

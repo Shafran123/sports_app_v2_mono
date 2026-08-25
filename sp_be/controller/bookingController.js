@@ -12,6 +12,7 @@ const billService = require('../utils/billService');
 const { colomboDate, colomboTime } = require('../utils/colombo');
 const { windowsForDay, effectiveAdvanceDays } = require('../services/venueEngine');
 const pricingEngine = require('../services/pricingEngine');
+const { validateWidgetScope } = require('../services/widgetInstances');
 
 const ACTIVE_BOOKING_STATES = ['confirmed', 'checked_in', 'completed', 'no_show'];
 
@@ -111,6 +112,19 @@ exports.checkout = async (req, res) => {
     const court = courtRows[0];
     if (court.venue_status !== 'approved' || !court.is_active) {
       return fail(res, 400, 'BOOKING_SLOT_UNAVAILABLE', 'This court is not bookable');
+    }
+
+    // Widget bookings (ADR-0028 v1.5, ticket 05): a presented instance key
+    // constrains the court to the instance's scope server-side — the venue
+    // must be eligible for the instance's business and, when venue choice is
+    // locked, equal the (effective) default venue. The scope degrades exactly
+    // like the public config, so a stale default never dead-ends the embed.
+    const widgetInstanceKey = String(req.body.widget_instance_key || '').trim();
+    if (widgetInstanceKey) {
+      const scope = await validateWidgetScope(client, court.venue_id, widgetInstanceKey);
+      if (scope.error) {
+        return fail(res, scope.error.status, scope.error.code, scope.error.message);
+      }
     }
 
     const now = new Date();

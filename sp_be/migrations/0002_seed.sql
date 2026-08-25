@@ -41,7 +41,9 @@ select
   u.id, 'Smash Arena', 'Premium indoor badminton and table tennis facility.',
   '45 Galle Road, Colombo 03', 'Colombo', 6.9004, 79.8539, '0112223344',
   '["parking","changing_rooms","showers","lighting","ac"]'::jsonb, 'approved'
-from users u where u.firebase_uid = 'demo-owner-uid'
+from users u
+where u.firebase_uid = 'demo-owner-uid'
+  and not exists (select 1 from venues vv where vv.id = '11111111-1111-1111-1111-111111111111'::uuid)
 on conflict (id) do nothing;
 
 insert into venues (id, owner_id, name, description, address, city, lat, lng, phone, amenities, status)
@@ -50,7 +52,9 @@ select
   u.id, 'Green Turf Colombo', 'Full-size and five-a-side football turfs with floodlights.',
   '12 Havelock Road, Colombo 05', 'Colombo', 6.8859, 79.8653, '0115556677',
   '["parking","changing_rooms","showers","lighting","equipment_rental"]'::jsonb, 'approved'
-from users u where u.firebase_uid = 'demo-owner-uid'
+from users u
+where u.firebase_uid = 'demo-owner-uid'
+  and not exists (select 1 from venues vv where vv.id = '22222222-2222-2222-2222-222222222222'::uuid)
 on conflict (id) do nothing;
 
 insert into venues (id, owner_id, name, description, address, city, lat, lng, phone, amenities, status)
@@ -59,7 +63,9 @@ select
   u.id, 'Lanka Cricket Nets', 'Indoor and outdoor cricket practice nets.',
   '88 Baseline Road, Colombo 09', 'Colombo', 6.9110, 79.8737, '0117778899',
   '["parking","changing_rooms","lighting","equipment_rental"]'::jsonb, 'approved'
-from users u where u.firebase_uid = 'demo-owner-uid'
+from users u
+where u.firebase_uid = 'demo-owner-uid'
+  and not exists (select 1 from venues vv where vv.id = '33333333-3333-3333-3333-333333333333'::uuid)
 on conflict (id) do nothing;
 
 insert into venue_hours (venue_id, day_of_week, open_time, close_time)

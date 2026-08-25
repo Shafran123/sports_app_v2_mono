@@ -24,11 +24,11 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { slug } = await params;
   const venue = await fetchVenueBySlug(slug);
   if (!venue) return {};
-  const tagline = venue.brand?.tagline;
+  const tagline = venue.business?.brand?.tagline;
   return {
     title: tagline ? `${venue.name} — ${tagline}` : venue.name,
     description:
-      venue.brand?.about ||
+      venue.business?.brand?.about ||
       `Book courts at ${venue.name} in ${venue.city}. Real-time availability, instant confirmation.`,
     robots: { index: true, follow: true }
   };

@@ -52,8 +52,11 @@ describe('business court management', () => {
 
   it('owner cannot add a court to a venue they do not own', async () => {
     const { rows } = await pool.query(
-      `insert into venues (owner_id, name, city, address, status)
-       select id, 'Foreign Venue', 'Kandy', '1 Kandy St', 'approved' from users where firebase_uid = 'demo-player-uid'
+      `insert into venues (owner_id, business_id, name, city, address, status)
+       select id,
+              (select b.id from businesses b join users o on o.id = b.owner_id where o.firebase_uid = 'demo-owner-uid'),
+              'Foreign Venue', 'Kandy', '1 Kandy St', 'approved'
+       from users where firebase_uid = 'demo-player-uid'
        returning id`
     );
     const foreignVenueId = rows[0].id;

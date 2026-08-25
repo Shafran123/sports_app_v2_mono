@@ -1,9 +1,10 @@
 "use client";
 
-// The white-labeled storefront (ADR-0028, ticket 06): venue name, brand
-// colors, photos, about + hours + contact, and the booking flow inline. One
-// page per venue — portfolio pages are v2. The venue's brand tokens drive
-// CSS vars so every venue renders its own look with one component tree.
+// The white-labeled storefront (ADR-0028, ticket 06): Business brand chrome
+// (colors, tagline, logo) over the venue's own content — name, photos,
+// about + hours + contact — and the booking flow inline. One page per venue —
+// portfolio pages are v2 (ADR-0028 v1.5: brand tokens moved from the venue
+// to its Business). Prices always come from the court config, never re-entered.
 
 import { useMemo } from "react";
 import { MapPin, Phone, Clock } from "lucide-react";
@@ -15,7 +16,8 @@ import { brandCssVars } from "./widget-theme";
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 export function BrandedVenuePage({ venue }: { venue: WidgetConfig }) {
-  const style = useMemo(() => brandCssVars(venue.brand), [venue.brand]);
+  const brand = venue.business?.brand;
+  const style = useMemo(() => brandCssVars(brand), [brand]);
   const cover = venue.photos?.[0];
 
   return (
@@ -34,12 +36,25 @@ export function BrandedVenuePage({ venue }: { venue: WidgetConfig }) {
             <div className="p-6 md:p-8" style={{ borderTop: `6px solid var(--brand-primary, #16a34a)` }}>
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div className="min-w-0">
+                  {venue.business?.brand?.logo_url && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={venue.business.brand.logo_url}
+                      alt={`${venue.business.name} logo`}
+                      className="mb-2 h-12 w-12 rounded-2xl border border-border object-cover"
+                    />
+                  )}
+                  {venue.business?.name && (
+                    <p className="text-xs font-semibold uppercase tracking-wider text-ink-3">
+                      {venue.business.name}
+                    </p>
+                  )}
                   <h1 className="font-display text-2xl font-extrabold tracking-tight text-ink md:text-4xl">
                     {venue.name}
                   </h1>
-                  {venue.brand?.tagline && (
+                  {brand?.tagline && (
                     <p className="mt-1 font-medium" style={{ color: "var(--brand-primary, #16a34a)" }}>
-                      {venue.brand.tagline}
+                      {brand.tagline}
                     </p>
                   )}
                   <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-2">
@@ -77,9 +92,9 @@ export function BrandedVenuePage({ venue }: { venue: WidgetConfig }) {
                 </div>
               </div>
 
-              {venue.brand?.about && (
+              {brand?.about && (
                 <p className="mt-5 max-w-2xl whitespace-pre-line text-sm leading-relaxed text-ink-2">
-                  {venue.brand.about}
+                  {brand.about}
                 </p>
               )}
             </div>
@@ -87,8 +102,9 @@ export function BrandedVenuePage({ venue }: { venue: WidgetConfig }) {
         </div>
 
         <div className="mx-auto mt-8 max-w-3xl">
-          {/* Max width keeps long URL-installed pages readable on venue sites. */}
-          <BookPanel config={venue} widgetKey={venue.widget_key ?? ""} />
+          {/* The branded page is per-venue: never a venue step, never an
+              instance key at checkout (the page IS the venue). */}
+          <BookPanel venue={venue} />
         </div>
       </div>
     </div>
