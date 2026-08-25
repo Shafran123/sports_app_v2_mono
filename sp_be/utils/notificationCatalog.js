@@ -561,7 +561,19 @@ async function dispatch(key, payload, opts = {}) {
           if (!rec.phone) continue;
           let message = null;
           try {
-            message = await def.buildSms({ payload, key, role, brand }, role);
+            // QR SMS (booking.confirmed/reminder): the player's SMS carries
+            // the QR link (the token is loaded only for the player recipient,
+            // never owner/admin roles). The SMS text is the bearer disclosure.
+            const ctx = { payload, key, role, brand, qrUrl: null };
+            if (role === 'player' && QR_KEYS.has(key) && rec.phone === payload.booking?.user_phone && payload.booking?.id) {
+              try {
+                const token = await loadQrToken(payload.booking.id);
+                if (token) ctx.qrUrl = smsService.bookingQrUrl(payload.booking.id, token);
+              } catch (err) {
+                logger.error(`QR SMS link load failed for ${key} player (sent without link): ${err.message}`);
+              }
+            }
+            message = await def.buildSms(ctx, role);
           } catch (err) {
             logger.error(`SMS builder failed for ${key} ${role}: ${err.message}`);
           }

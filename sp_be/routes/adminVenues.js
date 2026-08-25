@@ -254,4 +254,40 @@ router.post('/:id/archive', (req, res) =>
 router.post('/:id/ban', (req, res) =>
   transitionVenue(req, res, 'banned', 'banned', ['approved', 'suspended', 'changes_requested']));
 
+// Public/private switch — the Admin sets it (typically at provisioning).
+// Visibility never changes through the marketplace or owner console; it only
+// controls in-app discoverability, never bookability.
+router.patch('/:id/visibility', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { id } = req.params;
+    const { visibility } = req.body || {};
+    if (!['public', 'private'].includes(visibility)) {
+      return fail(res, 400, 'VISIBILITY_INVALID', 'visibility must be "public" or "private"');
+    }
+
+    await client.query('begin');
+    const { rows } = await client.query(
+      `update venues set visibility = $2, updated_at = now()
+       where id = $1
+       returning id, name, visibility, status`,
+      [id, visibility]
+    );
+    if (rows.length === 0) {
+      await client.query('rollback');
+      return fail(res, 404, 'VENUE_NOT_FOUND', 'Venue not found');
+    }
+    await auditAction(client, id, req.user.id, visibility === 'private' ? 'made_private' : 'made_public', null);
+    await client.query('commit');
+
+    ok(res, 200, rows[0]);
+  } catch (error) {
+    await client.query('rollback').catch(() => {});
+    logger.error(`Error updating venue visibility: ${error.message}`);
+    fail(res, 500, 'INTERNAL_SERVER_ERROR', 'Something went wrong');
+  } finally {
+    client.release();
+  }
+});
+
 module.exports = router;

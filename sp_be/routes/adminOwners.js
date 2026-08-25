@@ -9,6 +9,7 @@ router.patch('/plan-templates/:id', ownersController.updatePlanTemplate);
 router.post('/plan-templates/:id/archive', ownersController.archivePlanTemplate);
 
 router.get('/', ownersController.listOwners);
+router.get('/:id/allowance', ownersController.listOwnerAllowance);
 router.post('/', ownersController.createOwner);
 router.post('/:id/renew', ownersController.renewOwner);
 router.post('/:id/nudge', ownersController.nudgeOwner);

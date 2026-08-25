@@ -6,6 +6,7 @@ const { authenticate } = require('../middleware/authenticate');
 const router = express.Router();
 
 router.get('/', venueController.listVenues);
+router.get('/by-slug/:slug', venueController.getVenueBySlug);
 router.get('/mine', authenticate, venueController.listMyVenues);
 router.post('/', authenticate, venueController.createVenue);
 router.patch('/:id', authenticate, venueController.updateVenue);

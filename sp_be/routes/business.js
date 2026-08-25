@@ -1,6 +1,7 @@
 const express = require('express');
 const businessController = require('../controller/businessController');
 const businessSettingsController = require('../controller/businessSettingsController');
+const widgetSettingsController = require('../controller/widgetSettingsController');
 const { makeRateLimiter } = require('../middleware/rateLimit');
 
 const router = express.Router();
@@ -26,6 +27,8 @@ router.delete('/offers/:id', writeLimiter, businessSettingsController.deleteOffe
 router.post('/courts/:id/blocks', businessController.createBlock);
 router.get('/courts/:id/blocks', businessController.listBlocks);
 router.delete('/courts/:id/blocks/:blockId', businessController.deleteBlock);
+router.get('/venues/:id/widget', widgetSettingsController.getWidgetSettings);
+router.patch('/venues/:id/widget', writeLimiter, widgetSettingsController.updateWidgetSettings);
 router.get('/bookings', businessController.listBookings);
 router.get('/overview', businessController.overview);
 router.get('/reports', businessController.reports);

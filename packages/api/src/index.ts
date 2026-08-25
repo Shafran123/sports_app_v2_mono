@@ -21,6 +21,7 @@ import {
   NudgeResultSchema,
   OfferSchema,
   OwnerAgreementSchema,
+  OwnerAllowanceSchema,
   OwnerCreateResultSchema,
   OwnerLeadSchema,
   OwnerListItemSchema,
@@ -34,7 +35,11 @@ import {
   UserSchema,
   VenueAuditSchema,
   VenueDetailSchema,
-  VenueSchema
+  VenueSchema,
+  WidgetConfigSchema,
+  WidgetSettingsSchema,
+  WidgetVerifyConfirmSchema,
+  WidgetVerifySendSchema
 } from "@myslot/types";
 import type { OwnerAgreement, OwnerPlan } from "@myslot/types";
 export { TOKEN_KEY } from "./client";
@@ -64,6 +69,11 @@ export const venues = {
   async detail(id: string, client: AxiosInstance = getClient()) {
     const res = await client.get(`/venues/${id}`);
     return parseData(VenueDetailSchema, res.data.data ?? res.data);
+  },
+  // Branded venue page lookup (myslot.lk/<slug>) — public storefront payload.
+  async bySlug(slug: string, client: AxiosInstance = getClient()) {
+    const res = await client.get(`/venues/by-slug/${slug}`);
+    return parseData(WidgetConfigSchema, res.data.data ?? res.data);
   },
   async mine(client: AxiosInstance = getClient()) {
     const res = await client.get("/venues/mine");
@@ -245,6 +255,30 @@ export const featureFlags = {
   }
 };
 
+// Public Booking Widget endpoints (ADR-0028): embed config + the unified
+// phone-OTP identity step. Unauthenticated by design — the widget's iframe
+// runs before any session exists.
+export const widget = {
+  async config(
+    key: string,
+    opts: { origin?: string } = {},
+    client: AxiosInstance = getClient()
+  ) {
+    const res = await client.get(`/public/widget/${key}/config`, {
+      params: opts.origin ? { origin: opts.origin } : {}
+    });
+    return parseData(WidgetConfigSchema, res.data.data ?? res.data);
+  },
+  async phoneSend(key: string, phone: string, client: AxiosInstance = getClient()) {
+    const res = await client.post(`/public/widget/${key}/phone/send`, { phone });
+    return parseData(WidgetVerifySendSchema, res.data.data ?? res.data);
+  },
+  async phoneConfirm(key: string, phone: string, code: string, client: AxiosInstance = getClient()) {
+    const res = await client.post(`/public/widget/${key}/phone/confirm`, { phone, code });
+    return parseData(WidgetVerifyConfirmSchema, res.data.data ?? res.data);
+  }
+};
+
 export const auth = {
   async me(client: AxiosInstance = getClient()) {
     const res = await client.get("/auth/me");
@@ -420,6 +454,28 @@ export const business = {
   async deleteBlock(courtId: string, blockId: string, client: AxiosInstance = getClient()) {
     const res = await client.delete(`/business/courts/${courtId}/blocks/${blockId}`);
     return res.data;
+  },
+  // Booking Widget & Branded page settings (owner self-serve, ADR-0028).
+  async widgetSettings(venueId: string, client: AxiosInstance = getClient()) {
+    const res = await client.get(`/business/venues/${venueId}/widget`);
+    return parseData(WidgetSettingsSchema, res.data.data ?? res.data);
+  },
+  async updateWidgetSettings(
+    venueId: string,
+    input: Partial<{
+      widget_enabled: boolean;
+      allowed_domains: string[];
+      brand: {
+        colors?: { primary?: string; accent?: string };
+        logo_url?: string;
+        tagline?: string;
+        about?: string;
+      };
+    }>,
+    client: AxiosInstance = getClient()
+  ) {
+    const res = await client.patch(`/business/venues/${venueId}/widget`, input);
+    return parseData(WidgetSettingsSchema, res.data.data ?? res.data);
   }
 };
 
@@ -479,6 +535,16 @@ export const admin = {
     const res = await client.post(`/admin/venues/${id}/archive`);
     return parseData(VenueSchema, res.data.data ?? res.data);
   },
+  // Public/private switch (ADR-0028): marketplace discoverability only.
+  async setVenueVisibility(id: string, visibility: "public" | "private", client: AxiosInstance = getClient()) {
+    const res = await client.patch(`/admin/venues/${id}/visibility`, { visibility });
+    return parseData(VenueSchema, res.data.data ?? res.data);
+  },
+  // Booking Allowance month tally (ADR-0028, off-platform billing).
+  async ownerAllowance(ownerId: string, month: string, client: AxiosInstance = getClient()) {
+    const res = await client.get(`/admin/owners/${ownerId}/allowance`, { params: { month } });
+    return parseData(OwnerAllowanceSchema, res.data.data ?? res.data);
+  },
   async overview(client: AxiosInstance = getClient()) {
     const res = await client.get("/admin/overview");
     return parseData(AdminOverviewSchema, res.data.data ?? res.data);
@@ -517,11 +583,11 @@ export const admin = {
     const res = await client.get("/admin/owners/plan-templates", { params: includeArchived ? { include_archived: 1 } : {} });
     return parseList(OwnerPlanTemplateSchema, res.data.data ?? res.data);
   },
-  async createPlanTemplate(input: { name: string; term_days: number; price_lkr?: number }, client: AxiosInstance = getClient()) {
+  async createPlanTemplate(input: { name: string; term_days: number; price_lkr?: number; booking_allowance?: number; overflow_fee_percent?: number }, client: AxiosInstance = getClient()) {
     const res = await client.post("/admin/owners/plan-templates", input);
     return parseData(OwnerPlanTemplateSchema, res.data.data ?? res.data);
   },
-  async updatePlanTemplate(id: string, input: { name?: string; term_days?: number; price_lkr?: number }, client: AxiosInstance = getClient()) {
+  async updatePlanTemplate(id: string, input: { name?: string; term_days?: number; price_lkr?: number; booking_allowance?: number; overflow_fee_percent?: number }, client: AxiosInstance = getClient()) {
     const res = await client.patch(`/admin/owners/plan-templates/${id}`, input);
     return parseData(OwnerPlanTemplateSchema, res.data.data ?? res.data);
   },
@@ -540,7 +606,7 @@ export const admin = {
       phone?: string;
       temporary_password: string;
       plan_template_id?: string;
-      plan?: { name: string; term_days: number; price_lkr?: number };
+      plan?: { name: string; term_days: number; price_lkr?: number; booking_allowance?: number; overflow_fee_percent?: number };
       start_date?: string;
       agreement: { title: string; body: string };
       lead_id?: string;
@@ -554,7 +620,7 @@ export const admin = {
     id: string,
     input: {
       plan_template_id?: string;
-      plan?: { name: string; term_days: number; price_lkr?: number };
+      plan?: { name: string; term_days: number; price_lkr?: number; booking_allowance?: number; overflow_fee_percent?: number };
       start_date?: string;
       agreement: { title: string; body: string };
     },

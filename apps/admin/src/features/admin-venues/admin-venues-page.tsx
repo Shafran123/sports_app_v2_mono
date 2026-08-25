@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { History, MapPin, ShieldAlert, ShieldBan, ShieldCheck, Trash2 } from "lucide-react";
+import { Eye, EyeOff, History, MapPin, ShieldAlert, ShieldBan, ShieldCheck, Trash2 } from "lucide-react";
 import { admin } from "@myslot/api";
 import type { Venue, VenueAudit } from "@myslot/types";
 import {
@@ -87,6 +87,24 @@ export function AdminVenuesPage() {
     }
   });
 
+  // Visibility flips marketplace discoverability only (ADR-0028): a private
+  // venue stays bookable via its widget/branded page — never in the app.
+  const visibilityMutation = useMutation({
+    mutationFn: ({ venue, visibility }: { venue: AdminVenue; visibility: "public" | "private" }) =>
+      admin.setVenueVisibility(venue.id, visibility),
+    onSuccess: (_data, vars) => {
+      push(
+        "success",
+        "Visibility updated",
+        `${vars.venue.name} is now ${vars.visibility === "private" ? "private (widget only)" : "public (in the marketplace)"}.`
+      );
+      void queryClient.invalidateQueries({ queryKey: ["admin-all-venues"] });
+    },
+    onError: () => {
+      push("error", "Could not update visibility", "Please try again or reload the page.");
+    }
+  });
+
   const confirmAction = () => {
     if (!actionTarget) return;
     if ((actionTarget.action === "suspend" || actionTarget.action === "ban") && !reason.trim()) {
@@ -134,6 +152,11 @@ export function AdminVenuesPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="font-semibold tracking-tight text-ink">{venue.name}</h3>
                       <StatusPill status={venue.status}>{STATUS_LABEL[venue.status] ?? venue.status}</StatusPill>
+                      {venue.visibility === "private" && (
+                        <Badge variant="accent">
+                          <EyeOff className="h-3 w-3" /> Private
+                        </Badge>
+                      )}
                       {banned && (
                         <Badge variant="error">
                           <ShieldBan className="h-3 w-3" /> Owner banned
@@ -159,6 +182,25 @@ export function AdminVenuesPage() {
                     >
                       <History className="h-4 w-4" /> Audit
                     </Button>
+                    {venue.status === "approved" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        loading={visibilityMutation.isPending}
+                        onClick={() =>
+                          visibilityMutation.mutate({
+                            venue,
+                            visibility: venue.visibility === "private" ? "public" : "private"
+                          })
+                        }
+                      >
+                        {venue.visibility === "private" ? (
+                          <><Eye className="h-4 w-4" /> Make public</>
+                        ) : (
+                          <><EyeOff className="h-4 w-4" /> Make private</>
+                        )}
+                      </Button>
+                    )}
                     {venue.status === "approved" && (
                       <Button variant="outline" size="sm" onClick={() => { setReason(""); setActionTarget({ venue, action: "suspend" }); }}>
                         <ShieldAlert className="h-4 w-4" /> Suspend

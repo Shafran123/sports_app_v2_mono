@@ -18,9 +18,20 @@ function formatSriLankanPhone(phone) {
   return `+94${digits}`;
 }
 
-function buildBookingSms(booking, brand = DEFAULT_BRAND) {
+// The QR check-in link disclosed to a booking's own player by SMS. The URL
+// embeds the secret QR token, so it is only sent to the player recipient
+// (never the owner/admin) — the same bearer model as the player's inline email
+// QR. A widget player has no app and no email, so this is their only QR.
+function bookingQrUrl(bookingId, qrToken) {
+  const base = process.env.FRONTEND_URL;
+  if (!base || !bookingId || !qrToken) return '';
+  return `${base}/api/v1/public/qr/${bookingId}?t=${qrToken}`;
+}
+
+function buildBookingSms(booking, brand = DEFAULT_BRAND, opts = {}) {
   const method = booking.payment_method === 'cash' ? 'Pay at venue' : 'Paid online';
-  return `${brand}: Booking confirmed at ${booking.venue_name || ''} (${booking.court_name || ''}) on ${fmtWhen(booking.start_at)}. ${method}. Show the QR at check-in.`;
+  const qr = opts?.qrUrl ? ` Show your QR to check in: ${opts.qrUrl}` : ` Show the QR at check-in.`;
+  return `${brand}: Booking confirmed at ${booking.venue_name || ''} (${booking.court_name || ''}) on ${fmtWhen(booking.start_at)}. ${method}.${qr}`;
 }
 
 function buildOwnerBookingSms(booking, brand = DEFAULT_BRAND) {
@@ -28,8 +39,9 @@ function buildOwnerBookingSms(booking, brand = DEFAULT_BRAND) {
   return `${brand}: New booking at your venue ${booking.venue_name || ''} (${booking.court_name || ''}) on ${fmtWhen(booking.start_at)}. ${method}.`;
 }
 
-function buildReminderSms(booking, brand = DEFAULT_BRAND) {
-  return `${brand}: Reminder — your booking at ${booking.venue_name || ''} (${booking.court_name || ''}) is on ${fmtWhen(booking.start_at)}. Have your QR ready.`;
+function buildReminderSms(booking, brand = DEFAULT_BRAND, opts = {}) {
+  const qr = opts?.qrUrl ? ` Have your QR ready to check in: ${opts.qrUrl}` : ' Have your QR ready.';
+  return `${brand}: Reminder — your booking at ${booking.venue_name || ''} (${booking.court_name || ''}) is on ${fmtWhen(booking.start_at)}.${qr}`;
 }
 
 function buildPlayerCancelledSms(booking, brand = DEFAULT_BRAND) {
@@ -97,6 +109,7 @@ async function sendSms({ to, message }) {
 module.exports = {
   sendSms,
   formatSriLankanPhone,
+  bookingQrUrl,
   buildBookingSms,
   buildOwnerBookingSms,
   buildReminderSms,

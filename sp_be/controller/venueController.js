@@ -2,6 +2,24 @@ const pool = require('../db');
 const { ok, fail } = require('../utils/response');
 const logger = require('../utils/logger');
 const storage = require('../utils/storage');
+const { slugify, mintWidgetKey } = require('../utils/widget');
+
+// Derive a unique, URL-safe slug for a venue's branded page. On collision the
+// slug is suffixed -2, -3, ... so the page URL stays stable and human-typed.
+async function uniqueSlug(client, name) {
+  const base = slugify(name);
+  let candidate = base;
+  let n = 1;
+  // An existing row is a collision whether it is this venue or another; the
+  // loop keeps probing until a free slug is found.
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const { rows } = await client.query(`select 1 from venues where slug = $1 limit 1`, [candidate]);
+    if (rows.length === 0) return candidate;
+    n += 1;
+    candidate = `${base}-${n}`;
+  }
+}
 
 async function resolveSportIds(client, sports) {
   if (!Array.isArray(sports) || sports.length === 0) {
@@ -55,15 +73,18 @@ exports.createVenue = async (req, res) => {
 
     await client.query('begin');
 
+    const slug = await uniqueSlug(client, name);
+    const widgetKey = mintWidgetKey();
+
     const { rows: venueRows } = await client.query(
-      `insert into venues (owner_id, name, description, address, city, phone, lat, lng, photos, amenities, status, accepts_cash, venue_tax_rate)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending', $11, $12)
+      `insert into venues (owner_id, name, description, address, city, phone, lat, lng, photos, amenities, status, accepts_cash, venue_tax_rate, slug, widget_key)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending', $11, $12, $13, $14)
        returning *`,
       [
         req.user.id, name, description || null, address, city, phone || null,
         lat || null, lng || null,
         JSON.stringify(photos || []), JSON.stringify(amenities || []),
-        !!accepts_cash, venueTax
+        !!accepts_cash, venueTax, slug, widgetKey
       ]
     );
     const venue = venueRows[0];
@@ -133,7 +154,7 @@ exports.listVenues = async (req, res) => {
   try {
     const { search, sport, city, min_price, max_price, indoor, page = 1, limit = 20 } = req.query;
 
-    const conditions = [`v.status = 'approved'`];
+    const conditions = [`v.status = 'approved'`, `v.visibility = 'public'`];
     const values = [];
     let index = 1;
 
@@ -205,7 +226,7 @@ exports.getVenue = async (req, res) => {
     const { id } = req.params;
 
     const { rows } = await pool.query(
-      `select v.* from venues v where v.id = $1 and v.status = 'approved'`,
+      `select v.* from venues v where v.id = $1 and v.status = 'approved' and v.visibility = 'public'`,
       [id]
     );
 
@@ -246,6 +267,65 @@ exports.getVenue = async (req, res) => {
     });
   } catch (error) {
     logger.error(`Error fetching venue: ${error.message}`);
+    fail(res, 500, 'INTERNAL_SERVER_ERROR', 'Something went wrong');
+  }
+};
+
+// Public branded page lookup by slug (myslot.lk/<slug>). gated on the same
+// widget_enabled switch as the embed route: off means no off-platform surface.
+// The payload carries venue + brand data a storefront needs, never the
+// owner's identity or the widget internals (key, allowlist).
+exports.getVenueBySlug = async (req, res) => {
+  try {
+    const { slug } = req.params;
+    if (!/^[a-z0-9-]+$/.test(slug)) {
+      return fail(res, 404, 'VENUE_NOT_FOUND', 'Venue not found');
+    }
+
+    const { rows } = await pool.query(
+      `select v.* from venues v
+       where v.slug = $1 and v.status = 'approved' and v.widget_enabled`,
+      [slug]
+    );
+    if (rows.length === 0) {
+      return fail(res, 404, 'VENUE_NOT_FOUND', 'Venue not found');
+    }
+    const venue = rows[0];
+
+    const [courtsRes, sportsRes, hoursRes] = await Promise.all([
+      pool.query(
+        `select c.id, c.name, c.capacity, c.price_per_slot, c.slot_duration_min,
+                c.is_indoor, s.name as sport, s.slug as sport_slug
+         from courts c
+         left join sports s on s.id = c.sport_id
+         where c.venue_id = $1 and c.is_active
+         order by c.name`,
+        [venue.id]
+      ),
+      pool.query(
+        `select s.name, s.slug, s.icon
+         from venue_sports vs join sports s on s.id = vs.sport_id
+         where vs.venue_id = $1 order by s.name`,
+        [venue.id]
+      ),
+      pool.query(
+        `select day_of_week, open_time, close_time
+         from venue_hours where venue_id = $1 order by day_of_week`,
+        [venue.id]
+      )
+    ]);
+
+    // widget_key stays public (it is the embed snippet's identifier); only the
+    // owner identity and the allowlist are stripped.
+    const { owner_id, allowed_domains, ...publicVenue } = venue;
+    ok(res, 200, {
+      ...publicVenue,
+      courts: courtsRes.rows,
+      sports: sportsRes.rows.map((s) => s.name),
+      hours: hoursRes.rows
+    });
+  } catch (error) {
+    logger.error(`Error fetching venue by slug: ${error.message}`);
     fail(res, 500, 'INTERNAL_SERVER_ERROR', 'Something went wrong');
   }
 };

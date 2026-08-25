@@ -31,6 +31,7 @@ import { HoursEditor } from "./hours-editor";
 import { ClosedDatesEditor } from "./closed-dates-editor";
 import { PricingRulesEditor } from "./pricing-rules-editor";
 import { OffersEditor } from "./offers-editor";
+import { WidgetPageEditor } from "./widget-page-editor";
 
 const STATUS_LABEL: Record<string, string> = {
   pending: "Pending",
@@ -367,6 +368,7 @@ export function VenueDetailPage({ venueId }: { venueId: string }) {
           <TabsTrigger value="pricing" className="shrink-0">Pricing</TabsTrigger>
           <TabsTrigger value="offers" className="shrink-0">Offers</TabsTrigger>
           <TabsTrigger value="blocks" className="shrink-0">Blocks</TabsTrigger>
+          <TabsTrigger value="widget" className="shrink-0">Widget &amp; page</TabsTrigger>
           <TabsTrigger value="settings" className="shrink-0">Settings</TabsTrigger>
         </TabsList>
 
@@ -681,6 +683,10 @@ export function VenueDetailPage({ venueId }: { venueId: string }) {
               </div>
             )}
           </div>
+        </TabsContent>
+
+        <TabsContent value="widget">
+          <WidgetPageEditor venueId={venueId} venueName={venue.name} approved={venue.status === "approved"} />
         </TabsContent>
 
         <TabsContent value="settings">

@@ -5,7 +5,7 @@ const { getBankDetails } = require('../utils/featureFlags');
 const { createOwnerAccount } = require('../services/ownerAccounts');
 const notificationCatalog = require('../utils/notificationCatalog');
 
-const PLAN_FIELDS = ['name', 'term_days', 'price_lkr'];
+const PLAN_FIELDS = ['name', 'term_days', 'price_lkr', 'booking_allowance', 'overflow_fee_percent'];
 
 // node-postgres returns `date` columns as Date objects constructed in the
 // server's local timezone; render them back to the wall-clock date stored.
@@ -31,6 +31,8 @@ function validatePlanInput(plan) {
   const name = String(plan.name || '').trim();
   const termDays = Number(plan.term_days);
   const priceLkr = Number(plan.price_lkr ?? 0);
+  const bookingAllowance = plan.booking_allowance === undefined ? 0 : Number(plan.booking_allowance);
+  const overflowFeePercent = plan.overflow_fee_percent === undefined ? 5 : Number(plan.overflow_fee_percent);
   if (!name || name.length > 60) {
     throw Object.assign(new Error('Plan name is required (60 characters or fewer)'), { code: 'PLAN_VALIDATION' });
   }
@@ -40,7 +42,19 @@ function validatePlanInput(plan) {
   if (!Number.isInteger(priceLkr) || priceLkr < 0) {
     throw Object.assign(new Error('price_lkr must be a non-negative integer'), { code: 'PLAN_VALIDATION' });
   }
-  return { name, term_days: termDays, price_lkr: priceLkr };
+  if (!Number.isInteger(bookingAllowance) || bookingAllowance < 0) {
+    throw Object.assign(new Error('booking_allowance must be a non-negative integer'), { code: 'PLAN_VALIDATION' });
+  }
+  if (!Number.isInteger(overflowFeePercent) || overflowFeePercent < 0 || overflowFeePercent > 100) {
+    throw Object.assign(new Error('overflow_fee_percent must be an integer between 0 and 100'), { code: 'PLAN_VALIDATION' });
+  }
+  return {
+    name,
+    term_days: termDays,
+    price_lkr: priceLkr,
+    booking_allowance: bookingAllowance,
+    overflow_fee_percent: overflowFeePercent
+  };
 }
 
 async function resolvePlanTemplate(client, templateId) {
@@ -58,10 +72,10 @@ async function resolvePlanTemplate(client, templateId) {
 async function createPlanInstance(client, ownerId, planFields, startDate) {
   const start = startDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate) ? startDate : new Date(Date.now() + (5 * 60 + 30) * 60 * 1000).toISOString().slice(0, 10);
   const { rows } = await client.query(
-    `insert into owner_plans (owner_id, name, term_days, price_lkr, start_date, end_date)
-     values ($1, $2, $3, $4, $5, $5::date + make_interval(days => $3))
+    `insert into owner_plans (owner_id, name, term_days, price_lkr, booking_allowance, overflow_fee_percent, start_date, end_date)
+     values ($1, $2, $3, $4, $5, $6, $7, $7::date + make_interval(days => $3))
      returning *`,
-    [ownerId, planFields.name, planFields.term_days, planFields.price_lkr, start]
+    [ownerId, planFields.name, planFields.term_days, planFields.price_lkr, planFields.booking_allowance, planFields.overflow_fee_percent, start]
   );
   return rows[0];
 }
@@ -72,9 +86,12 @@ async function createAgreement(client, ownerId, planId, title, body) {
   if (!trimmedTitle || !trimmedBody) {
     throw Object.assign(new Error('Agreement title and body are required'), { code: 'AGREEMENT_VALIDATION' });
   }
+  // Agreement versioning (ADR-0028): every fresh draft bumps the version, so
+  // the owner re-accepts the CURRENT terms on renewal — never a stale copy.
   const { rows } = await client.query(
-    `insert into owner_agreements (owner_id, plan_id, title, body)
-     values ($1, $2, $3, $4)
+    `insert into owner_agreements (owner_id, plan_id, title, body, version)
+     values ($1, $2, $3, $4,
+       coalesce((select max(version) + 1 from owner_agreements where owner_id = $1), 1))
      returning *`,
     [ownerId, planId || null, trimmedTitle, trimmedBody]
   );
@@ -85,7 +102,14 @@ async function createAgreement(client, ownerId, planId, title, body) {
 async function resolvePlanInput(client, body) {
   if (body.plan_template_id) {
     const template = await resolvePlanTemplate(client, body.plan_template_id);
-    return { name: template.name, term_days: template.term_days, price_lkr: template.price_lkr, template_id: template.id };
+    return {
+      name: template.name,
+      term_days: template.term_days,
+      price_lkr: template.price_lkr,
+      booking_allowance: template.booking_allowance,
+      overflow_fee_percent: template.overflow_fee_percent,
+      template_id: template.id
+    };
   }
   if (body.plan) {
     const fields = validatePlanInput(body.plan);
@@ -119,10 +143,10 @@ exports.createPlanTemplate = async (req, res) => {
       return fail(res, 400, error.code, error.message);
     }
     const { rows } = await pool.query(
-      `insert into owner_plan_templates (name, term_days, price_lkr)
-       values ($1, $2, $3)
+      `insert into owner_plan_templates (name, term_days, price_lkr, booking_allowance, overflow_fee_percent)
+       values ($1, $2, $3, $4, $5)
        returning *`,
-      [fields.name, fields.term_days, fields.price_lkr]
+      [fields.name, fields.term_days, fields.price_lkr, fields.booking_allowance, fields.overflow_fee_percent]
     );
     ok(res, 201, rows[0]);
   } catch (error) {
@@ -142,16 +166,23 @@ exports.updatePlanTemplate = async (req, res) => {
       return fail(res, 400, 'PLAN_VALIDATION', 'Nothing to update');
     }
     // Validate through the same rules; instances already snapshot their terms.
-    const fields = validatePlanInput({ ...(req.body.plan || {}), ...patch });
-    const { rows } = await pool.query(
-      `update owner_plan_templates set name = $2, term_days = $3, price_lkr = $4
-       where id = $1
-       returning *`,
-      [id, fields.name, fields.term_days, fields.price_lkr]
+    // Merge with the current row so a partial PATCH (e.g. fee only) validates.
+    const { rows: currentRows } = await pool.query(
+      `select name, term_days, price_lkr, booking_allowance, overflow_fee_percent
+       from owner_plan_templates where id = $1`,
+      [id]
     );
-    if (rows.length === 0) {
+    if (currentRows.length === 0) {
       return fail(res, 404, 'PLAN_TEMPLATE_NOT_FOUND', 'Plan template not found');
     }
+    const fields = validatePlanInput({ ...currentRows[0], ...patch });
+    const { rows } = await pool.query(
+      `update owner_plan_templates set name = $2, term_days = $3, price_lkr = $4,
+              booking_allowance = $5, overflow_fee_percent = $6
+       where id = $1
+       returning *`,
+      [id, fields.name, fields.term_days, fields.price_lkr, fields.booking_allowance, fields.overflow_fee_percent]
+    );
     ok(res, 200, rows[0]);
   } catch (error) {
     if (error.code === 'PLAN_VALIDATION') {
@@ -216,6 +247,96 @@ exports.listOwners = async (req, res) => {
 
 // Admin creates a Venue Owner (ADR-0022): brand-new account, unique email,
 // temporary password, a Plan instance, and a drafted Agreement — all emailed.
+// Booking Allowance tally for an owner in a month (ADR-0028, ticket 10).
+// Rules: one Booking counts once regardless of slot count; walk-in (quick-book)
+// bookings count; cancelled and refunded bookings are excluded; overflow is
+// the revenue of the bookings that fall AFTER the allowance is consumed
+// (chronological), so the first `allowance` bookings in the month are free and
+// everything after carries the fee. Billed off-platform (invoice/bank), so
+// this endpoint is the record + readout the admin bases the invoice on.
+exports.listOwnerAllowance = async (req, res) => {
+  try {
+    const ownerId = req.params.id;
+    const month = String(req.query.month || '');
+    if (!/^\d{4}-\d{2}$/.test(month)) {
+      return fail(res, 400, 'MONTH_INVALID', 'month must be YYYY-MM');
+    }
+
+    const { rows: ownerRows } = await pool.query(
+      `select u.id, u.name, u.email,
+              p.id as plan_id, p.name as plan_name, p.booking_allowance, p.overflow_fee_percent
+       from users u
+       left join lateral (
+         select * from owner_plans op
+         where op.owner_id = u.id and op.start_date <= $2::date and op.end_date >= $2::date
+         order by op.start_date desc limit 1
+       ) p on true
+       where u.id = $1 and u.role = 'venue_owner'`,
+      [ownerId, `${month}-01`]
+    );
+    if (ownerRows.length === 0) {
+      return fail(res, 404, 'OWNER_NOT_FOUND', 'Owner not found');
+    }
+    const owner = ownerRows[0];
+
+    const { rows: tallyRows } = await pool.query(
+      `select
+         count(*)::int as usage,
+         coalesce(sum(total_price) filter (where b.total_price is not null), 0)::int as revenue
+       from bookings b
+       join courts c on c.id = b.court_id
+       join venues v on v.id = c.venue_id
+       where v.owner_id = $1
+         and b.start_at >= $2::date
+         and b.start_at < ($2::date + interval '1 month')
+         and b.status <> 'cancelled'`,
+      [ownerId, `${month}-01`]
+    );
+    const { usage, revenue } = tallyRows[0];
+    const allowance = Number(owner.booking_allowance || 0);
+    const overflowCount = Math.max(0, usage - allowance);
+
+    let overflowRevenue = 0;
+    if (overflowCount > 0) {
+      const { rows: overflowRows } = await pool.query(
+        `select coalesce(sum(total_price), 0)::int as overflow_revenue
+         from (
+           select total_price, row_number() over (order by b.start_at, b.created_at) as rn
+           from bookings b
+           join courts c on c.id = b.court_id
+           join venues v on v.id = c.venue_id
+           where v.owner_id = $1
+             and b.start_at >= $2::date
+             and b.start_at < ($2::date + interval '1 month')
+             and b.status <> 'cancelled'
+         ) ranked
+         where ranked.rn > $3`,
+        [ownerId, `${month}-01`, allowance]
+      );
+      overflowRevenue = overflowRows[0].overflow_revenue;
+    }
+
+    const overflowFeePercent = Number(owner.overflow_fee_percent ?? 0);
+    const feeEstimateLkr = Math.round(overflowRevenue * overflowFeePercent / 100);
+
+    ok(res, 200, {
+      owner: { id: owner.id, name: owner.name, email: owner.email },
+      plan: owner.plan_id
+        ? { id: owner.plan_id, name: owner.plan_name, booking_allowance: allowance, overflow_fee_percent: overflowFeePercent }
+        : null,
+      month,
+      usage,
+      revenue,
+      overflow_count: overflowCount,
+      overflow_revenue: overflowRevenue,
+      fee_estimate_lkr: feeEstimateLkr
+    });
+  } catch (error) {
+    logger.error(`Error listing owner allowance: ${error.message}`);
+    fail(res, 500, 'INTERNAL_SERVER_ERROR', 'Something went wrong');
+  }
+};
+
 exports.createOwner = async (req, res) => {
   const client = await pool.connect();
   try {

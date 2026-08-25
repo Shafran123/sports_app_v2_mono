@@ -62,6 +62,19 @@ export type Sport = z.infer<typeof SportSchema>;
 
 /* ---------- Venues ---------- */
 
+export const BrandSchema = z.object({
+  colors: z
+    .object({
+      primary: z.string().optional(),
+      accent: z.string().optional()
+    })
+    .optional(),
+  logo_url: z.string().optional(),
+  tagline: z.string().optional(),
+  about: z.string().optional()
+});
+export type VenueBrand = z.infer<typeof BrandSchema>;
+
 export const VenueSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -81,7 +94,10 @@ export const VenueSchema = z.object({
   accepts_cash: z.boolean().optional(),
   venue_tax_rate: z.number().optional(),
   advance_days: z.number().optional(),
-  sports: z.array(z.string()).optional()
+  sports: z.array(z.string()).optional(),
+  visibility: z.enum(["public", "private"]).optional(),
+  slug: z.string().nullable().optional(),
+  brand: BrandSchema.optional()
 });
 export type Venue = z.infer<typeof VenueSchema>;
 
@@ -106,12 +122,45 @@ export const VenueHoursSchema = z.object({
 });
 export type VenueHours = z.infer<typeof VenueHoursSchema>;
 
+/* ---------- Off-platform venues: brand + widget (ADR-0028) ---------- */
+
+export const WidgetSettingsSchema = z.object({
+  venue_id: z.string(),
+  slug: z.string().nullable(),
+  widget_key: z.string().nullable(),
+  widget_enabled: z.boolean(),
+  allowed_domains: z.array(z.string()),
+  brand: BrandSchema,
+  visibility: z.enum(["public", "private"])
+});
+export type WidgetSettings = z.infer<typeof WidgetSettingsSchema>;
+
+export const WidgetVerifySendSchema = z.object({
+  sent: z.boolean(),
+  resend_after_seconds: z.number()
+});
+export type WidgetVerifySend = z.infer<typeof WidgetVerifySendSchema>;
+
+export const WidgetVerifyConfirmSchema = z.object({
+  token: z.string(),
+  is_new: z.boolean()
+});
+export type WidgetVerifyConfirm = z.infer<typeof WidgetVerifyConfirmSchema>;
+
 export const VenueDetailSchema = VenueSchema.extend({
   courts: z.array(CourtSchema),
   sports: z.array(z.string()),
   hours: z.array(VenueHoursSchema)
 });
 export type VenueDetail = z.infer<typeof VenueDetailSchema>;
+
+export const WidgetConfigSchema = VenueDetailSchema.extend({
+  brand: BrandSchema.optional(),
+  visibility: z.enum(["public", "private"]).optional(),
+  widget_enabled: z.boolean().optional(),
+  widget_key: z.string().nullable().optional()
+});
+export type WidgetConfig = z.infer<typeof WidgetConfigSchema>;
 
 /* ---------- Availability ---------- */
 
@@ -363,7 +412,8 @@ export const FeatureFlagsSchema = z.object({
   sms_enabled: z.boolean(),
   payhere_enabled: z.boolean(),
   events_discovery_state: z.enum(["enabled", "coming_soon", "hidden"]),
-  brand_name: z.string().optional()
+  brand_name: z.string().optional(),
+  app_url: z.string().nullable().optional()
 });
 export type FeatureFlags = z.infer<typeof FeatureFlagsSchema>;
 
@@ -455,6 +505,8 @@ export const OwnerPlanTemplateSchema = z.object({
   name: z.string(),
   term_days: z.number(),
   price_lkr: z.number(),
+  booking_allowance: z.number().optional(),
+  overflow_fee_percent: z.number().optional(),
   is_archived: z.boolean(),
   created_at: z.string().optional()
 });
@@ -466,11 +518,32 @@ export const OwnerPlanSchema = z.object({
   name: z.string(),
   term_days: z.number(),
   price_lkr: z.number(),
+  booking_allowance: z.number().optional(),
+  overflow_fee_percent: z.number().optional(),
   start_date: z.string(),
   end_date: z.string(),
   created_at: z.string().optional()
 });
 export type OwnerPlan = z.infer<typeof OwnerPlanSchema>;
+
+export const OwnerAllowanceSchema = z.object({
+  owner: z.object({ id: z.string(), name: z.string().nullable(), email: z.string().nullable() }),
+  plan: z
+    .object({
+      id: z.string(),
+      name: z.string(),
+      booking_allowance: z.number(),
+      overflow_fee_percent: z.number()
+    })
+    .nullable(),
+  month: z.string(),
+  usage: z.number(),
+  revenue: z.number(),
+  overflow_count: z.number(),
+  overflow_revenue: z.number(),
+  fee_estimate_lkr: z.number()
+});
+export type OwnerAllowance = z.infer<typeof OwnerAllowanceSchema>;
 
 export const OwnerAgreementSchema = z.object({
   id: z.string(),

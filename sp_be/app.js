@@ -25,6 +25,8 @@ const adminLeadsRoute = require('./routes/adminLeads');
 const adminOwnersRoute = require('./routes/adminOwners');
 const ownerOnboardingRoute = require('./routes/ownerOnboarding');
 const publicLeadsRoute = require('./routes/publicLeads');
+const publicWidgetRoute = require('./routes/publicWidget');
+const publicQrRoute = require('./routes/publicQr');
 const { requireRole } = require('./middleware/requireRole');
 const { requireOnboarded } = require('./middleware/requireOnboarded');
 const { authenticate } = require('./middleware/authenticate');
@@ -83,6 +85,8 @@ app.use('/api/v1/admin/owners', authenticate, requireRole('admin'), adminWriteLi
 app.use('/api/v1/owner-onboarding', authenticate, requireRole('venue_owner', 'admin'), ownerOnboardingRoute);
 app.use('/api/v1/public', publicConfigRoute);
 app.use('/api/v1/public/leads', makeRateLimiter({ windowMs: 60 * 1000, limit: 10 }), publicLeadsRoute);
+app.use('/api/v1/public/widget', publicWidgetRoute);
+app.use('/api/v1/public', publicQrRoute);
 app.use('/api/v1/notifications', authenticate, notificationsRoute);
 app.use('/api/v1/events', eventsRoute);
 app.use('/api/v1/uploads', authenticate, requireRole('venue_owner', 'admin'), uploadsLimiter, uploadsRoute);

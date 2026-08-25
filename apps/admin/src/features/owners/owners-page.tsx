@@ -3,9 +3,10 @@
 import * as React from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { admin, toApiFailure } from "@myslot/api";
-import { Button, Card, EmptyState, ErrorState, Input, SelectSheet, Textarea } from "@myslot/ui";
+import { Button, Card, Dialog, DialogContent, EmptyState, ErrorState, Input, SelectSheet, Textarea } from "@myslot/ui";
 import { formatDateLong, formatLkr } from "@myslot/utils";
-import type { OwnerAgreement, OwnerListItem, OwnerPlanTemplate } from "@myslot/types";
+import type { OwnerAgreement, OwnerAllowance, OwnerListItem, OwnerPlanTemplate } from "@myslot/types";
+import { BarChart3 } from "lucide-react";
 
 type AgreementDraft = { title: string; body: string };
 
@@ -104,6 +105,7 @@ function OwnerRow({
 }) {
   const qc = useQueryClient();
   const [renewOpen, setRenewOpen] = React.useState(false);
+  const [allowanceOpen, setAllowanceOpen] = React.useState(false);
 
   const nudge = useMutation({
     mutationFn: () => admin.nudgeOwner(owner.id),
@@ -146,6 +148,9 @@ function OwnerRow({
           <p className="mt-1 text-xs text-ink-3">Created {formatDateLong(owner.created_at)}</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="secondary" size="sm" onClick={() => setAllowanceOpen(true)}>
+            <BarChart3 className="h-4 w-4" /> Allowance
+          </Button>
           <Button variant="secondary" size="sm" onClick={() => setRenewOpen(true)} disabled={!owner.plan_name}>
             Renew
           </Button>
@@ -154,6 +159,10 @@ function OwnerRow({
           </Button>
         </div>
       </div>
+
+      {allowanceOpen && (
+        <AllowanceDialog owner={owner} onClose={() => setAllowanceOpen(false)} />
+      )}
 
       {renewOpen && (
         <RenewDialog
@@ -169,6 +178,69 @@ function OwnerRow({
         />
       )}
     </Card>
+  );
+}
+
+// Booking Allowance readout for a month (ADR-0028, ticket 10). The tally is
+// the record the platform invoices on: usage vs allowance, overflow revenue,
+// and the estimated fee at the plan's overflow rate.
+function AllowanceDialog({ owner, onClose }: { owner: OwnerListItem; onClose: () => void }) {
+  const now = new Date();
+  const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const [month, setMonth] = React.useState(defaultMonth);
+
+  const q = useQuery({
+    queryKey: ["owner-allowance", owner.id, month],
+    queryFn: () => admin.ownerAllowance(owner.id, month),
+    enabled: /^\d{4}-\d{2}$/.test(month)
+  });
+
+  const data: OwnerAllowance | null = q.data ?? null;
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent
+        title={`Booking allowance — ${owner.name || owner.email}`}
+        description="Bookings tallied this month: every booking counts once, cancelled/refunded ones never."
+        onClose={onClose}
+      >
+        <div className="space-y-4">
+          <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} aria-label="Month" className="max-w-52" />
+
+          {q.isLoading ? (
+            <p className="text-sm text-ink-3">Counting bookings…</p>
+          ) : q.isError || !data ? (
+            <p className="text-sm text-error">Could not load the tally.</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <Stat label="Bookings" value={String(data.usage)} />
+              <Stat label="Allowance" value={data.plan ? String(data.plan.booking_allowance) : "—"} />
+              <Stat label="Overflow" value={String(data.overflow_count)} />
+              <Stat label="Fee (est.)" value={formatLkr(data.fee_estimate_lkr)} />
+            </div>
+          )}
+
+          {data && data.plan && (
+            <div className="rounded-xl bg-surface-2 px-3 py-2 text-xs text-ink-2">
+              {data.plan.name} · {data.plan.overflow_fee_percent}% overflow fee on {formatLkr(data.overflow_revenue)} overflow
+              revenue ({formatLkr(data.revenue)} booked). Invoiced off-platform.
+            </div>
+          )}
+          {data && !data.plan && (
+            <p className="text-xs text-ink-3">No active plan covers this month — no allowance applies.</p>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-border bg-surface-2/50 px-3 py-2">
+      <p className="text-[11px] font-medium uppercase tracking-wide text-ink-3">{label}</p>
+      <p className="mt-0.5 font-display text-lg font-extrabold tracking-tight text-ink">{value}</p>
+    </div>
   );
 }
 
@@ -420,7 +492,11 @@ function PlanTemplatesSection({
             <li key={t.id} className="flex flex-wrap items-center justify-between gap-2 py-3">
               <div>
                 <p className="font-medium text-ink">{t.name}</p>
-                <p className="text-sm text-ink-2">{t.term_days} days • {t.price_lkr ? formatLkr(t.price_lkr) : "Free"}</p>
+                <p className="text-sm text-ink-2">
+                  {t.term_days} days • {t.price_lkr ? formatLkr(t.price_lkr) : "Free"} •{" "}
+                  {t.booking_allowance ?? 0} free {Number(t.booking_allowance ?? 0) === 1 ? "booking" : "bookings"}/month •{" "}
+                  {t.overflow_fee_percent ?? 5}% overflow fee
+                </p>
               </div>
               <Button variant="secondary" size="sm" onClick={() => archive.mutate(t.id)} disabled={archive.isPending}>
                 Archive
@@ -449,10 +525,19 @@ function PlanTemplateForm({ onCancel, onDone }: { onCancel: () => void; onDone: 
   const [name, setName] = React.useState("");
   const [termDays, setTermDays] = React.useState("");
   const [priceLkr, setPriceLkr] = React.useState("0");
+  const [allowance, setAllowance] = React.useState("0");
+  const [overflowFee, setOverflowFee] = React.useState("5");
   const [error, setError] = React.useState<string | null>(null);
 
   const create = useMutation({
-    mutationFn: () => admin.createPlanTemplate({ name, term_days: Number(termDays), price_lkr: Number(priceLkr) }),
+    mutationFn: () =>
+      admin.createPlanTemplate({
+        name,
+        term_days: Number(termDays),
+        price_lkr: Number(priceLkr),
+        booking_allowance: Number(allowance),
+        overflow_fee_percent: Number(overflowFee)
+      }),
     onSuccess: onDone,
     onError: (e) => setError(toApiFailure(e)?.message ?? "Could not create the plan template.")
   });
@@ -471,6 +556,27 @@ function PlanTemplateForm({ onCancel, onDone }: { onCancel: () => void; onDone: 
         <div className="space-y-1.5">
           <label className="text-xs font-semibold uppercase tracking-wide text-ink-3">Price (LKR, 0 = free)</label>
           <Input type="number" min={0} value={priceLkr} onChange={(e) => setPriceLkr(e.target.value)} />
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-xs font-semibold uppercase tracking-wide text-ink-3">Free bookings / month</label>
+          <Input
+            type="number"
+            min={0}
+            value={allowance}
+            onChange={(e) => setAllowance(e.target.value)}
+            placeholder="10"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-xs font-semibold uppercase tracking-wide text-ink-3">Overflow fee %</label>
+          <Input
+            type="number"
+            min={0}
+            max={100}
+            value={overflowFee}
+            onChange={(e) => setOverflowFee(e.target.value)}
+            placeholder="5"
+          />
         </div>
       </div>
       {error && <p className="rounded-xl bg-red-50 p-3 text-sm text-error">{error}</p>}

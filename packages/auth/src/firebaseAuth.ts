@@ -7,6 +7,7 @@ import {
   updatePassword,
   RecaptchaVerifier,
   signInWithPhoneNumber,
+  signInWithCustomToken,
   type Auth,
   type ConfirmationResult
 } from "firebase/auth";
@@ -38,6 +39,13 @@ export async function changePassword(newPassword: string): Promise<void> {
 export async function loginWithGoogle(): Promise<void> {
   const provider = new GoogleAuthProvider();
   const userCred = await signInWithPopup(getFirebaseAuth(), provider);
+  await persistToken(userCred.user);
+}
+
+/** Widget sign-in (ADR-0028): the backend verifies the OTP and mints a custom
+ * token linking the phone to its Player account (creating it if new). */
+export async function loginWithCustomToken(token: string): Promise<void> {
+  const userCred = await signInWithCustomToken(getFirebaseAuth(), token);
   await persistToken(userCred.user);
 }
 

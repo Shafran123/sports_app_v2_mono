@@ -20,6 +20,19 @@ _Avoid_: block, takedown
 A permanent admin action that revokes the owner's console access and makes all of that owner's venues unbookable.
 _Avoid_: delete, terminate
 
+**Private Venue**:
+A Venue that is bookable but not discoverable — absent from browse, search, and any in-app surface. Reached only through its own booking widget and its branded venue page (and by its Venue Owner in the console). Governed by a visibility flag the Admin sets when provisioning the venue.
+_Avoid_: hidden listing, private listing, ghost venue
+
+**Booking Widget**:
+The embeddable booking interface a Venue Owner publishes on their own website (iframe) to sell the Venue's courts to their own audience. Keyed by a stable per-venue embed id so the widget always books that Venue and no other; tied to a domain allowlist (Owner self-serve) so it only renders where the Owner has authorized it. Offered to any Venue; required for a Private Venue (its only public surface). The buyer verifies a phone (or signs in with a Player account) and books — online payment optional per the Owner's choice, otherwise cash at the venue. The widget exposes the venue's full booking engine (all courts, availability, Variable Pricing, Offers, Closed Dates). When online payments land (P2), the widget uses **embedded checkout** (hosted payment fields inside the iframe), not a redirect, so the flow stays in the iframe and lands back on its success screen.
+_Avoid_: embed widget, booking iframe, widget (bare)
+
+**Branded Venue Page**:
+A white-labeled, public storefront page for a Venue — venue name, brand colors, logo, tagline, photos, about text, court list with live prices, opening hours, and the booking flow — served by the platform at its own URL (`myslot.lk/<slug>`), for venues that want to sell off-platform under their own brand. Owner-configurable brand tokens (colors, logo, tagline, photos, about) with platform defaults; prices always render from the venue's Court and Variable Pricing config (never re-entered on the page). Public and indexable on the open web. Offered to any Venue; a Private Venue's only public surface.
+_Note_: A single **portfolio page** presenting several Venues under one owner is a v2 capability; the MVP is one Venue per page URL.
+_Avoid_: venue landing page, microsite, storefront
+
 **Court**:
 A bookable playing area within a Venue (badminton court, football turf, cricket nets). Has a sport, capacity, a base price per slot, and a configurable slot duration. The base price is what a slot costs when no Variable Pricing rule applies.
 _Avoid_: subYard, turf, field
@@ -60,6 +73,7 @@ _Note_: A booking has a payment method (online via PayHere, or cash collected at
 **QR Token**:
 A random, secret, single-use string minted when a Booking is created. Encoded in the player's check-in QR code; the venue consumes it by scanning and checking in. Re-scanning a consumed token returns "already used." Disclosed to the Booking's Player in their own app and in transactional emails sent to that player's inbox (booking confirmation, reminder, and bill); never surfaced to Venue Owners or in venue-facing read APIs. Disclosed only to the Booking's Player (in their own app) and consumed only by the Venue Owner of the Venue the Booking was made on — the check-in validates ownership of the Venue as well as the identity of the Token.
 _Avoid_: ticket number, booking ID (the Booking UUID is NOT the QR token)
+_Note_: For widget bookings the QR is also shown on the widget's success screen and sent by SMS/email to the verified phone/inbox — a fresh widget Player may never open their own app, but must be able to check in.
 
 **Payment**:
 A recorded transfer of money for a Booking or Event Registration. Online payments come from PayHere; cash payments are recorded by the Venue Owner when collected. Status: pending / paid / failed / refunded. Cash payments never sit in pending — the owner records them as paid on collection.
@@ -109,9 +123,16 @@ _Note_: The landing page's "Book a demo" CTA submits through the same Owner Lead
 _Avoid_: prospect, partner request, enquiry, demo request
 
 **Owner Plan**:
-The commercial term attached to a Venue Owner, drawn from an Admin-maintained catalog of plan templates (name, term, price) and applied to an Owner with a start and an end date. Expiring and expired Plans surface to the Admin so renewal can be chased.
-_Note_: The launch offer is a **3-month free trial** — an Owner Plan template with a zero price and a 3-month term, marketed on the landing page.
+The commercial term attached to a Venue Owner, drawn from an Admin-maintained catalog of plan templates (name, term, price, **Booking Allowance**, **Overflow Platform Fee**). Applied to an Owner with a start and an end date. Expiring and expired Plans surface to the Admin so renewal can be chased; when a Plan lapses past a grace period, the Owner's Widget and Branded Venue Page go offline while already-confirmed bookings still play out. A plan change creates a fresh Owner Agreement version the Owner must re-accept on renewal.
 _Avoid_: subscription, contract, pricing tier
+
+**Booking Allowance**:
+The number of Bookings a Venue Owner's plan entitles them to per period (default per month) at no platform fee, counted across all of that Owner's Venues. One Booking counts once regardless of slot count; every recorded Booking counts (including Walk-in Guest bookings), except cancelled and refunded ones. Part of the Owner Plan template, alongside price and term.
+_Avoid_: free bookings, quota, allotment
+
+**Overflow Platform Fee**:
+The platform fee percentage applied to Bookings beyond a Venue Owner's **Booking Allowance** in a given period (default 5%). Billed off-platform (bank transfer / invoice) from platform booking data, never deducted from the player's payment. Distinct from **Platform Tax**, which is a government-mandated tax carved out of a Booking's price.
+_Avoid_: commission, platform cut, overage fee, service fee
 
 **Owner Agreement**:
 A sales-agreement document of terms drafted by an Admin for a Venue Owner — generated from a reusable template with per-Owner placeholders (parties, venue, Plan, dates, bank details) and editable per Owner. It is emailed to the Owner and must be accepted before the Owner may use the console; a renewal creates a fresh agreement requiring a fresh acceptance.
