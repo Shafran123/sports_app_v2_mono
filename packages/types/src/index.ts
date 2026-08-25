@@ -80,6 +80,7 @@ export const VenueSchema = z.object({
   max_price: z.number().nullable().optional(),
   accepts_cash: z.boolean().optional(),
   venue_tax_rate: z.number().optional(),
+  advance_days: z.number().optional(),
   sports: z.array(z.string()).optional()
 });
 export type Venue = z.infer<typeof VenueSchema>;
@@ -117,7 +118,9 @@ export type VenueDetail = z.infer<typeof VenueDetailSchema>;
 export const SlotSchema = z.object({
   start_at: z.string(),
   end_at: z.string(),
-  state: SLOT_STATE
+  state: SLOT_STATE,
+  price: z.number().optional(),
+  offer_price: z.number().nullable().optional()
 });
 export type Slot = z.infer<typeof SlotSchema>;
 
@@ -131,11 +134,59 @@ export const CourtAvailabilitySchema = z.object({
 });
 export type CourtAvailability = z.infer<typeof CourtAvailabilitySchema>;
 
+export const VenueOfferSchema = z.object({
+  discount_type: z.enum(["percent", "flat"]),
+  value: z.number()
+});
+export type VenueOffer = z.infer<typeof VenueOfferSchema>;
+
 export const AvailabilitySchema = z.object({
   date: z.string(),
+  advance_days: z.number().optional(),
+  venue_offer: VenueOfferSchema.nullable().optional(),
   courts: z.array(CourtAvailabilitySchema)
 });
 export type Availability = z.infer<typeof AvailabilitySchema>;
+
+/* ---------- Closed dates / pricing rules / offers (owner config) ---------- */
+
+export const ClosedDateSchema = z.object({
+  closed_date: z.string(),
+  reason: z.string().nullable().optional()
+});
+export type ClosedDate = z.infer<typeof ClosedDateSchema>;
+
+export const CourtPricingRuleSchema = z.object({
+  id: z.string(),
+  court_id: z.string().optional(),
+  day_of_week: z.number().nullable(),
+  start_time: z.string(),
+  end_time: z.string(),
+  price_per_slot: z.number()
+});
+export type CourtPricingRule = z.infer<typeof CourtPricingRuleSchema>;
+
+export const OfferSchema = z.object({
+  id: z.string(),
+  venue_id: z.string().optional(),
+  kind: z.enum(["venue", "slot"]),
+  discount_type: z.enum(["percent", "flat"]),
+  percent: z.number().nullable().optional(),
+  flat_amount: z.number().nullable().optional(),
+  is_active: z.boolean().optional(),
+  start_date: z.string().nullable().optional(),
+  end_date: z.string().nullable().optional(),
+  scopes: z.array(z.string()).optional(),
+  windows: z.array(
+    z.object({
+      day_of_week: z.number().nullable(),
+      start_time: z.string(),
+      end_time: z.string()
+    })
+  ).optional(),
+  created_at: z.string().nullable().optional()
+});
+export type Offer = z.infer<typeof OfferSchema>;
 
 /* ---------- Bookings ---------- */
 
@@ -147,6 +198,8 @@ export const BookingSchema = z.object({
   end_at: z.string(),
   price_per_slot: z.number(),
   total_price: z.number(),
+  subtotal_amount: z.number().optional(),
+  discount_amount: z.number().optional(),
   tax_rate: z.number().optional(),
   tax_amount: z.number().optional(),
   venue_tax_rate: z.number().optional(),

@@ -1,53 +1,89 @@
-import type { Availability, CourtAvailability, Slot } from "@myslot/types";
+import type { Availability, CourtAvailability, Slot, VenueOffer } from "@myslot/types";
 
 export const MAX_SLOTS = 8;
 
 export type SelectedSlots = Record<string, { start: string; end: string }>;
 
+// Display-only application of a venue-wide offer to an amount (mirrors the
+// server's math: percent or flat off the subtotal, half-up rounding). The
+// server remains authoritative at checkout — this only drives the pre-checkout
+// display so the player sees the reduced price before confirming.
+export function applyVenueOffer(
+  amount: number,
+  offer?: VenueOffer | null
+): { total: number; discount: number } {
+  if (!offer || !Number.isFinite(amount) || amount <= 0) return { total: amount, discount: 0 };
+  const discount =
+    offer.discount_type === "percent"
+      ? Math.round((amount * offer.value) / 100)
+      : Math.min(offer.value, amount);
+  return { total: Math.max(0, amount - discount), discount };
+}
+
 export function selectionKey(courtId: string, startAt: string): string {
   return `${courtId}:${startAt}`;
 }
 
-/**
- * Toggle a slot into/out of the selection.
- *
- * Invariants: selection lives on ONE court only, as ONE contiguous run of at
- * most MAX_SLOTS slots. Clicking a selected slot clears that court's run;
- * clicking an available slot on another court replaces the whole selection;
- * clicking a slot further along the same court extends the run and fills the
- * gap, but never jumps over a taken (held/booked/blocked/past) slot.
- */
-export function toggleSlot(selected: SelectedSlots, court: CourtAvailability, slot: Slot): SelectedSlots {
-  const prefix = `${court.court_id}:`;
-  const key = selectionKey(court.court_id, slot.start_at);
+// Duration chips offered for a court on a date: multiples of the court's slot
+// duration, capped at MAX_SLOTS and at the longest contiguous run of available
+// slots in a single Opening Window. Returns durations in minutes, ascending.
+export function durationChoices(court: CourtAvailability, slots: Slot[]): number[] {
+  const dur = court.slot_duration_min;
+  const maxRun = longestAvailableRun(slots);
+  const count = Math.max(1, Math.min(MAX_SLOTS, maxRun));
+  const out: number[] = [];
+  for (let i = 1; i <= count; i++) out.push(i * dur);
+  return out;
+}
 
-  if (selected[key]) {
-    const next: SelectedSlots = {};
-    for (const [k, v] of Object.entries(selected)) {
-      if (!k.startsWith(prefix)) next[k] = v;
+// Longest run of consecutive available slots that are contiguous in time — a
+// run can never cross a gap between Opening Windows (a new window's first slot
+// does not start at the previous window's last end).
+export function longestAvailableRun(slots: Slot[]): number {
+  let best = 0;
+  let cur = 0;
+  let prevEnd: string | null = null;
+  for (const slot of slots) {
+    const contiguous = slot.state === "available" && prevEnd !== null && slot.start_at === prevEnd;
+    if (slot.state === "available" && (cur === 0 || contiguous)) {
+      cur += 1;
+      if (cur > best) best = cur;
+    } else {
+      cur = slot.state === "available" ? 1 : 0;
     }
-    return next;
+    prevEnd = slot.end_at;
   }
+  return best;
+}
 
-  const onThisCourt = Object.keys(selected).filter((k) => k.startsWith(prefix));
-  if (onThisCourt.length === 0 || onThisCourt.length !== Object.keys(selected).length) {
-    return { [key]: { start: slot.start_at, end: slot.end_at } };
+// Select a run of `durationMin` starting at `slot`. Returns the updated
+// selection (always on ONE court, contiguous, never spanning a gap/taken slot).
+export function selectRun(
+  selected: SelectedSlots,
+  court: CourtAvailability,
+  startSlot: Slot,
+  durationMin: number
+): SelectedSlots {
+  const dur = durationMin / court.slot_duration_min;
+  const idx = court.slots.findIndex((s) => s.start_at === startSlot.start_at);
+  if (idx < 0 || dur < 1) return selected;
+
+  const run: Slot[] = [];
+  let prevEnd: string | null = null;
+  for (let i = idx; i < court.slots.length && run.length < dur; i++) {
+    const s = court.slots[i]!;
+    const isSel = isSelected(selected, court, s);
+    const passable = s.state === "available" || isSel;
+    if (prevEnd === null) {
+      if (!passable) return selected;
+    } else {
+      if (s.start_at !== prevEnd) return selected; // gap between windows
+      if (!passable) return selected;
+    }
+    run.push(s);
+    prevEnd = s.end_at;
   }
-
-  const selectedIdx: number[] = [];
-  court.slots.forEach((s, i) => {
-    if (selected[selectionKey(court.court_id, s.start_at)]) selectedIdx.push(i);
-  });
-  const clickedIdx = court.slots.findIndex((s) => s.start_at === slot.start_at);
-  if (clickedIdx < 0 || selectedIdx.length === 0) return selected;
-
-  const lo = Math.min(clickedIdx, selectedIdx[0] ?? clickedIdx);
-  const hi = Math.max(clickedIdx, selectedIdx[selectedIdx.length - 1] ?? clickedIdx);
-  const run = court.slots.slice(lo, hi + 1);
-  const jumpsOverTaken = run.some(
-    (s) => s.state !== "available" && !selected[selectionKey(court.court_id, s.start_at)]
-  );
-  if (jumpsOverTaken || run.length > MAX_SLOTS) return selected;
+  if (run.length < dur) return selected;
 
   const next: SelectedSlots = {};
   for (const s of run) {
@@ -56,20 +92,28 @@ export function toggleSlot(selected: SelectedSlots, court: CourtAvailability, sl
   return next;
 }
 
+function isSelected(selected: SelectedSlots, court: CourtAvailability, slot: Slot): boolean {
+  return !!selected[selectionKey(court.court_id, slot.start_at)];
+}
+
 export interface SelectionSummary {
   count: number;
+  durationMin: number;
   courtId: string | null;
   courtName: string | null;
   total: number;
+  baseTotal: number;
   startAt: string | null;
   endAt: string | null;
 }
 
 const EMPTY_SUMMARY: SelectionSummary = {
   count: 0,
+  durationMin: 0,
   courtId: null,
   courtName: null,
   total: 0,
+  baseTotal: 0,
   startAt: null,
   endAt: null
 };
@@ -88,12 +132,25 @@ export function summarizeSelection(selected: SelectedSlots, availability?: Avail
   const last = sorted[sorted.length - 1];
   const endAt = last?.end ?? null;
   const count = sorted.length;
+  const durationMin = count * court.slot_duration_min;
+
+  let total = 0;
+  let baseTotal = 0;
+  const byStart = new Map(court.slots.map((s) => [s.start_at, s]));
+  for (const [, v] of entries) {
+    const slot = byStart.get(v.start);
+    const base = slot?.price ?? court.price_per_slot;
+    baseTotal += base;
+    total += slot?.offer_price ?? base;
+  }
 
   return {
     count,
+    durationMin,
     courtId,
     courtName: court.name,
-    total: count * court.price_per_slot,
+    total,
+    baseTotal,
     startAt,
     endAt
   };
@@ -102,10 +159,11 @@ export function summarizeSelection(selected: SelectedSlots, availability?: Avail
 /**
  * Contract with /book/[venueId]: date, court_id, start_at, end_at (ISO
  * strings), plus the display names and pricing the checkout/confirmation
- * screens render before/after the API round-trip.
+ * screens render before/after the API round-trip. The `slot_min` duration is
+ * carried so checkout can show "1h 30m × Rs 1,500" instead of a slot count.
  */
 export function buildCtaHref(
-  { venueId, venueName, venueSlug, date }: { venueId: string; venueName: string | null | undefined; venueSlug: string | null | undefined; date: string },
+  { venueId, venueName, venueSlug, date, venueOffer }: { venueId: string; venueName: string | null | undefined; venueSlug: string | null | undefined; date: string; venueOffer?: VenueOffer | null },
   summary: SelectionSummary
 ): string {
   if (summary.count === 0 || !summary.courtId || !summary.startAt || !summary.endAt) return "";
@@ -117,8 +175,14 @@ export function buildCtaHref(
     venue: venueName ?? "",
     venue_slug: venueSlug ?? "",
     court: summary.courtName ?? "",
-    price_per_slot: String(summary.total / summary.count),
-    slots: String(summary.count)
+    price_per_slot: String(Math.round(summary.total / summary.count)),
+    base_price_per_slot: String(Math.round(summary.baseTotal / summary.count)),
+    slots: String(summary.count),
+    slot_min: String(summary.durationMin)
   });
+  if (venueOffer) {
+    params.set("venue_offer_type", venueOffer.discount_type);
+    params.set("venue_offer_value", String(venueOffer.value));
+  }
   return `/book/${venueId}?${params.toString()}`;
 }

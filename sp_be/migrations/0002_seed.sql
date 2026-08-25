@@ -70,7 +70,11 @@ where v.id in (
   '22222222-2222-2222-2222-222222222222'::uuid,
   '33333333-3333-3333-3333-333333333333'::uuid
 )
-on conflict (venue_id, day_of_week) do nothing;
+  and not exists (
+    select 1 from venue_hours vh
+    where vh.venue_id = v.id and vh.day_of_week = dow
+      and vh.open_time = '06:00' and vh.close_time = '23:00'
+  );
 
 insert into venue_sports (venue_id, sport_id)
 select v.id, s.id from venues v cross join sports s

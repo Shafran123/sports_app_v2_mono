@@ -8,6 +8,9 @@ const cancellationService = require('../services/cancellation');
 const { mintQrToken } = require('../utils/tokens');
 const billService = require('../utils/billService');
 const { getTaxRate, applyInclusiveTax } = require('../utils/featureFlags');
+const { colomboDate, colomboTime } = require('../utils/colombo');
+const { windowsForDay } = require('../services/venueEngine');
+const pricingEngine = require('../services/pricingEngine');
 
 async function verifyOwnership(client, venueId, userId) {
   const { rows } = await client.query(
@@ -143,10 +146,27 @@ exports.updateVenueHours = async (req, res) => {
     if (!Array.isArray(hours)) {
       return fail(res, 400, 'HOURS_VALIDATION', 'hours must be an array');
     }
+
+    // Each row is one Opening Window. A day may have several windows, but they
+    // must not overlap and each must be a valid open < close pair.
+    const byDay = {};
     for (const hour of hours) {
       const day = Number(hour.day_of_week);
       if (!Number.isInteger(day) || day < 0 || day > 6 || !hour.open_time || !hour.close_time) {
         return fail(res, 400, 'HOURS_VALIDATION', 'Each hour needs day_of_week (0-6), open_time, close_time');
+      }
+      if (hour.close_time <= hour.open_time) {
+        return fail(res, 400, 'HOURS_VALIDATION', 'Close time must be after open time');
+      }
+      if (!byDay[day]) byDay[day] = [];
+      byDay[day].push({ open: hour.open_time, close: hour.close_time });
+    }
+    for (const day of Object.keys(byDay)) {
+      const windows = byDay[day].sort((a, b) => (a.open > b.open ? 1 : -1));
+      for (let i = 1; i < windows.length; i++) {
+        if (windows[i].open < windows[i - 1].close) {
+          return fail(res, 400, 'HOURS_VALIDATION', 'Opening windows on the same day must not overlap');
+        }
       }
     }
 
@@ -735,8 +755,8 @@ exports.createManualBooking = async (req, res) => {
   try {
     const { court_id, start_at, end_at, player_name, player_phone, amount } = req.body;
 
-    if (!court_id || !start_at || !end_at || amount === undefined) {
-      return fail(res, 400, 'MANUAL_BOOKING_VALIDATION', 'court_id, start_at, end_at, and amount are required');
+    if (!court_id || !start_at || !end_at) {
+      return fail(res, 400, 'MANUAL_BOOKING_VALIDATION', 'court_id, start_at, and end_at are required');
     }
 
     const { rows: courtRows } = await client.query(
@@ -751,23 +771,49 @@ exports.createManualBooking = async (req, res) => {
       return fail(res, 403, 'FORBIDDEN', 'You do not manage this court');
     }
 
+    // Walk-ins use the same pricing engine as players: the server derives the
+    // authoritative total from variable pricing + offers and rejects a client
+    // amount that drifts from it (one pricing path everywhere).
+    const start = new Date(start_at);
+    const end = new Date(end_at);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
+      return fail(res, 400, 'MANUAL_BOOKING_VALIDATION', 'Invalid time range');
+    }
+    const localDate = colomboDate(start_at);
+    const windows = await windowsForDay(client, court.venue_id, localDate);
+    if (windows.length === 0) {
+      return fail(res, 400, 'BOOKING_SLOT_UNAVAILABLE', 'The venue is closed on this date');
+    }
+    const slotStart = colomboTime(start_at);
+    const slotEnd = colomboTime(end_at);
+    if (!windows.some((w) => slotStart >= w.open_time && slotEnd <= w.close_time)) {
+      return fail(res, 400, 'BOOKING_SLOT_UNAVAILABLE', 'This booking must fit inside one opening window');
+    }
+
+    const pricing = await pricingEngine.computePricing(client, court, start_at, end_at);
+    const total = pricing.total;
+    if (amount !== undefined && Number(amount) !== total) {
+      return fail(res, 409, 'PRICE_DRIFT', `The price for this slot is ${total}; refresh and try again`);
+    }
+
     await client.query('begin');
     await client.query('savepoint manual_insert');
     try {
-      // The venue-entered amount is the total the walk-in pays; the platform
-      // and venue taxes are derived server-side from it (inclusive math,
-      // ADR-0021) and snapshotted like any booking.
+      // The derived total is the amount the walk-in pays; the platform and
+      // venue taxes are derived server-side from it (inclusive math, ADR-0021)
+      // and snapshotted like any booking.
       const platformRate = await getTaxRate();
-      const split = applyInclusiveTax(amount, platformRate, court.venue_tax_rate || 0);
+      const split = applyInclusiveTax(total, platformRate, court.venue_tax_rate || 0);
       const { rows } = await client.query(
-        `insert into bookings (court_id, user_id, start_at, end_at, price_per_slot, total_price, tax_rate, tax_amount, venue_tax_rate, venue_tax_amount, status, payment_method, player_name, player_phone, qr_token, idempotency_key)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'confirmed', 'cash', $11, $12, $13, $14)
+        `insert into bookings (court_id, user_id, start_at, end_at, price_per_slot, total_price, tax_rate, tax_amount, venue_tax_rate, venue_tax_amount, status, payment_method, player_name, player_phone, qr_token, idempotency_key, subtotal_amount, discount_amount)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'confirmed', 'cash', $11, $12, $13, $14, $15, $16)
          returning *`,
         [
           court_id, req.user.id, start_at, end_at,
-          court.price_per_slot, amount, split.platformRate, split.platformTax, split.venueRate, split.venueTax, player_name || null, player_phone || null,
+          pricing.slots[0]?.base_price ?? court.price_per_slot, total, split.platformRate, split.platformTax, split.venueRate, split.venueTax, player_name || null, player_phone || null,
           mintQrToken(),
-          `manual-${Math.random().toString(36).slice(2)}`
+          `manual-${Math.random().toString(36).slice(2)}`,
+          pricing.subtotal, pricing.discount
         ]
       );
       await client.query('commit');

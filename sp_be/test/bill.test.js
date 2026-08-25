@@ -138,7 +138,7 @@ describe('booking bills', () => {
         end_at: isoColombo(colomboDate(4), '12:00'),
         player_name: 'Walk-In Guest',
         player_phone: '0771234567',
-        amount: 1650
+        amount: 1500
       });
     expect(manual.status).toBe(201);
 

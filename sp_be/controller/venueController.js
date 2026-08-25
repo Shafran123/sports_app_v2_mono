@@ -93,8 +93,7 @@ exports.createVenue = async (req, res) => {
     for (const hour of hours || []) {
       await client.query(
         `insert into venue_hours (venue_id, day_of_week, open_time, close_time)
-         values ($1, $2, $3, $4)
-         on conflict (venue_id, day_of_week) do nothing`,
+         values ($1, $2, $3, $4)`,
         [venue.id, hour.day_of_week, hour.open_time, hour.close_time]
       );
     }

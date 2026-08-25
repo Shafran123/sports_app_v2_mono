@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatLkr, humanizeSlug } from "./format";
+import { formatDuration, formatLkr, humanizeSlug } from "./format";
 
 describe("formatLkr", () => {
   it("formats a whole number with en-LK grouping and Rs prefix", () => {
@@ -38,5 +38,20 @@ describe("humanizeSlug", () => {
 
   it("keeps common acronyms uppercase", () => {
     expect(humanizeSlug("ac")).toBe("AC");
+  });
+});
+
+describe("formatDuration", () => {
+  it("renders minutes, hours, and mixed", () => {
+    expect(formatDuration(45)).toBe("45m");
+    expect(formatDuration(90)).toBe("1h 30m");
+    expect(formatDuration(120)).toBe("2h");
+    expect(formatDuration(30)).toBe("30m");
+  });
+
+  it("returns an empty string for null/undefined/zero", () => {
+    expect(formatDuration(null)).toBe("");
+    expect(formatDuration(undefined)).toBe("");
+    expect(formatDuration(0)).toBe("");
   });
 });

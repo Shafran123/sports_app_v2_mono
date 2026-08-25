@@ -1,4 +1,4 @@
-export { formatLkr, humanizeSlug } from "./format";
+export { formatLkr, humanizeSlug, formatDuration } from "./format";
 export { normalizePhone } from "./phone";
 export {
   dayName,

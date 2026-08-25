@@ -9,6 +9,9 @@ const { publishBookingEvent } = require('../utils/publish');
 const notificationCatalog = require('../utils/notificationCatalog');
 const { getFlag, getTaxRate, applyInclusiveTax } = require('../utils/featureFlags');
 const billService = require('../utils/billService');
+const { colomboDate, colomboTime } = require('../utils/colombo');
+const { windowsForDay, effectiveAdvanceDays } = require('../services/venueEngine');
+const pricingEngine = require('../services/pricingEngine');
 
 const ACTIVE_BOOKING_STATES = ['confirmed', 'checked_in', 'completed', 'no_show'];
 
@@ -16,33 +19,11 @@ const ACTIVE_BOOKING_STATES = ['confirmed', 'checked_in', 'completed', 'no_show'
 // Production default 3 (spec/security hardening); tests may raise it.
 const HOLD_LIMIT = () => Number(process.env.HOLD_LIMIT || 3);
 
-// Convert an instant (UTC or offset ISO string) to Colombo wall-clock time
-// (+05:30) so that slot times compare correctly against local venue hours.
-function colomboLocal(dateStr) {
-  const d = new Date(dateStr);
-  return new Date(d.getTime() + (5 * 60 + 30) * 60 * 1000).toISOString();
-}
-
-// Weekday index (0=Sunday) of the LOCAL date the slot falls on. Mirrors the
-// availability engine's day lookup so both sides consult the same venue_hours row.
-// Noon local keeps the UTC date identical to the local date (local midnight would
-// fall on the previous UTC day for +05:30).
-function dayOfWeekOfColombo(dateStr) {
-  return new Date(`${colomboLocal(dateStr).slice(0, 10)}T12:00:00+05:30`).getUTCDay();
-}
-
 async function getHoldConfig() {
   const { rows } = await pool.query(
     `select value from platform_config where key = 'hold_minutes'`
   );
   return rows.length ? Number(rows[0].value) : 10;
-}
-
-async function getAdvanceDays() {
-  const { rows } = await pool.query(
-    `select value from platform_config where key = 'advance_days'`
-  );
-  return rows.length ? Number(rows[0].value) : 14;
 }
 
 // The venue-entered price is the inclusive total the player pays; this
@@ -137,8 +118,8 @@ exports.checkout = async (req, res) => {
       return fail(res, 400, 'BOOKING_SLOT_UNAVAILABLE', 'This slot is in the past');
     }
 
-    const advanceDays = await getAdvanceDays();
-    if (start > new Date(now.getTime() + advanceDays * 24 * 3600 * 1000)) {
+    const advanceDays = await effectiveAdvanceDays(client, court.venue_id);
+    if (advanceDays > 0 && start > new Date(now.getTime() + advanceDays * 24 * 3600 * 1000)) {
       return fail(res, 400, 'BOOKING_SLOT_UNAVAILABLE', 'This slot is beyond the booking window');
     }
 
@@ -147,20 +128,18 @@ exports.checkout = async (req, res) => {
       return fail(res, 400, 'BOOKING_SLOT_UNAVAILABLE', 'The duration does not align with slot length');
     }
 
-const dayOfWeek = dayOfWeekOfColombo(start_at);
-    const { rows: hoursRows } = await client.query(
-      `select open_time, close_time from venue_hours where venue_id = $1 and day_of_week = $2`,
-      [court.venue_id, dayOfWeek]
-    );
-    if (hoursRows.length === 0) {
+    // The booking must fit entirely inside one Opening Window — it never spans
+    // a mid-day closure or a Closed Date (windowsForDay already returns [] for
+    // closed dates, which is handled as "the venue is closed on this day").
+    const localDate = colomboDate(start_at);
+    const windows = await windowsForDay(client, court.venue_id, localDate);
+    if (windows.length === 0) {
       return fail(res, 400, 'BOOKING_SLOT_UNAVAILABLE', 'The venue is closed on this day');
     }
-    const open = hoursRows[0].open_time.slice(0, 5);
-    const close = hoursRows[0].close_time.slice(0, 5);
-    const slotStart = colomboLocal(start_at).slice(11, 16);
-    const slotEnd = colomboLocal(end_at).slice(11, 16);
-    if (slotStart < open || slotEnd > close) {
-      return fail(res, 400, 'BOOKING_SLOT_UNAVAILABLE', 'This slot is outside opening hours');
+    const slotStart = colomboTime(start_at);
+    const slotEnd = colomboTime(end_at);
+    if (!windows.some((w) => slotStart >= w.open_time && slotEnd <= w.close_time)) {
+      return fail(res, 400, 'BOOKING_SLOT_UNAVAILABLE', 'This booking must fit inside one opening window');
     }
 
     const overlaps = await client.query(
@@ -193,9 +172,11 @@ const dayOfWeek = dayOfWeekOfColombo(start_at);
       return fail(res, 409, 'BOOKING_SLOT_UNAVAILABLE', 'This slot is currently on hold');
     }
 
-    const listedTotal = Math.round((durationMin / court.slot_duration_min) * court.price_per_slot);
-    // Inclusive pricing (ADR-0021): the listed court price is the total the
-    // player pays; platform + venue taxes are carved out of it and snapshotted.
+    // Inclusive pricing (ADR-0021): the engine prices each slot (variable
+    // pricing + offers), the player pays the discounted total, and platform +
+    // venue taxes are carved out of it and snapshotted.
+    const pricing = await pricingEngine.computePricing(client, court, start_at, end_at);
+    const listedTotal = pricing.total;
     const split = applyInclusiveTax(listedTotal, taxRate, court.venue_tax_rate || 0);
     const amount = split.total;
 
@@ -207,10 +188,10 @@ const dayOfWeek = dayOfWeekOfColombo(start_at);
       await client.query('begin');
       try {
         const { rows: bookingRows } = await client.query(
-          `insert into bookings (court_id, user_id, start_at, end_at, price_per_slot, total_price, tax_rate, tax_amount, venue_tax_rate, venue_tax_amount, status, payment_method, player_name, player_phone, qr_token, idempotency_key)
-           values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'confirmed', 'cash', $11, $12, $13, $14)
+          `insert into bookings (court_id, user_id, start_at, end_at, price_per_slot, total_price, tax_rate, tax_amount, venue_tax_rate, venue_tax_amount, status, payment_method, player_name, player_phone, qr_token, idempotency_key, subtotal_amount, discount_amount)
+           values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'confirmed', 'cash', $11, $12, $13, $14, $15, $16)
            returning *`,
-          [court_id, req.user.id, start, end, court.price_per_slot, amount, split.platformRate, split.platformTax, split.venueRate, split.venueTax, req.user.name, req.user.phone, mintQrToken(), idempotency_key]
+          [court_id, req.user.id, start, end, pricing.slots[0]?.base_price ?? court.price_per_slot, amount, split.platformRate, split.platformTax, split.venueRate, split.venueTax, req.user.name, req.user.phone, mintQrToken(), idempotency_key, pricing.subtotal, pricing.discount]
         );
         await client.query('commit');
         await publishBookingEvent('booking.created', bookingRows[0].id);
@@ -257,10 +238,10 @@ const dayOfWeek = dayOfWeekOfColombo(start_at);
     // the subquery re-checks both limits inside the same statement that
     // writes the hold, so two racing requests cannot both succeed.
     const { rows: holdRows } = await client.query(
-      `insert into holds (court_id, user_id, start_at, end_at, expires_at, idempotency_key, player_phone, tax_rate, tax_amount, venue_tax_rate, venue_tax_amount)
-       select $1, $2, $3, $4, now() + ($5 || ' minutes')::interval, $6, $7, $8, $9, $10, $11
+      `insert into holds (court_id, user_id, start_at, end_at, expires_at, idempotency_key, player_phone, tax_rate, tax_amount, venue_tax_rate, venue_tax_amount, subtotal_amount, discount_amount)
+       select $1, $2, $3, $4, now() + ($5 || ' minutes')::interval, $6, $7, $8, $9, $10, $11, $12, $13
        where (
-         (select count(*) from holds h where h.user_id = $2 and h.expires_at > now()) < $12
+         (select count(*) from holds h where h.user_id = $2 and h.expires_at > now()) < $14
          and not exists (
            select 1 from holds h
            where h.court_id = $1 and h.expires_at > now() and h.user_id = $2
@@ -268,7 +249,7 @@ const dayOfWeek = dayOfWeekOfColombo(start_at);
          )
        )
        returning id, expires_at`,
-      [court_id, req.user.id, start, end, String(holdMinutes), idempotency_key, req.user.phone, split.platformRate, split.platformTax, split.venueRate, split.venueTax, HOLD_LIMIT()]
+      [court_id, req.user.id, start, end, String(holdMinutes), idempotency_key, req.user.phone, split.platformRate, split.platformTax, split.venueRate, split.venueTax, pricing.subtotal, pricing.discount, HOLD_LIMIT()]
     );
 
     if (holdRows.length === 0) {
@@ -315,13 +296,13 @@ const dayOfWeek = dayOfWeekOfColombo(start_at);
 
 async function computeAmount(client, courtId, start, end) {
   const { rows } = await client.query(
-    `select price_per_slot, slot_duration_min from courts where id = $1`,
+    `select * from courts where id = $1`,
     [courtId]
   );
   if (rows.length === 0) return 0;
   const court = rows[0];
-  const durationMin = (end - start) / 60000;
-  return Math.round((durationMin / court.slot_duration_min) * court.price_per_slot);
+  const pricing = await pricingEngine.computePricing(client, court, start.toISOString(), end.toISOString());
+  return pricing.total;
 }
 
 exports.getBooking = async (req, res) => {

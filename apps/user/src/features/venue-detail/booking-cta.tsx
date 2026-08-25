@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Button, buttonVariants } from "@myslot/ui";
-import { cn, formatLkr, formatTime12 } from "@myslot/utils";
+import { cn, formatDuration, formatLkr, formatTime12 } from "@myslot/utils";
 import type { SelectionSummary } from "./selection";
 
 function ContinueButton({ count, total, href, className }: { count: number; total: number; href: string; className?: string }) {
@@ -33,7 +33,7 @@ export function BookingCta({
   stacked?: boolean;
   className?: string;
 }) {
-  const { count, total, courtName, startAt, endAt } = summary;
+  const { count, durationMin, total, courtName, startAt, endAt } = summary;
   const timeRange = startAt && endAt ? `${formatTime12(startAt)} – ${formatTime12(endAt)}` : null;
 
   return (
@@ -46,9 +46,7 @@ export function BookingCta({
             </p>
             <p className="mt-0.5 font-display text-base font-extrabold text-ink">
               {formatLkr(total)}{" "}
-              <span className="text-xs font-medium text-ink-3">
-                {count} slot{count === 1 ? "" : "s"}
-              </span>
+              <span className="text-xs font-medium text-ink-3">{formatDuration(durationMin)}</span>
             </p>
           </>
         ) : (

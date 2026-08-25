@@ -1,9 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import {
   Bath,
   Car,
   Check,
+  Clock,
   CupSoda,
   Lightbulb,
   Lock,
@@ -16,8 +18,8 @@ import {
   Wind,
   type LucideIcon
 } from "lucide-react";
-import { Badge, Card } from "@myslot/ui";
-import { cn, dayName, formatLkr, humanizeSlug } from "@myslot/utils";
+import { Badge, Card, Dialog, DialogContent } from "@myslot/ui";
+import { dayName, formatLkr, humanizeSlug } from "@myslot/utils";
 import type { VenueDetail } from "@myslot/types";
 
 const DAYS = [0, 1, 2, 3, 4, 5, 6];
@@ -36,15 +38,6 @@ function amenityIcon(amenity: string): LucideIcon {
   return Check;
 }
 
-function clock12(time: string): string {
-  const m = /^(\d{1,2}):(\d{2})/.exec(time);
-  if (!m) return time;
-  const h = Number(m[1]);
-  const suffix = h >= 12 ? "PM" : "AM";
-  const hh = h % 12 === 0 ? 12 : h % 12;
-  return `${hh}:${m[2]} ${suffix}`;
-}
-
 function mapsUrl(venue: VenueDetail): string {
   if (venue.lat != null && venue.lng != null) {
     return `https://www.google.com/maps/search/?api=1&query=${venue.lat},${venue.lng}`;
@@ -56,7 +49,7 @@ function mapsUrl(venue: VenueDetail): string {
 export function VenueInfo({ venue }: { venue: VenueDetail }) {
   const rating = (venue as VenueDetail & { rating?: number | null }).rating;
   const location = [venue.address, venue.city].filter(Boolean).join(", ");
-  const todayDow = new Date().getDay();
+  const [hoursOpen, setHoursOpen] = useState(false);
 
   return (
     <div className="space-y-8">
@@ -79,6 +72,19 @@ export function VenueInfo({ venue }: { venue: VenueDetail }) {
               <Navigation className="h-4 w-4" aria-hidden="true" />
               Get directions
             </a>
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-ink-2">
+              <span className="inline-flex items-center gap-1">
+                <Clock className="h-3.5 w-3.5 shrink-0 text-ink-3" aria-hidden="true" />
+                {todayHoursLabel(venue)}
+              </span>
+              <button
+                type="button"
+                onClick={() => setHoursOpen(true)}
+                className="inline-flex items-center gap-0.5 font-semibold text-primary transition-colors hover:text-primary-hover"
+              >
+                More info
+              </button>
+            </div>
           </div>
           {venue.min_price != null && (
             <p className="text-sm text-ink-3">
@@ -133,32 +139,68 @@ export function VenueInfo({ venue }: { venue: VenueDetail }) {
         )}
       </div>
 
-      <Card className="p-5">
-        <h2 className="font-semibold tracking-tight text-ink">Opening hours</h2>
-        <div className="mt-2 divide-y divide-border">
-          {DAYS.map((dow) => {
-            const entries = venue.hours.filter((h) => h.day_of_week === dow);
-            const isToday = dow === todayDow;
-            return (
-              <div key={dow} className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
-                <span className={cn("text-sm font-medium", isToday ? "text-primary" : "text-ink")}>
-                  {dayName(dow)}
-                  {isToday && (
-                    <span className="ml-1.5 text-[10px] font-bold uppercase tracking-wide text-primary">Today</span>
-                  )}
-                </span>
-                <span className="text-sm text-ink-2">
-                  {entries.length > 0 ? (
-                    entries.map((e) => `${clock12(e.open_time)} – ${clock12(e.close_time)}`).join(" · ")
-                  ) : (
-                    <span className="text-ink-3">Closed</span>
-                  )}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      </Card>
+      <OpeningHoursModal open={hoursOpen} onClose={() => setHoursOpen(false)} venue={venue} />
     </div>
+  );
+}
+
+export function clock12(time: string): string {
+  const m = /^(\d{1,2}):(\d{2})/.exec(time);
+  if (!m) return time;
+  const h = Number(m[1]);
+  const suffix = h >= 12 ? "PM" : "AM";
+  const hh = h % 12 === 0 ? 12 : h % 12;
+  return `${hh}:${m[2]} ${suffix}`;
+}
+
+// One-line summary of today's opening windows for the venue header.
+export function todayHoursLabel(venue: VenueDetail): string {
+  const todayDow = new Date().getDay();
+  const entries = venue.hours.filter((h) => Number(h.day_of_week) === todayDow);
+  if (entries.length === 0) return "Closed today";
+  return `Open today · ${entries.map((e) => `${clock12(e.open_time)} – ${clock12(e.close_time)}`).join(" · ")}`;
+}
+
+// Modal with the full week's opening windows — opened from the venue header
+// "More info" link. Multi-window days list each window.
+export function OpeningHoursModal({
+  open,
+  onClose,
+  venue
+}: {
+  open: boolean;
+  onClose: () => void;
+  venue: VenueDetail;
+}) {
+  const todayDow = new Date().getDay();
+
+  return (
+    <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose(); }}>
+      {open && (
+        <DialogContent title="Opening hours" description={venue.name} onClose={onClose}>
+          <div className="mt-2 divide-y divide-border">
+            {DAYS.map((dow) => {
+              const entries = venue.hours.filter((h) => Number(h.day_of_week) === dow);
+              const isToday = dow === todayDow;
+              return (
+                <div key={dow} className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
+                  <span className={`text-sm font-medium ${isToday ? "text-primary" : "text-ink"}`}>
+                    {dayName(dow)}
+                    {isToday && <span className="ml-1.5 text-[10px] font-bold uppercase tracking-wide text-primary">Today</span>}
+                  </span>
+                  <span className="text-sm text-ink-2">
+                    {entries.length > 0 ? (
+                      entries.map((e) => `${clock12(e.open_time)} – ${clock12(e.close_time)}`).join(" · ")
+                    ) : (
+                      <span className="text-ink-3">Closed</span>
+                    )}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </DialogContent>
+      )}
+    </Dialog>
   );
 }

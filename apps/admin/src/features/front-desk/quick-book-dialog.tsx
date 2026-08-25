@@ -67,9 +67,12 @@ export function QuickBookDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [courtId, selectedCourt?.court_id]);
 
-  const pickSlot = (slot: { start_at: string; end_at: string }) => {
+  const pickSlot = (slot: { start_at: string; end_at: string; price?: number; offer_price?: number | null }) => {
     setStartAt(slot.start_at);
     setEndAt(slot.end_at);
+    const base = slot.price ?? selectedCourt?.price_per_slot ?? 0;
+    setPricePerSlot(base);
+    setAmount(String(slot.offer_price != null && slot.offer_price < base ? slot.offer_price : base));
   };
 
   const canSubmit = !!courtId && !!startAt && !!endAt && Number(amount) > 0;
@@ -196,7 +199,10 @@ export function QuickBookDialog({
             </label>
             <Input id="qb-amount" type="number" min={0} value={amount} onChange={(e) => setAmount(e.target.value)} />
             {pricePerSlot > 0 && (
-              <p className="text-xs text-ink-3">Court price: {formatLkr(pricePerSlot)}</p>
+              <p className="text-xs text-ink-3">
+                Slot price: {formatLkr(pricePerSlot)}
+                {Number(amount) < pricePerSlot && Number(amount) > 0 ? " (offer applied)" : ""}
+              </p>
             )}
           </div>
 

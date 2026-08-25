@@ -5,8 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/auth";
-import { ArrowLeft, Clock, Info, Lock, MapPin, Plus, RefreshCw, Trash2 } from "lucide-react";
-import { courts, sports, venues, business, getClient, toApiFailure } from "@myslot/api";
+import { ArrowLeft, Info, Lock, MapPin, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { courts, sports, venues, business, toApiFailure } from "@myslot/api";
 import {
   Badge,
   Button,
@@ -23,18 +23,20 @@ import {
   TabsList,
   TabsTrigger
 } from "@myslot/ui";
-import { dayName, formatLkr } from "@myslot/utils";
-import type { Block, VenueHours } from "@myslot/types";
+import { formatLkr } from "@myslot/utils";
+import type { Block } from "@myslot/types";
 import { fetchMyVenues, fetchOwnerCourts } from "./venue-api";
 import { PhotoUploader } from "./photo-uploader";
+import { HoursEditor } from "./hours-editor";
+import { ClosedDatesEditor } from "./closed-dates-editor";
+import { PricingRulesEditor } from "./pricing-rules-editor";
+import { OffersEditor } from "./offers-editor";
 
 const STATUS_LABEL: Record<string, string> = {
   pending: "Pending",
   approved: "Approved",
   rejected: "Rejected"
 };
-
-const DAYS = 7;
 
 interface CourtDraft {
   name: string;
@@ -53,9 +55,6 @@ const blankCourtDraft = (): CourtDraft => ({
   capacity: "",
   is_indoor: false
 });
-
-const blankDays = (): VenueHours[] =>
-  Array.from({ length: DAYS }, (_, i) => ({ day_of_week: i, open_time: "", close_time: "" }));
 
 function formatBlockRange(iso: string): string {
   const d = new Date(iso);
@@ -112,26 +111,22 @@ export function VenueDetailPage({ venueId }: { venueId: string }) {
     enabled: venueCourts.length > 0
   });
 
-  const [hours, setHours] = useState<VenueHours[]>(blankDays());
-  const [savingHours, setSavingHours] = useState(false);
-  const [hoursError, setHoursError] = useState("");
-  const [hoursNotice, setHoursNotice] = useState("");
-
-  useEffect(() => {
-    if (!detailQuery.data?.hours) return;
-    setHours(
-      Array.from({ length: DAYS }, (_, i) => {
-        const h = detailQuery.data.hours.find((x) => Number(x.day_of_week) === i);
-        return { day_of_week: i, open_time: h?.open_time ?? "", close_time: h?.close_time ?? "" };
-      })
-    );
-  }, [detailQuery.data?.hours]);
-
   const [courtDraft, setCourtDraft] = useState<CourtDraft>(blankCourtDraft());
   const [addingCourt, setAddingCourt] = useState(false);
   const [courtError, setCourtError] = useState("");
   const [togglingCourtId, setTogglingCourtId] = useState<string | null>(null);
   const [courtActionError, setCourtActionError] = useState("");
+
+  const [tab, setTab] = useState("courts");
+  const [pricingDirty, setPricingDirty] = useState(false);
+
+  const handleTabChange = (next: string) => {
+    if (next !== "pricing" && tab === "pricing" && pricingDirty && !window.confirm("Discard unsaved pricing changes?")) {
+      return;
+    }
+    setTab(next);
+    if (next !== "pricing") setPricingDirty(false);
+  };
 
   const [blockForms, setBlockForms] = useState<Record<string, { start: string; end: string; reason: string }>>({});
   const [blockBusyId, setBlockBusyId] = useState<string | null>(null);
@@ -229,42 +224,6 @@ export function VenueDetailPage({ venueId }: { venueId: string }) {
       setCourtActionError(toApiFailure(err).message);
     } finally {
       setTogglingCourtId(null);
-    }
-  };
-
-  const updateHour = (day: number, field: "open_time" | "close_time", value: string) => {
-    setHours((prev) => prev.map((h) => (h.day_of_week === day ? { ...h, [field]: value } : h)));
-  };
-
-  const saveHours = async () => {
-    setHoursError("");
-    setHoursNotice("");
-    for (const h of hours) {
-      if (Boolean(h.open_time) !== Boolean(h.close_time)) {
-        setHoursError(
-          `Set both open and close time for ${dayName(h.day_of_week)}, or leave both blank to mark it closed.`
-        );
-        return;
-      }
-      if (h.open_time && h.close_time && h.close_time <= h.open_time) {
-        setHoursError(`Close time must be after open time for ${dayName(h.day_of_week)}.`);
-        return;
-      }
-    }
-    setSavingHours(true);
-    try {
-      await business.updateVenueHours(
-        venueId,
-        hours
-          .filter((h) => Boolean(h.open_time) && Boolean(h.close_time))
-          .map((h) => ({ day_of_week: h.day_of_week, open_time: h.open_time!, close_time: h.close_time! }))
-      );
-      setHoursNotice("Opening hours saved.");
-      queryClient.invalidateQueries({ queryKey: ["venue-detail", venueId] });
-    } catch (err) {
-      setHoursError(toApiFailure(err).message);
-    } finally {
-      setSavingHours(false);
     }
   };
 
@@ -400,10 +359,13 @@ export function VenueDetailPage({ venueId }: { venueId: string }) {
         </div>
       )}
 
-      <Tabs defaultValue="courts">
+      <Tabs value={tab} onValueChange={handleTabChange}>
         <TabsList className="w-full max-w-full overflow-x-auto lg:w-auto">
           <TabsTrigger value="courts" className="shrink-0">Courts</TabsTrigger>
           <TabsTrigger value="hours" className="shrink-0">Hours</TabsTrigger>
+          <TabsTrigger value="closed" className="shrink-0">Closed dates</TabsTrigger>
+          <TabsTrigger value="pricing" className="shrink-0">Pricing</TabsTrigger>
+          <TabsTrigger value="offers" className="shrink-0">Offers</TabsTrigger>
           <TabsTrigger value="blocks" className="shrink-0">Blocks</TabsTrigger>
           <TabsTrigger value="settings" className="shrink-0">Settings</TabsTrigger>
         </TabsList>
@@ -565,56 +527,44 @@ export function VenueDetailPage({ venueId }: { venueId: string }) {
                 <Info className="mt-0.5 h-4 w-4 shrink-0" />
                 <p>
                   Opening hours are only visible to players once your venue is approved. You can still
-                  set them below — we'll show them as soon as your venue goes live.
+                  set them below — we&apos;ll show them as soon as your venue goes live.
                 </p>
               </div>
             )}
-            <Card className="p-5 md:p-6">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h2 className="font-display text-lg font-extrabold tracking-tight text-ink">
-                    Opening hours
-                  </h2>
-                  <p className="mt-0.5 text-xs text-ink-3">Leave a day blank to mark it closed.</p>
-                </div>
-                <Button type="button" onClick={saveHours} loading={savingHours}>
-                  {savingHours ? "Saving…" : "Save hours"}
-                </Button>
-              </div>
-              <div className="mt-4 space-y-2">
-                {hours.map((hour) => (
-                  <div
-                    key={hour.day_of_week}
-                    className="grid grid-cols-2 items-center gap-2 rounded-2xl bg-surface-2/60 px-3 py-2.5 sm:grid-cols-[9rem_1fr_1fr] sm:gap-3"
-                  >
-                    <span className="col-span-2 flex items-center gap-1.5 text-sm font-medium text-ink sm:col-span-1">
-                      <Clock className="h-3.5 w-3.5 text-ink-3" /> {dayName(hour.day_of_week)}
-                    </span>
-                    <Input
-                      type="time"
-                      aria-label={`${dayName(hour.day_of_week)} open time`}
-                      value={hour.open_time}
-                      onChange={(e) => updateHour(hour.day_of_week, "open_time", e.target.value)}
-                    />
-                    <Input
-                      type="time"
-                      aria-label={`${dayName(hour.day_of_week)} close time`}
-                      value={hour.close_time}
-                      onChange={(e) => updateHour(hour.day_of_week, "close_time", e.target.value)}
-                    />
-                  </div>
-                ))}
-              </div>
-              {hoursError && (
-                <p className="mt-3 rounded-lg bg-error-light px-3 py-2 text-sm text-error">{hoursError}</p>
-              )}
-              {hoursNotice && (
-                <p className="mt-3 flex items-center gap-1.5 rounded-lg bg-success-light px-3 py-2 text-sm text-success">
-                  {hoursNotice}
-                </p>
-              )}
-            </Card>
+            {detailQuery.data ? (
+              <HoursEditor
+                venueId={venueId}
+                hours={detailQuery.data.hours ?? []}
+                advanceDays={detailQuery.data.advance_days}
+                onSaved={() => {
+                  void queryClient.invalidateQueries({ queryKey: ["venue-detail", venueId] });
+                  void queryClient.invalidateQueries({ queryKey: ["my-venues"] });
+                }}
+              />
+            ) : (
+              <Skeleton className="h-64 w-full rounded-3xl" />
+            )}
           </div>
+        </TabsContent>
+
+        <TabsContent value="closed">
+          {venueCourts.length >= 0 && <ClosedDatesEditor venueId={venueId} />}
+        </TabsContent>
+
+        <TabsContent value="pricing">
+          {venueCourts.length === 0 ? (
+            <EmptyState title="No courts yet" message="Add a court before setting pricing rules." />
+          ) : (
+            <PricingRulesEditor
+              venueCourts={venueCourts}
+              hours={detailQuery.data?.hours ?? []}
+              onDirtyChange={setPricingDirty}
+            />
+          )}
+        </TabsContent>
+
+        <TabsContent value="offers">
+          <OffersEditor venueId={venueId} venueCourts={venueCourts} />
         </TabsContent>
 
         <TabsContent value="blocks">

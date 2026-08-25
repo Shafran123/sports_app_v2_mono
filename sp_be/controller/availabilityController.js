@@ -1,39 +1,9 @@
 const pool = require('../db');
 const { ok, fail } = require('../utils/response');
 const logger = require('../utils/logger');
-
-function isoColombo(dateStr, timeStr) {
-  return `${dateStr}T${timeStr}:00+05:30`;
-}
-
-function dayOfWeekOf(dateStr) {
-  // Noon local (+05:30) so the UTC date always matches the local date — using
-  // local midnight would land on the previous UTC day and return the wrong weekday.
-  return new Date(`${dateStr}T12:00:00+05:30`).getUTCDay();
-}
-
-function buildSlots(openTime, closeTime, durationMin, dateStr) {
-  const slots = [];
-  const [openH, openM] = openTime.split(':').map(Number);
-  const [closeH, closeM] = closeTime.split(':').map(Number);
-
-  let hour = openH;
-  let minute = openM;
-
-  while (hour * 60 + minute + durationMin <= closeH * 60 + closeM) {
-    const start = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
-    let endMin = minute + durationMin;
-    let endHour = hour + Math.floor(endMin / 60);
-    endMin = endMin % 60;
-    const end = `${String(endHour).padStart(2, '0')}:${String(endMin).padStart(2, '0')}`;
-    slots.push({ start_time: start, end_time: end });
-    minute += durationMin;
-    hour += Math.floor(minute / 60);
-    minute = minute % 60;
-  }
-
-  return slots;
-}
+const { isoColombo } = require('../utils/colombo');
+const { windowsForDay, effectiveAdvanceDays, slotsForWindows } = require('../services/venueEngine');
+const { slotPricing } = require('../services/pricingEngine');
 
 async function getOverlaps(courtIds, dayStart, dayEnd) {
   const [bookings, holds, blocks] = await Promise.all([
@@ -95,74 +65,108 @@ exports.getAvailability = async (req, res) => {
       return fail(res, 404, 'VENUE_NOT_FOUND', 'Venue not found');
     }
 
-    const dayOfWeek = dayOfWeekOf(date);
+    const windows = await windowsForDay(pool, id, date);
+    const advanceDays = await effectiveAdvanceDays(pool, id);
 
-    const [hoursRes, courtsRes, configRes] = await Promise.all([
-      pool.query(
-        `select open_time, close_time from venue_hours where venue_id = $1 and day_of_week = $2`,
-        [id, dayOfWeek]
-      ),
-      pool.query(
-        `select c.id, c.name, c.price_per_slot, c.slot_duration_min, s.name as sport
-         from courts c left join sports s on s.id = c.sport_id
-         where c.venue_id = $1 and c.is_active
-         order by c.name`,
-        [id]
-      ),
-      pool.query(`select value from platform_config where key = 'advance_days'`)
-    ]);
+    // Best active venue-wide offer for the requested date, so the player can
+    // see the promotion before checkout. Venue-wide offers apply to the whole
+    // booking at checkout; this only drives the pre-checkout badge.
+    const venueOffer = await activeVenueOffer(pool, id, date);
 
-    if (hoursRes.rows.length === 0) {
-      return ok(res, 200, { date, courts: [] });
+    if (windows.length === 0) {
+      return ok(res, 200, { date, advance_days: advanceDays, venue_offer: venueOffer, courts: [] });
     }
 
-    const open_time = hoursRes.rows[0].open_time.slice(0, 5);
-    const close_time = hoursRes.rows[0].close_time.slice(0, 5);
-    const advanceDays = configRes.rows.length ? Number(configRes.rows[0].value) : 14;
-
-    const dayStart = isoColombo(date, open_time);
-    const dayEnd = isoColombo(date, close_time);
+    const dayStart = isoColombo(date, windows[0].open_time);
+    const dayEnd = isoColombo(date, windows[windows.length - 1].close_time);
     const now = new Date();
 
-    const courtIds = courtsRes.rows.map((c) => c.id);
+    const { rows: courtsRes } = await pool.query(
+      `select c.id, c.venue_id, c.name, c.price_per_slot, c.slot_duration_min, s.name as sport
+       from courts c left join sports s on s.id = c.sport_id
+       where c.venue_id = $1 and c.is_active
+       order by c.name`,
+      [id]
+    );
+
+    const courtIds = courtsRes.map((c) => c.id);
     const overlaps = await getOverlaps(courtIds, dayStart, dayEnd);
 
-    const courts = courtsRes.rows.map((court) => {
-      const slots = buildSlots(open_time, close_time, court.slot_duration_min, date);
+    const courts = [];
+    for (const court of courtsRes) {
+      const rawSlots = slotsForWindows(windows, court.slot_duration_min);
       const courtOverlaps = overlaps.get(court.id) || [];
 
-      return {
+      const slots = [];
+      for (const raw of rawSlots) {
+        const start = new Date(isoColombo(date, raw.start_time));
+        const end = new Date(isoColombo(date, raw.end_time));
+
+        let state = 'available';
+        if (end <= now) {
+          state = 'past';
+        } else if (advanceDays > 0 && start > new Date(now.getTime() + advanceDays * 24 * 3600 * 1000)) {
+          state = 'outside_window';
+        } else {
+          for (const overlap of courtOverlaps) {
+            if (start < new Date(overlap.end) && end > new Date(overlap.start)) {
+              state = overlap.type === 'hold' ? 'held' : overlap.type === 'block' ? 'blocked' : 'booked';
+              break;
+            }
+          }
+        }
+
+        const pricing = await slotPricing(pool, court, date, raw.start_time);
+        slots.push({
+          start_at: start.toISOString(),
+          end_at: end.toISOString(),
+          state,
+          price: pricing.base_price,
+          offer_price: pricing.offer_price
+        });
+      }
+
+      courts.push({
         court_id: court.id,
         name: court.name,
         sport: court.sport,
         price_per_slot: court.price_per_slot,
         slot_duration_min: court.slot_duration_min,
-        slots: slots.map((slot) => {
-          const start = new Date(isoColombo(date, slot.start_time));
-          const end = new Date(isoColombo(date, slot.end_time));
+        slots
+      });
+    }
 
-          let state = 'available';
-          if (end <= now) {
-            state = 'past';
-          } else if (start > new Date(now.getTime() + advanceDays * 24 * 3600 * 1000)) {
-            state = 'outside_window';
-          } else {
-            for (const overlap of courtOverlaps) {
-              if (start < new Date(overlap.end) && end > new Date(overlap.start)) {
-                state = overlap.type === 'hold' ? 'held' : overlap.type === 'block' ? 'blocked' : 'booked';
-                break;
-              }
-            }
-          }
-
-          return { start_at: start.toISOString(), end_at: end.toISOString(), state };
-        })
-      };
-    });
-
-    ok(res, 200, { date, courts });
+    ok(res, 200, { date, advance_days: advanceDays, venue_offer: venueOffer, courts });
   } catch (error) {
     logger.error(`Error fetching availability: ${error.message}`);
     fail(res, 500, 'INTERNAL_SERVER_ERROR', 'Something went wrong');
   }
 };
+
+// Best venue-wide offer active for the venue on `dateStr`, or null. The best
+// (largest discount on a Rs 100 base) is returned for the header badge.
+async function activeVenueOffer(client, venueId, dateStr) {
+  const { rows } = await client.query(
+    `select discount_type, percent, flat_amount
+     from offers
+     where venue_id = $1 and kind = 'venue' and is_active = true
+       and (start_date is null or start_date <= $2::date)
+       and (end_date is null or end_date >= $2::date)`,
+    [venueId, dateStr]
+  );
+  let best = null;
+  let bestScore = -1;
+  for (const row of rows) {
+    const score = row.discount_type === 'percent'
+      ? Number(row.percent) || 0
+      : (Number(row.flat_amount) || 0) / 100;
+    if (score > bestScore) {
+      bestScore = score;
+      best = {
+        discount_type: row.discount_type,
+        value: row.discount_type === 'percent' ? Number(row.percent) || 0 : Number(row.flat_amount) || 0
+      };
+    }
+  }
+  return best;
+}

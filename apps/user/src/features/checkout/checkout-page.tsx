@@ -7,10 +7,12 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Banknote, ShieldCheck, Wallet } from "lucide-react";
 import { bookings, featureFlags, toApiFailure, venues } from "@myslot/api";
 import { Badge, Button, Card, CardContent, CountdownPill, ErrorState, Skeleton } from "@myslot/ui";
-import { formatDateLong, formatLkr, formatTime12, uuidV4 } from "@myslot/utils";
+import { formatDateLong, formatDuration, formatLkr, formatTime12, uuidV4 } from "@myslot/utils";
 import { useAuth } from "@/context/auth";
 import { submitPayHere } from "@myslot/api";
 import { VerifyPhoneModal } from "@/features/verify-phone/verify-phone-modal";
+import type { VenueOffer } from "@myslot/types";
+import { applyVenueOffer } from "@/features/venue-detail/selection";
 
 type PaymentMethod = "online" | "cash";
 
@@ -39,7 +41,11 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
   const venueNameParam = searchParams?.get("venue") ?? "";
   const courtNameParam = searchParams?.get("court") ?? "";
   const rawPricePerSlot = searchParams?.get("price_per_slot");
+  const rawBasePricePerSlot = searchParams?.get("base_price_per_slot");
   const rawSlots = searchParams?.get("slots");
+  const rawSlotMin = searchParams?.get("slot_min");
+  const rawVenueOfferType = searchParams?.get("venue_offer_type");
+  const rawVenueOfferValue = searchParams?.get("venue_offer_value");
 
   const incomplete = !courtId || !startAt || !endAt;
 
@@ -260,19 +266,40 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
   }
 
   const pricePerSlot = rawPricePerSlot ? Number(rawPricePerSlot) : null;
+  const basePricePerSlot = rawBasePricePerSlot ? Number(rawBasePricePerSlot) : null;
+  const durationMin = rawSlotMin ? Number(rawSlotMin) : null;
   const slotsCount = rawSlots
     ? Number(rawSlots)
     : pricePerSlot && pricePerSlot > 0 && result?.amount
       ? Math.max(1, Math.round(result.amount / pricePerSlot))
       : null;
   const rateLine =
-    slotsCount && pricePerSlot
-      ? `${slotsCount} × ${formatLkr(pricePerSlot)}`
-      : pricePerSlot
-        ? formatLkr(pricePerSlot)
-        : null;
-  const rateTotal =
-    slotsCount && pricePerSlot ? slotsCount * pricePerSlot : (result?.amount ?? 0);
+    durationMin && durationMin > 0
+      ? `${formatDuration(durationMin)} × ${formatLkr(pricePerSlot ?? 0)}`
+      : slotsCount && pricePerSlot
+        ? `${slotsCount} × ${formatLkr(pricePerSlot)}`
+        : pricePerSlot
+          ? formatLkr(pricePerSlot)
+          : null;
+  // The server is authoritative for what the player pays (offers, variable
+  // pricing, tax carve-out). The URL-derived rate is only a display fallback.
+  const serverTotal = result?.amount ?? null;
+  const baseTotal = slotsCount && basePricePerSlot ? slotsCount * basePricePerSlot : null;
+  const savings = serverTotal != null && baseTotal != null && baseTotal > serverTotal
+    ? baseTotal - serverTotal
+    : 0;
+
+  // Venue-wide offer carried from the venue page (availability.venue_offer).
+  // Pre-checkout the server hasn't priced yet (cash doesn't auto-fire), so we
+  // show the venue-wide-discounted total for display; the server amount wins
+  // once the checkout responds.
+  const venueOffer: VenueOffer | null =
+    (rawVenueOfferType === "percent" || rawVenueOfferType === "flat") && rawVenueOfferValue
+      ? { discount_type: rawVenueOfferType, value: Number(rawVenueOfferValue) }
+      : null;
+  const displaySubtotal = slotsCount && pricePerSlot ? slotsCount * pricePerSlot : 0;
+  const venueOfferAdj = applyVenueOffer(displaySubtotal, venueOffer);
+  const displayTotal = serverTotal ?? venueOfferAdj.total;
 
   if (!result) {
     const pausedAndNoCash = !onlineAvailable && !acceptsCash;
@@ -361,9 +388,21 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
                     <div className="flex items-baseline justify-between">
                       <span className="text-sm text-ink-2">Total</span>
                       <span className="font-display text-2xl font-extrabold tabular-nums text-ink">
-                        {formatLkr(rateTotal)}
+                        {formatLkr(displayTotal)}
                       </span>
                     </div>
+                    {venueOffer && (
+                      <p className="mt-1 text-xs font-medium text-success">
+                        {venueOffer.discount_type === "percent"
+                          ? `Venue-wide ${venueOffer.value}% off — you save ${formatLkr(venueOfferAdj.discount)}`
+                          : `Venue-wide offer — you save ${formatLkr(venueOfferAdj.discount)}`}
+                      </p>
+                    )}
+                    {savings > 0 && (
+                      <p className="mt-1 text-xs font-medium text-success">
+                        You saved {formatLkr(savings)} — {formatLkr(baseTotal ?? 0)} originally
+                      </p>
+                    )}
                     {venueTaxRate > 0 && (
                       <p className="mt-1 text-xs text-ink-3">
                         Total includes {venueTaxRate}% Venue Tax and the platform tax.
@@ -441,6 +480,18 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
               {formatLkr(result.amount)}
             </span>
           </div>
+          {venueOffer && (
+            <p className="mt-1 text-xs font-medium text-success">
+              {venueOffer.discount_type === "percent"
+                ? `Venue-wide ${venueOffer.value}% off — you save ${formatLkr(venueOfferAdj.discount)}`
+                : `Venue-wide offer — you save ${formatLkr(venueOfferAdj.discount)}`}
+            </p>
+          )}
+          {savings > 0 && (
+            <p className="mt-1 text-xs font-medium text-success">
+              You saved {formatLkr(savings)} — {formatLkr(baseTotal ?? 0)} originally
+            </p>
+          )}
           <Button
             size="lg"
             loading={paying}

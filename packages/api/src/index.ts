@@ -9,6 +9,8 @@ import {
   BusinessOverviewSchema,
   BookingSchema,
   CheckoutResultSchema,
+  ClosedDateSchema,
+  CourtPricingRuleSchema,
   CourtSchema,
   EventRegisterResultSchema,
   EventSchema,
@@ -17,6 +19,7 @@ import {
   MyVenueSchema,
   NotificationSchema,
   NudgeResultSchema,
+  OfferSchema,
   OwnerAgreementSchema,
   OwnerCreateResultSchema,
   OwnerLeadSchema,
@@ -327,6 +330,79 @@ export const business = {
     client: AxiosInstance = getClient()
   ) {
     const res = await client.put(`/business/venues/${venueId}/hours`, { hours });
+    return res.data;
+  },
+  async updateAdvanceDays(venueId: string, advanceDays: number, client: AxiosInstance = getClient()) {
+    const res = await client.put(`/business/venues/${venueId}/advance-days`, { advance_days: advanceDays });
+    return res.data;
+  },
+  async listClosedDates(venueId: string, client: AxiosInstance = getClient()) {
+    const res = await client.get(`/business/venues/${venueId}/closed-dates`);
+    return parseList(ClosedDateSchema, res.data.data ?? res.data);
+  },
+  async addClosedDate(venueId: string, input: { closed_date: string; reason?: string }, client: AxiosInstance = getClient()) {
+    const res = await client.post(`/business/venues/${venueId}/closed-dates`, input);
+    return parseData(ClosedDateSchema, res.data.data ?? res.data);
+  },
+  async removeClosedDate(venueId: string, closedDate: string, client: AxiosInstance = getClient()) {
+    const res = await client.delete(`/business/venues/${venueId}/closed-dates/${closedDate}`);
+    return res.data;
+  },
+  async listPricingRules(courtId: string, client: AxiosInstance = getClient()) {
+    const res = await client.get(`/business/courts/${courtId}/pricing`);
+    return parseList(CourtPricingRuleSchema, res.data.data ?? res.data);
+  },
+  async addPricingRule(
+    courtId: string,
+    input: { day_of_week: number | null; start_time: string; end_time: string; price_per_slot: number },
+    client: AxiosInstance = getClient()
+  ) {
+    const res = await client.post(`/business/courts/${courtId}/pricing`, input);
+    return parseData(CourtPricingRuleSchema, res.data.data ?? res.data);
+  },
+  async replacePricingRules(
+    courtId: string,
+    rules: { day_of_week: number | null; start_time: string; end_time: string; price_per_slot: number }[],
+    client: AxiosInstance = getClient()
+  ) {
+    const res = await client.put(`/business/courts/${courtId}/pricing`, { rules });
+    return parseList(CourtPricingRuleSchema, res.data.data ?? res.data);
+  },
+  async deletePricingRule(ruleId: string, client: AxiosInstance = getClient()) {
+    const res = await client.delete(`/business/pricing/${ruleId}`);
+    return res.data;
+  },
+  async listOffers(venueId: string, client: AxiosInstance = getClient()) {
+    const res = await client.get(`/business/venues/${venueId}/offers`);
+    return parseList(OfferSchema, res.data.data ?? res.data);
+  },
+  async createOffer(
+    venueId: string,
+    input: {
+      kind: "venue" | "slot";
+      discount_type: "percent" | "flat";
+      percent?: number;
+      flat_amount?: number;
+      start_date?: string;
+      end_date?: string;
+      scopes?: string[];
+      windows?: { day_of_week: number | null; start_time: string; end_time: string }[];
+    },
+    client: AxiosInstance = getClient()
+  ) {
+    const res = await client.post(`/business/venues/${venueId}/offers`, input);
+    return parseData(OfferSchema, res.data.data ?? res.data);
+  },
+  async updateOffer(
+    offerId: string,
+    input: { is_active?: boolean; start_date?: string | null; end_date?: string | null },
+    client: AxiosInstance = getClient()
+  ) {
+    const res = await client.patch(`/business/offers/${offerId}`, input);
+    return parseData(OfferSchema, res.data.data ?? res.data);
+  },
+  async deleteOffer(offerId: string, client: AxiosInstance = getClient()) {
+    const res = await client.delete(`/business/offers/${offerId}`);
     return res.data;
   },
   async createBlock(

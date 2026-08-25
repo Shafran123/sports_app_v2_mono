@@ -275,6 +275,65 @@ describe("CheckoutPage venue/court display", () => {
   });
 });
 
+describe("CheckoutPage venue-wide offer display", () => {
+  it("shows the reduced total and an offer line on the cash confirmation with a venue-wide offer", async () => {
+    vi.mocked(venues.detail).mockResolvedValue(cashVenue as never);
+    vi.mocked(bookings.checkout).mockResolvedValue({ ...cashResult, amount: 1200, booking: { ...cashResult.booking!, total_price: 1200 } } as never);
+
+    vi.mocked(useSearchParams).mockReturnValue(
+      new URLSearchParams({
+        court_id: "court-1",
+        start_at: "2026-08-22T04:30:00.000Z",
+        end_at: "2026-08-22T05:30:00.000Z",
+        venue: "Smash Arena",
+        court: "Court 1",
+        price_per_slot: "1500",
+        base_price_per_slot: "1500",
+        slots: "1",
+        slot_min: "60",
+        venue_offer_type: "percent",
+        venue_offer_value: "20"
+      })
+    );
+
+    renderPage();
+    const cashOption = await screen.findByTestId("method-cash");
+    await userEvent.click(cashOption);
+
+    // Pre-confirmation: total shows the venue-wide-discounted amount.
+    expect(await screen.findByText(/Venue-wide 20% off/i)).toBeInTheDocument();
+    expect(screen.getByText("Rs 1,200")).toBeInTheDocument();
+
+    await userEvent.click(await screen.findByRole("button", { name: /Confirm booking/i }));
+    await screen.findByText("Pay on arrival");
+  });
+
+  it("shows no offer line and base total when no venue-wide offer is active", async () => {
+    vi.mocked(venues.detail).mockResolvedValue(cashVenue as never);
+
+    vi.mocked(useSearchParams).mockReturnValue(
+      new URLSearchParams({
+        court_id: "court-1",
+        start_at: "2026-08-22T04:30:00.000Z",
+        end_at: "2026-08-22T05:30:00.000Z",
+        venue: "Smash Arena",
+        court: "Court 1",
+        price_per_slot: "1500",
+        base_price_per_slot: "1500",
+        slots: "1",
+        slot_min: "60"
+      })
+    );
+
+    renderPage();
+    const cashOption = await screen.findByTestId("method-cash");
+    await userEvent.click(cashOption);
+
+    expect(screen.queryByText(/Venue-wide/i)).toBeNull();
+    expect(screen.getByText("Rs 1,500")).toBeInTheDocument();
+  });
+});
+
 describe("CheckoutPage on insecure contexts", () => {
   const realCrypto = globalThis.crypto;
 

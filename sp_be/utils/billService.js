@@ -110,8 +110,15 @@ async function renderBookingPdf(booking) {
 
   doc.moveDown(1.5);
 
+  // With offers (ADR-0026): Subtotal = sum of rule-priced slots, then the
+  // offer discount, then the inclusive taxes carve out of the paid total.
+  const discount = Number(booking.discount_amount || 0);
   const base = Number(booking.total_price || 0) - Number(booking.tax_amount || 0) - Number(booking.venue_tax_amount || 0);
-  tableRow(doc, 'Base', fmtLkr(base));
+  const subtotal = Number(booking.subtotal_amount || 0) || base + discount;
+  tableRow(doc, 'Subtotal', fmtLkr(subtotal));
+  if (discount > 0) {
+    tableRow(doc, 'Offer discount', `− ${fmtLkr(discount)}`);
+  }
   for (const line of taxLines(booking.tax_rate || 0, booking.tax_amount || 0, booking.venue_tax_rate || 0, booking.venue_tax_amount || 0)) {
     tableRow(doc, line.label, line.value);
   }

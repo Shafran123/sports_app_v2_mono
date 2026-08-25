@@ -36,7 +36,7 @@ export function ManualBookingDialog({
     if (open) {
       setName("");
       setPhone("");
-      setAmount(court && slot ? String(court.price_per_slot) : "");
+      setAmount(court && slot ? String(slot.offer_price ?? slot.price ?? court.price_per_slot) : "");
       manual.reset();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -76,7 +76,10 @@ export function ManualBookingDialog({
                 {court.name} · {formatTime12(slot.start_at)}–{formatTime12(slot.end_at)}
               </p>
               <p className="mt-1 text-xs text-ink-2">
-                {formatLkr(court.price_per_slot)} per {court.slot_duration_min} min slot
+                {formatLkr(slot.price ?? court.price_per_slot)} per {court.slot_duration_min} min slot
+                {slot.offer_price != null && slot.offer_price < (slot.price ?? court.price_per_slot)
+                  ? " · offer applied"
+                  : ""}
               </p>
             </div>
 

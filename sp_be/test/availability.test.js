@@ -57,6 +57,10 @@ describe('availability engine', () => {
       .post(`/api/v1/admin/venues/${VENUE_ID}/approve`)
       .set('Authorization', `Bearer ${adminToken}`);
 
+    // Per-venue advance horizon (0 = unlimited): pin 14 days so the
+    // beyond-window assertions below stay meaningful.
+    await pool.query(`update venues set advance_days = 14 where id = $1`, [VENUE_ID]);
+
     const { rows } = await pool.query(
       `select id from courts where venue_id = $1`,
       [VENUE_ID]

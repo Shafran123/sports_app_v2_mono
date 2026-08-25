@@ -9,7 +9,7 @@ The admin-configurable display name of the platform (default "MySlot.LK"), shown
 _Avoid_: product name, brand (bare)
 
 **Venue**:
-A sports facility that lists courts for hire. Has an owner, address, photos, opening hours, and a cancellation policy. Lifecycle: pending → approved → (rejected / suspended / banned / archived).
+A sports facility that lists courts for hire. Has an owner, address, photos, opening windows, a cancellation policy, and an advance-booking horizon. Lifecycle: pending → approved → (rejected / suspended / banned / archived).
 _Avoid_: Yard, facility, arena
 
 **Venue Suspension**:
@@ -21,12 +21,32 @@ A permanent admin action that revokes the owner's console access and makes all o
 _Avoid_: delete, terminate
 
 **Court**:
-A bookable playing area within a Venue (badminton court, football turf, cricket nets). Has a sport, capacity, pricing, and a configurable slot duration.
+A bookable playing area within a Venue (badminton court, football turf, cricket nets). Has a sport, capacity, a base price per slot, and a configurable slot duration. The base price is what a slot costs when no Variable Pricing rule applies.
 _Avoid_: subYard, turf, field
 
 **Slot**:
 A bookable time segment of a Court on a given date.
 _Avoid_: session
+
+**Slot-time**:
+A day-of-week and start-time position within a Court's recurring weekly schedule (e.g. Saturday 18:00). Distinct from a **Slot**, which is a bookable segment on a concrete date; a Slot's start lands at a Slot-time.
+_Avoid_: time slot, hour slot
+
+**Opening Window**:
+A contiguous open→close period within a single day during which a Venue accepts bookings (e.g. 09:00–12:00). A Venue may have several Opening Windows per day — e.g. a mid-day closure splits the day into two — and a day with none is closed. Slots must fit entirely inside one Opening Window; they never span across a gap.
+_Avoid_: hours slot, time block, window (bare)
+
+**Variable Pricing**:
+Court-level pricing that varies by day and time. A Court has a base price per slot; a Slot-time that falls inside a configured day+time window on that Court uses the window's price instead (peak vs off-peak). Not the same as an **Offer** — Variable Pricing sets what the slot costs; an Offer discounts what it costs.
+_Avoid_: dynamic pricing, surge pricing
+
+**Offer**:
+An owner-configured discount, auto-applied server-side to Bookings (never Event Registrations). Two kinds: **Venue-wide** (a percentage or flat LKR amount off the whole booking) and **Slot-based** (a percentage or flat LKR amount off each matching slot, scoped to one or more Courts by day+time window). Each has optional start/end dates plus an active toggle. Stacking is best-single-per-kind — the best Venue offer plus the best Slot offer, never compounding. Applies to the peak-adjusted price.
+_Avoid_: coupon, promo, discount code (no codes exist), voucher
+
+**Closed Date**:
+A specific date on which a Venue is closed: no availability is offered and checkout rejects it. One-off dates only — recurring weekly closure lives in Opening Windows. A Closed Date blocks new bookings but never cancels existing ones; the Owner cancels those manually if needed.
+_Avoid_: holiday, maintenance day (closed date is the canonical term)
 
 **Hold**:
 A temporary claim on a Slot while a player is in checkout. Expires after a fixed window and releases the Slot back to availability.
@@ -138,11 +158,11 @@ The platform-level state controlling how Events appear to players: **Enabled** (
 _Avoid_: event visibility, event mode
 
 **Platform Tax**:
-A platform-wide percentage rate, Admin-configurable, applied to Bookings and Event Registrations. All prices are tax-inclusive: the listed price is the total the player pays, and the Platform Tax is split out of it at checkout and snapshotted on the Booking or Registration at creation. A rate of zero is presented as "Tax not applicable" (no 0.00 line).
+A platform-wide percentage rate, Admin-configurable, applied to Bookings and Event Registrations. All prices are tax-inclusive: the listed price is the total the player pays, and the Platform Tax is split out of it at checkout and snapshotted on the Booking or Registration at creation. A rate of zero is presented as "Tax not applicable" (no 0.00 line). Tax carves out of the **discounted** amount when an Offer applies.
 _Avoid_: VAT, GST, service charge, tax (bare)
 
 **Venue Tax**:
-A percentage rate set by a Venue Owner for a specific Venue. Like Platform Tax, it is inclusive: the Owner sets the listed price knowing the split, and the Platform Tax and the Venue Tax are both carved out of that price at checkout and snapshotted separately. The Owner manages their own rate (with a live "what you keep vs tax" readout while setting it); the Admin may view Venue Tax but not edit it.
+A percentage rate set by a Venue Owner for a specific Venue. Like Platform Tax, it is inclusive: the Owner sets the listed price knowing the split, and the Platform Tax and the Venue Tax are both carved out of that price at checkout and snapshotted separately. The Owner manages their own rate (with a live "what you keep vs tax" readout while setting it); the Admin may view Venue Tax but not edit it. With an Offer, the Venue Tax splits out of the **discounted** amount.
 _Avoid_: owner tax, venue tax rate
 
 **Booking Bill**:
