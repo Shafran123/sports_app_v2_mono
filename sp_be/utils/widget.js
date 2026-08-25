@@ -89,6 +89,10 @@ function sanitizeBrand(brand) {
   return out;
 }
 
+// host[:port]. A port is optional and, when present, must match exactly — so
+// a local dev host like `localhost:5173` is a distinct, precise entry.
+const HOST_OR_HOSTPORT = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*(:\d{1,5})?$/;
+
 function sanitizeDomains(domains) {
   if (domains === null || domains === undefined) return null;
   if (!Array.isArray(domains)) {
@@ -100,7 +104,7 @@ function sanitizeDomains(domains) {
   const out = [];
   for (const raw of domains) {
     const host = String(raw || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
-    if (!host || host.length > 253 || !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/.test(host)) {
+    if (!host || host.length > 253 || !HOST_OR_HOSTPORT.test(host)) {
       throw Object.assign(new Error(`Invalid domain: ${raw}`), { code: 'WIDGET_VALIDATION' });
     }
     out.push(host);
@@ -108,18 +112,26 @@ function sanitizeDomains(domains) {
   return [...new Set(out)];
 }
 
-// An embed request is authorized when its parent-origin hostname (how the
-// venue's actual website frames the widget) is on the venue's allowlist.
+// An embed request is authorized when its parent origin (how the venue's
+// actual website frames the widget) matches an allowlist entry. An entry
+// without a port matches the hostname on any port; an entry WITH a port (e.g.
+// `localhost:5173`) must match both, so local testing is precise.
 function isHostAllowed(venue, origin) {
   if (!venue || !Array.isArray(venue.allowed_domains) || venue.allowed_domains.length === 0) return false;
-  let host = String(origin || '');
+  let url;
   try {
-    host = new URL(host.length > 0 && !host.includes('://') ? `https://${host}` : host).hostname.toLowerCase();
+    url = new URL(String(origin || '').includes('://') ? origin : `https://${origin}`);
   } catch {
     return false;
   }
-  // Exact hostname match; the subdomain of an allowlisted root is NOT implied.
-  return venue.allowed_domains.includes(host);
+  const host = url.hostname.toLowerCase();
+  const port = url.port || null;
+  for (const entry of venue.allowed_domains) {
+    const [entryHost, entryPort = null] = String(entry).split(':');
+    if (entryHost !== host) continue;
+    if (entryPort === null || entryPort === port) return true;
+  }
+  return false;
 }
 
 module.exports = { slugify, mintWidgetKey, sanitizeBrand, sanitizeDomains, isHostAllowed, SLUG_SAFE };

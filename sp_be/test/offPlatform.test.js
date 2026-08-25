@@ -87,17 +87,22 @@ describe('widget helpers (unit)', () => {
 
   it('sanitizes the domain allowlist', () => {
     expect(sanitizeDomains(['TheSite.COM', 'https://thesite.com/', 'thesite.com'])).toEqual(['thesite.com']);
+    expect(sanitizeDomains(['localhost:5173'])).toEqual(['localhost:5173']);
     expect(() => sanitizeDomains('thesite.com')).toThrow();
     expect(() => sanitizeDomains(['bad_domain!'])).toThrow();
+    expect(() => sanitizeDomains(['host:abc'])).toThrow();
     expect(() => sanitizeDomains(Array(11).fill('a.com'))).toThrow();
   });
 
   it('matches host origins exactly against the allowlist', () => {
-    const venue = { allowed_domains: ['thesite.com', 'book.co'] };
+    const venue = { allowed_domains: ['thesite.com', 'book.co', 'localhost:5173'] };
     expect(isHostAllowed(venue, 'https://thesite.com')).toBe(true);
     expect(isHostAllowed(venue, 'http://thesite.com')).toBe(true);
+    expect(isHostAllowed(venue, 'https://thesite.com:8443')).toBe(true); // no port = any port
     expect(isHostAllowed(venue, 'https://sub.thesite.com')).toBe(false);
     expect(isHostAllowed(venue, 'https://evil.com')).toBe(false);
+    expect(isHostAllowed(venue, 'http://localhost:5173')).toBe(true);   // port-specific
+    expect(isHostAllowed(venue, 'http://localhost:4000')).toBe(false);  // different port
     expect(isHostAllowed({ allowed_domains: [] }, 'https://thesite.com')).toBe(false);
   });
 });
