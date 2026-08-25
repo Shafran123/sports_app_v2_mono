@@ -429,6 +429,39 @@ function buildWelcomeHtml(brand = DEFAULT_BRAND, opts = {}) {
   };
 }
 
+// Verified-email OTP (ticket 01): the same code-in-SMS mental model, delivered
+// by email so the Booking Widget's QR can always reach an inbox.
+function buildVerificationCodeHtml(code, brand = DEFAULT_BRAND, ttlMinutes = 10) {
+  const safeCode = escapeHtml(code);
+  const preheader = `Your verification code is ${code}.`;
+  const text = plainLines(
+    `Your ${brand} verification code is ${code}.`,
+    `It expires in ${ttlMinutes} minutes. Do not share it.`,
+    '',
+    footerLine(brand)
+  );
+  return {
+    preheader,
+    text,
+    html: shell({
+      brand,
+      preheader,
+      content: `
+        <h1 class="ms-ink" style="margin:0 0 8px;color:${C.ink};font-size:22px;font-weight:800;line-height:1.25;">Verify your email</h1>
+        <p class="ms-ink2" style="margin:0 0 20px;color:${C.ink2};font-size:15px;">Enter this code to confirm this inbox belongs to your ${escapeHtml(brand)} account.</p>
+        <table role="presentation" cellpadding="0" cellspacing="0" align="center" style="border-collapse:collapse;margin:8px auto 0;">
+          <tr>
+            <td style="background:${C.primaryLight};border-radius:16px;padding:16px 32px;text-align:center;">
+              <span style="color:${C.primaryDark};font-family:'SF Mono',ui-monospace,Menlo,Consolas,monospace;font-size:28px;font-weight:800;letter-spacing:8px;">${safeCode}</span>
+            </td>
+          </tr>
+        </table>
+        <p class="ms-muted" style="margin:20px 0 0;color:${C.ink2};font-size:13px;">It expires in ${ttlMinutes} minutes. If you didn't request this, you can ignore this email.</p>`,
+      plainText: text
+    })
+  };
+}
+
 function buildVenueApprovedHtml(venue, brand = DEFAULT_BRAND, opts = {}) {
   const preheader = `Good news — ${venue?.name || 'your venue'} is live.`;
   const text = plainLines(
@@ -801,6 +834,7 @@ module.exports = {
   buildOwnerBookingHtml,
   buildReminderHtml,
   buildWelcomeHtml,
+  buildVerificationCodeHtml,
   buildVenueApprovedHtml,
   buildVenueRejectedHtml,
   buildBillHtml,

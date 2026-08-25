@@ -62,6 +62,15 @@ exports.checkout = async (req, res) => {
       return fail(res, 409, 'VERIFIED_PHONE_REQUIRED', 'Verify your phone number before booking.');
     }
 
+    // Verified Email gate (always-on, flag-independent): the QR must reach an
+    // inbox — a phone-only Player receives only a QR *link* by SMS. App and
+    // Booking Widget share this rule (template K); the old
+    // phone_verification_required flag above remains for the phone gate's
+    // rollout only.
+    if (!req.user.email || !req.user.email_verified_at) {
+      return fail(res, 409, 'VERIFIED_EMAIL_REQUIRED', 'Verify your email address before booking.');
+    }
+
     const paymentMethod = req.body.payment_method === 'cash' ? 'cash' : 'online';
     if (paymentMethod === 'online' && !payhereEnabled) {
       return fail(res, 409, 'PAYMENT_UNAVAILABLE', 'Online payment is disabled. Choose pay-at-venue instead.');
@@ -361,7 +370,7 @@ exports.getBooking = async (req, res) => {
 
 exports.listMyBookings = async (req, res) => {
   try {
-    const { status } = req.query;
+    const { status, venue_id } = req.query;
     const conditions = [`b.user_id = $1`];
     const values = [req.user.id];
     let index = 2;
@@ -374,8 +383,16 @@ exports.listMyBookings = async (req, res) => {
       conditions.push(`b.status = 'cancelled'`);
     }
 
+    // Venue-scoped list (widget "Your bookings"): the widget passes its
+    // venue so the server — not a brittle client filter — decides what the
+    // player sees for that embed.
+    if (venue_id) {
+      conditions.push(`v.id = $${index++}`);
+      values.push(venue_id);
+    }
+
     const { rows } = await pool.query(
-      `select b.*, c.name as court_name, v.name as venue_name, v.city as venue_city, s.name as sport
+      `select b.*, c.name as court_name, v.name as venue_name, v.city as venue_city, v.id as venue_id, s.name as sport
        from bookings b
        join courts c on c.id = b.court_id
        join venues v on v.id = c.venue_id

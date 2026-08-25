@@ -192,6 +192,7 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
 
   if (checkout.error) {
     const needsVerify = failure?.code === "VERIFIED_PHONE_REQUIRED";
+    const needsEmail = failure?.code === "VERIFIED_EMAIL_REQUIRED";
     return (
       <main className="mx-auto max-w-3xl px-4 pb-24 pt-8">
         {needsVerify ? (
@@ -204,6 +205,21 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
               <Button size="lg" onClick={() => setVerifyOpen(true)}>
                 Verify phone
               </Button>
+            </div>
+          </>
+        ) : needsEmail ? (
+          <>
+            <ErrorState
+              title="Verify your email first"
+              message="You need a verified email to book — your confirmation and check-in QR are sent there."
+            />
+            <div className="mt-6 flex justify-center">
+              <Link
+                href="/profile"
+                className="inline-flex h-11 items-center justify-center rounded-full bg-primary px-6 font-semibold text-surface transition-colors hover:bg-primary-hover"
+              >
+                Verify email
+              </Link>
             </div>
           </>
         ) : slotTaken ? (

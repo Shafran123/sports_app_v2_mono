@@ -143,6 +143,7 @@ export function VenueDetailPage({ venueId }: { venueId: string }) {
   const [photos, setPhotos] = useState<string[]>(venue?.photos ?? []);
   const [acceptsCash, setAcceptsCash] = useState(Boolean(venue?.accepts_cash));
   const [venueTaxRate, setVenueTaxRate] = useState(String(venue?.venue_tax_rate ?? ""));
+  const [cancelCutoff, setCancelCutoff] = useState(String(venue?.cancel_cutoff_hours ?? ""));
   const [savingSettings, setSavingSettings] = useState(false);
   const [settingsNotice, setSettingsNotice] = useState("");
   const [settingsError, setSettingsError] = useState("");
@@ -152,6 +153,7 @@ export function VenueDetailPage({ venueId }: { venueId: string }) {
       setPhotos(venue.photos ?? []);
       setAcceptsCash(Boolean(venue.accepts_cash));
       setVenueTaxRate(venue.venue_tax_rate != null ? String(venue.venue_tax_rate) : "");
+      setCancelCutoff(venue.cancel_cutoff_hours != null ? String(venue.cancel_cutoff_hours) : "");
     }
   }, [venue]);
 
@@ -165,7 +167,17 @@ export function VenueDetailPage({ venueId }: { venueId: string }) {
         setSettingsError("Venue tax must be between 0 and 100.");
         return;
       }
-      await venues.update(venueId, { photos, accepts_cash: acceptsCash, venue_tax_rate: taxRate });
+      const cutoff = cancelCutoff === "" ? 2 : Number(cancelCutoff);
+      if (!Number.isInteger(cutoff) || cutoff < 0 || cutoff > 168) {
+        setSettingsError("Cancel cutoff must be a whole number of hours between 0 and 168.");
+        return;
+      }
+      await venues.update(venueId, {
+        photos,
+        accepts_cash: acceptsCash,
+        venue_tax_rate: taxRate,
+        cancel_cutoff_hours: cutoff
+      });
       setSettingsNotice("Venue settings saved.");
       void queryClient.invalidateQueries({ queryKey: ["my-venues"] });
     } catch (err) {
@@ -728,6 +740,26 @@ export function VenueDetailPage({ venueId }: { venueId: string }) {
                   {venue?.venue_tax_rate ? `${venue.venue_tax_rate}% (read-only for admins — the owner manages it)` : "0% (read-only for admins — the owner manages it)"}
                 </p>
               )}
+            </Card>
+
+            <Card className="p-5 md:p-6">
+              <h2 className="font-display text-lg font-extrabold tracking-tight text-ink">Cancel cutoff</h2>
+              <p className="mt-0.5 text-sm text-ink-2">
+                How many hours before a booking&apos;s start a player may cancel it themselves.
+                Past the cutoff, players must contact you to cancel. Defaults to 2 hours.
+              </p>
+              <div className="mt-4 flex items-center gap-2">
+                <Input
+                  aria-label="Cancel cutoff hours"
+                  type="number"
+                  min={0}
+                  max={168}
+                  value={cancelCutoff}
+                  onChange={(e) => setCancelCutoff(e.target.value)}
+                  className="w-32"
+                />
+                <span className="text-sm text-ink-2">hours before the booking start</span>
+              </div>
             </Card>
 
             <Card className="p-5 md:p-6">

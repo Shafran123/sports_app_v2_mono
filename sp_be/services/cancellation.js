@@ -44,6 +44,24 @@ async function cancelBooking(client, bookingId, actorUserId, actorRole) {
   const now = new Date();
   const hoursBefore = (new Date(booking.start_at) - now) / 3600000;
 
+  // Cancel Cutoff (per venue): players self-cancel only while the booking
+  // start is at least the venue's cutoff away. Venue owners and admins are
+  // not bound by it — they cancel for operational reasons.
+  const { rows: venueRows } = await client.query(
+    `select cancel_cutoff_hours from venues where id = $1`,
+    [booking.venue_id]
+  );
+  const cancelCutoffHours = venueRows[0]?.cancel_cutoff_hours ?? 2;
+  if (!isOwnerActor && hoursBefore < cancelCutoffHours) {
+    return {
+      error: {
+        status: 409,
+        code: 'CANCEL_CUTOFF',
+        message: `Bookings can be self-cancelled up to ${cancelCutoffHours} hour${cancelCutoffHours === 1 ? '' : 's'} before the start. Please contact the venue.`
+      }
+    };
+  }
+
   const tiers = await getTiers();
   const refundPct = computeRefundPct(tiers, hoursBefore);
   const refundAmount = Math.round((booking.total_price * refundPct) / 100);

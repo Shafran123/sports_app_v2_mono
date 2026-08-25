@@ -18,7 +18,13 @@ vi.mock("@/context/auth", () => ({
 }));
 
 vi.mock("@myslot/api", () => ({
-  auth: { updateMe: updateMeMock, verifyPhoneSend: vi.fn(), verifyPhoneConfirm: vi.fn() },
+  auth: {
+    updateMe: updateMeMock,
+    verifyPhoneSend: vi.fn(),
+    verifyPhoneConfirm: vi.fn(),
+    verifyEmailSend: vi.fn(),
+    verifyEmailConfirm: vi.fn()
+  },
   toApiFailure: (e: unknown) => ({ message: (e as Error).message })
 }));
 
@@ -74,5 +80,34 @@ describe("ProfilePage — edits reflect on the profile", () => {
     await userEvent.clear(phone);
     await userEvent.type(phone, "+94779999999");
     expect(await screen.findByText(/verify the new number/i)).toBeInTheDocument();
+  });
+
+  it("shows a Verified badge next to the email when verified", async () => {
+    ctxUser = { ...baseUser, name: "Asif", email: "asif@example.com", email_verified_at: "2026-08-22T10:00:00.000Z" };
+    render(<ProfilePage />);
+    expect(await screen.findByText("Email")).toBeInTheDocument();
+    expect(screen.getAllByText("Verified").length).toBeGreaterThan(0);
+  });
+
+  it("offers a Verify-email action and opens the email OTP modal when unverified", async () => {
+    render(<ProfilePage />);
+    const verify = await screen.findByRole("button", { name: "Verify email" });
+    await userEvent.click(verify);
+    expect(await screen.findByText(/We'll email you a 6-digit code/i)).toBeInTheDocument();
+  });
+
+  it("shows the dismissible verify-email prompt for unverified users", async () => {
+    render(<ProfilePage />);
+    expect(await screen.findByText(/verify your email to get booking confirmations/i)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+    expect(screen.queryByText(/verify your email to get booking confirmations/i)).not.toBeInTheDocument();
+  });
+
+  it("warns that changing the email requires verifying the new address", async () => {
+    render(<ProfilePage />);
+    const email = await screen.findByLabelText("Email");
+    await userEvent.clear(email);
+    await userEvent.type(email, "new@example.com");
+    expect(await screen.findByText(/requires verifying the new address/i)).toBeInTheDocument();
   });
 });

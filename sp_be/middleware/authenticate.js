@@ -58,6 +58,22 @@ async function authenticate(req, res, next) {
       phone: decoded.phone_number,
       welcome: true
     });
+
+    // Verified Email attribution: when the identity provider attests the
+    // email — Google sign-in carries email_verified in the ID token, and
+    // test tokens embed an email like a real Google/provided identity — the
+    // email counts as Verified Email with no OTP challenge. Firebase
+    // email/password accounts have email_verified false until the OTP
+    // challenge (or the platform email-OTP) proves it.
+    if (user.email && !user.email_verified_at && decoded.email_verified === true) {
+      const { rows: verifiedRows } = await pool.query(
+        `update users set email_verified_at = coalesce(email_verified_at, now()), updated_at = now()
+         where id = $1 returning email_verified_at`,
+        [user.id]
+      );
+      user.email_verified_at = verifiedRows[0]?.email_verified_at ?? user.email_verified_at;
+    }
+
     req.user = user;
 
     // Admin-role callers are unaffected by player-level ban/suspension

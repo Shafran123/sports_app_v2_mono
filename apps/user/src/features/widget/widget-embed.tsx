@@ -7,20 +7,47 @@
 // booking flow chrome-less. The branded page is rendered by the same
 // BookPanel but never shows a venue step (it is per-venue by design).
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { widget, toApiFailure } from "@myslot/api";
+import { widget, featureFlags, auth as authApi, toApiFailure } from "@myslot/api";
 import { ErrorState, Skeleton } from "@myslot/ui";
+import { DEFAULT_BRAND_NAME } from "@myslot/utils";
+import { finishGoogleRedirect } from "@myslot/auth";
 import { ShieldX } from "lucide-react";
 import { BookPanel } from "./book-panel";
 import { VenueStep } from "./venue-step";
+import { WidgetBookings } from "./widget-bookings";
 import { brandCssVars } from "./widget-theme";
+import { useAuth } from "@/context/auth";
 
 export function WidgetEmbed({ widgetKey }: { widgetKey: string }) {
+  const { user, logout, setUser } = useAuth();
   const query = useQuery({
     queryKey: ["widget-config", widgetKey],
     queryFn: () => widget.config(widgetKey, { origin: parentOrigin() })
   });
+
+  // Bumping this on sign-out remounts the booking flow so it lands back on
+  // the identity step instead of showing the picker with a null user.
+  const [sessionKey, setSessionKey] = useState(0);
+
+  const handleSignOut = async () => {
+    await logout();
+    setUser(null);
+    setShowBookings(false);
+    setSessionKey((k) => k + 1);
+  };
+
+  // Settle a Firebase Google redirect sign-in that this embed initiated
+  // (the widget uses redirect, not popup — cross-origin iframes block
+  // popups). The browser returns to this same URL after Google auth.
+  useEffect(() => {
+    void finishGoogleRedirect().then((settled) => {
+      if (settled && typeof window !== "undefined") {
+        window.location.reload();
+      }
+    });
+  }, []);
 
   const config = query.data;
   const brand = config?.business.brand;
@@ -32,6 +59,7 @@ export function WidgetEmbed({ widgetKey }: { widgetKey: string }) {
   // the first venue stays the initially bookable surface.
   const venues = config?.venues ?? [];
   const [pickedVenueId, setPickedVenueId] = useState<string | null>(null);
+  const [showBookings, setShowBookings] = useState(false);
   const defaultId = venues.some((v) => v.id === config?.instance.default_venue_id)
     ? config!.instance.default_venue_id!
     : null;
@@ -85,28 +113,100 @@ export function WidgetEmbed({ widgetKey }: { widgetKey: string }) {
   return (
     <div style={style}>
       {/* inline brand color tokens never leak to the host page (shadow DOM-like) */}
-      <WidgetHeader business={config.business} venue={activeVenue} />
-      {showVenueStep && (
-        <VenueStep
-          venues={venues}
-          selectedId={selectedId}
-          onSelect={(id) => setPickedVenueId(id)}
+      <WidgetHeader
+        business={config.business}
+        venue={activeVenue}
+        showVenueName={!showVenueStep}
+        action={
+          <div className="flex items-center gap-2">
+            {user ? (
+              <div className="flex max-w-44 items-center gap-2 rounded-full border border-border bg-surface px-3 py-1.5 text-xs text-ink-2">
+                <span className="truncate">
+                  Signed in as{" "}
+                  <span className="font-semibold text-ink">
+                    {user.name || user.phone || user.email}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  className="shrink-0 font-semibold text-ink-3 underline-offset-2 hover:text-error hover:underline"
+                >
+                  Sign out
+                </button>
+              </div>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => setShowBookings((v) => !v)}
+              className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-ink-2 transition-colors hover:text-ink"
+            >
+              {showBookings ? "Back to booking" : "Your bookings"}
+            </button>
+          </div>
+        }
+      />
+      {showBookings ? (
+        <WidgetBookings
+          widgetKey={widgetKey}
+          venue={activeVenue}
+          onBack={() => setShowBookings(false)}
         />
+      ) : (
+        <>
+          {showVenueStep && (
+            <VenueStep
+              venues={venues}
+              selectedId={selectedId}
+              onSelect={(id) => setPickedVenueId(id)}
+            />
+          )}
+          <div className="mx-auto max-w-lg px-4 pb-10">
+            {/* key by venue+session: switching venues resets slot state, and
+                sign-out remounts so the identity step shows again */}
+            <BookPanel key={`${activeId}-${sessionKey}`} venue={activeVenue} instanceKey={widgetKey} />
+          </div>
+        </>
       )}
-      <div className="mx-auto max-w-lg px-4 pb-10">
-        {/* key by venue: switching venues resets date/slot/selection state */}
-        <BookPanel key={activeId} venue={activeVenue} instanceKey={widgetKey} />
-      </div>
+      <WidgetAttribution />
+    </div>
+  );
+}
+
+// "Powered by MySlot.LK" attribution: always on, opens the platform home in
+// the top-level frame (the embed's host page is a different origin).
+function WidgetAttribution() {
+  const { data: flags } = useQuery({
+    queryKey: ["feature-flags"],
+    queryFn: () => featureFlags.get()
+  });
+  const brand = flags?.brand_name ?? DEFAULT_BRAND_NAME;
+  const href =
+    flags?.app_url || (typeof window !== "undefined" ? window.location.origin : undefined);
+  return (
+    <div className="px-4 pb-8">
+      <a
+        href={href}
+        target="_top"
+        rel="noopener"
+        className="block text-center text-xs text-ink-3 transition-colors hover:text-ink-2"
+      >
+        Powered by <span className="font-semibold">{brand}</span>
+      </a>
     </div>
   );
 }
 
 function WidgetHeader({
   business,
-  venue
+  venue,
+  showVenueName,
+  action
 }: {
   business: { name: string; brand?: { tagline?: string; logo_url?: string } };
   venue: { name: string; photos?: string[]; city?: string; address?: string };
+  showVenueName?: boolean;
+  action?: ReactNode;
 }) {
   return (
     <div className="mx-auto max-w-lg px-4 pt-5">
@@ -116,20 +216,32 @@ function WidgetHeader({
           <img
             src={business.brand?.logo_url || venue.photos?.[0]!}
             alt=""
-            className="h-11 w-11 shrink-0 rounded-2xl object-cover"
+            className="h-12 w-12 shrink-0 rounded-2xl object-cover"
           />
         ) : null}
-        <div className="min-w-0">
-          <h1 className="truncate font-display text-base font-extrabold tracking-tight text-ink">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[11px] font-semibold uppercase tracking-wider text-ink-3">
             {business.name}
-          </h1>
-          {business.brand?.tagline ? (
-            <p className="truncate text-xs text-ink-2">{business.brand.tagline}</p>
+          </p>
+          {showVenueName ? (
+            // The venue step is hidden (locked or single-venue): the venue is
+            // the only bookable option, so its name leads the header.
+            <h1 className="truncate font-display text-lg font-extrabold leading-tight tracking-tight text-ink">
+              {venue.name}
+            </h1>
           ) : (
-            <p className="text-xs text-ink-3">{venue.city}{venue.address ? ` · ${venue.address}` : ""}</p>
+            <h1 className="truncate font-display text-lg font-extrabold leading-tight tracking-tight text-ink">
+              {business.brand?.tagline || venue.name}
+            </h1>
           )}
         </div>
+        {action}
       </div>
+      {showVenueName && (venue.city || venue.address) && (
+        <p className="mt-1.5 truncate text-xs text-ink-3">
+          {[venue.address, venue.city].filter(Boolean).join(", ")}
+        </p>
+      )}
     </div>
   );
 }

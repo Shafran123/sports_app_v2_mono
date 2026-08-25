@@ -4,14 +4,8 @@ import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toApiFailure } from "@myslot/api";
-import { Button, BrandLockup, Input, PasswordInput, Tabs, TabsContent, TabsList, TabsTrigger } from "@myslot/ui";
-import { normalizePhone } from "@myslot/utils";
-import type { ConfirmationResult } from "firebase/auth";
-import {
-  confirmPhoneOtp,
-  loginWithEmail,
-  sendPhoneOtp
-} from "@myslot/auth";
+import { Button, BrandLockup, Input, PasswordInput } from "@myslot/ui";
+import { loginWithEmail, sendPasswordReset } from "@myslot/auth";
 import { VerifyPhoneModal } from "@/features/verify-phone/verify-phone-modal";
 import { useGoogleVerify } from "@/features/verify-phone/use-google-verify";
 import { useBrandName } from "@/hooks/use-brand-name";
@@ -75,18 +69,6 @@ export function LoginForm() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  const [phone, setPhone] = useState("");
-  const [otp, setOtp] = useState("");
-  const [confirmation, setConfirmation] = useState<ConfirmationResult | null>(null);
-  const [phoneBusy, setPhoneBusy] = useState(false);
-  const [countdown, setCountdown] = useState(0);
-
-  useEffect(() => {
-    if (countdown <= 0) return;
-    const timer = setTimeout(() => setCountdown((c) => c - 1), 1000);
-    return () => clearTimeout(timer);
-  }, [countdown]);
-
   async function handleEmailSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
@@ -114,48 +96,18 @@ export function LoginForm() {
     }
   }
 
-  async function sendOtp() {
+  async function handleForgot() {
     setError("");
-    const normalized = normalizePhone(phone);
-    if (!normalized) {
-      setError("Enter a valid phone number with country code.");
+    if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
+      setError("Enter the email you signed up with.");
       return;
     }
-    setPhoneBusy(true);
     try {
-      const result = await sendPhoneOtp(normalized);
-      setConfirmation(result);
-      setPhone(normalized);
-      setOtp("");
-      setCountdown(30);
+      await sendPasswordReset(email.trim());
+      setError("");
+      window.alert("Password reset email sent — check your inbox.");
     } catch (err) {
       setError(messageFor(err));
-    } finally {
-      setPhoneBusy(false);
-    }
-  }
-
-  async function handleSendOtp(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    await sendOtp();
-  }
-
-  async function handleVerifyOtp(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setError("");
-    if (!confirmation) return;
-    if (!/^\d{6}$/.test(otp)) {
-      setError("Enter the 6-digit code sent to your phone.");
-      return;
-    }
-    setPhoneBusy(true);
-    try {
-      await confirmPhoneOtp(confirmation, otp);
-      router.push("/dashboard");
-    } catch (err) {
-      setError(messageFor(err));
-    } finally {
-      setPhoneBusy(false);
     }
   }
 
@@ -177,131 +129,52 @@ export function LoginForm() {
         </div>
       ) : null}
 
-      <Tabs defaultValue="email">
-        <TabsList className="mt-6 w-full">
-          <TabsTrigger value="email" className="flex-1">
-            Email
-          </TabsTrigger>
-          <TabsTrigger value="phone" className="flex-1">
-            Phone OTP
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="email">
-          <form className="mt-4 space-y-4" onSubmit={handleEmailSubmit} noValidate>
-            <label className="block">
-              <span className="mb-1.5 block text-sm font-medium text-ink-2">Email</span>
-              <Input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                autoComplete="email"
-                className="h-12"
-              />
-            </label>
-            <label className="block">
-              <span className="mb-1.5 block text-sm font-medium text-ink-2">Password</span>
-              <PasswordInput
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                autoComplete="current-password"
-                className="h-12"
-              />
-            </label>
-            <Button type="submit" size="lg" className="w-full" loading={busy}>
-              {busy ? "Logging in…" : "Log in"}
-            </Button>
-          </form>
-
-          <div className="my-6 flex items-center gap-3">
-            <span className="h-px flex-1 bg-border" />
-            <span className="text-xs font-semibold uppercase tracking-widest text-ink-3">or</span>
-            <span className="h-px flex-1 bg-border" />
-          </div>
-
-          <Button
-            variant="secondary"
-            size="lg"
-            className="w-full"
-            onClick={handleGoogle}
-            loading={googleBusy}
+      <form className="mt-4 space-y-4" onSubmit={handleEmailSubmit} noValidate>
+        <label className="block">
+          <span className="mb-1.5 block text-sm font-medium text-ink-2">Email</span>
+          <Input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            autoComplete="email"
+            className="h-12"
+          />
+        </label>
+        <label className="block">
+          <span className="mb-1.5 block text-sm font-medium text-ink-2">Password</span>
+          <PasswordInput
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••"
+            autoComplete="current-password"
+            className="h-12"
+          />
+        </label>
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            onClick={handleForgot}
+            className="text-xs font-medium text-primary underline-offset-2 hover:underline"
           >
-            <GoogleGlyph />
-            Continue with Google
+            Forgot password?
+          </button>
+          <Button type="submit" size="lg" className="px-6" loading={busy}>
+            {busy ? "Logging in…" : "Log in"}
           </Button>
-        </TabsContent>
+        </div>
+      </form>
 
-        <TabsContent value="phone">
-          <div id="recaptcha-container" />
-          {confirmation ? (
-            <form className="mt-4 space-y-4" onSubmit={handleVerifyOtp} noValidate>
-              <p className="text-sm text-ink-3">
-                We sent a 6-digit code to{" "}
-                <span className="font-medium text-ink-2">{phone.trim()}</span>.
-              </p>
-              <label className="block">
-                <span className="mb-1.5 block text-sm font-medium text-ink-2">
-                  Verification code
-                </span>
-                <Input
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                  placeholder="000000"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  className="h-12 text-center text-lg tracking-[0.4em]"
-                />
-              </label>
-              <Button type="submit" size="lg" className="w-full" loading={phoneBusy}>
-                Verify OTP
-              </Button>
-              <div className="flex items-center justify-between">
-                <Button
-                  variant="link"
-                  size="sm"
-                  type="button"
-                  onClick={sendOtp}
-                  disabled={countdown > 0 || phoneBusy}
-                >
-                  {countdown > 0 ? `Resend in ${countdown}s` : "Resend code"}
-                </Button>
-                <Button
-                  variant="link"
-                  size="sm"
-                  type="button"
-                  onClick={() => setConfirmation(null)}
-                >
-                  Change number
-                </Button>
-              </div>
-            </form>
-          ) : (
-            <form className="mt-4 space-y-4" onSubmit={handleSendOtp} noValidate>
-              <label className="block">
-                <span className="mb-1.5 block text-sm font-medium text-ink-2">Phone</span>
-                <Input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+94 71 234 5678"
-                  inputMode="tel"
-                  autoComplete="tel"
-                  className="h-12"
-                />
-              </label>
-              <p className="text-xs text-ink-3">
-                Include your country code. We&apos;ll text you a 6-digit code. Standard SMS
-                rates apply.
-              </p>
-              <Button type="submit" size="lg" className="w-full" loading={phoneBusy}>
-                Send OTP
-              </Button>
-            </form>
-          )}
-        </TabsContent>
-      </Tabs>
+      <div className="my-6 flex items-center gap-3">
+        <span className="h-px flex-1 bg-border" />
+        <span className="text-xs font-semibold uppercase tracking-widest text-ink-3">or</span>
+        <span className="h-px flex-1 bg-border" />
+      </div>
+
+      <Button variant="secondary" size="lg" className="w-full" onClick={handleGoogle} loading={googleBusy}>
+        <GoogleGlyph />
+        Continue with Google
+      </Button>
 
       <div className="mt-6 text-center text-sm">
         <span className="text-ink-3">New to {brand}?</span>{" "}

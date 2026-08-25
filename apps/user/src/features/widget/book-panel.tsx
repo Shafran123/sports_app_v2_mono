@@ -31,18 +31,22 @@ import { WidgetIdentity } from "./widget-identity";
 type Stage = "identity" | "pick" | "booked";
 
 export function BookPanel({ venue, instanceKey }: { venue: WidgetConfig; instanceKey?: string }) {
-  const { user } = useAuth();
+  const { user, setUser, logout, loading } = useAuth();
   const [stage, setStage] = useState<Stage>("identity");
   const [date, setDate] = useState(() => toDateKey(new Date()));
   const [durationMin, setDurationMin] = useState(0);
   const [selected, setSelected] = useState<SelectedSlots>({});
   const [checkoutKey, setCheckoutKey] = useState(() => uuidV4());
 
-  const verified = !!user?.phone_verified_at;
+  // Verified Email gate: a widget booking needs both a verified phone and a
+  // verified email — the QR must reach an inbox (ticket 04).
+  const ready = !!user?.phone_verified_at && !!user?.email_verified_at;
+  const identityLabel = user?.name || user?.phone || user?.email || "";
 
   useEffect(() => {
-    if (stage === "identity" && verified) setStage("pick");
-  }, [verified, stage]);
+    if (loading) return;
+    if (stage === "identity" && ready) setStage("pick");
+  }, [ready, stage, loading]);
 
   const availabilityQuery = useAvailability(venue.id, date);
   const summary = summarizeSelection(selected, availabilityQuery.data);
@@ -75,8 +79,28 @@ export function BookPanel({ venue, instanceKey }: { venue: WidgetConfig; instanc
     });
   };
 
+  // The identity decision needs the settled session: while the AuthProvider
+  // is still resolving, show a skeleton instead of flashing the login form
+  // (misleading for a returning, already-verified player).
   if (stage === "identity") {
-    return <WidgetIdentity widgetKey={instanceKey} onDone={() => setStage("pick")} />;
+    if (loading) {
+      return (
+        <div data-testid="identity-skeleton" className="space-y-4">
+          <div className="pt-3">
+            <Skeleton className="h-6 w-2/3" />
+            <Skeleton className="mt-2 h-3.5 w-full" />
+          </div>
+          <Skeleton className="h-12 w-full rounded-2xl" />
+          <Skeleton className="h-12 w-full rounded-2xl" />
+          <Skeleton className="h-11 w-full rounded-full" />
+        </div>
+      );
+    }
+    // Session is settled: only show identity when the booking gate is unmet.
+    // A ready player falls through to the picker with no flicker.
+    if (!ready) {
+      return <WidgetIdentity widgetKey={instanceKey} onDone={() => setStage("pick")} />;
+    }
   }
 
   if (stage === "booked" && checkout.data?.booking) {
@@ -95,7 +119,7 @@ export function BookPanel({ venue, instanceKey }: { venue: WidgetConfig; instanc
       )}
 
       <div>
-        <h3 className="font-display text-lg font-extrabold tracking-tight text-ink">Book a slot</h3>
+        <h3 className="pt-3 font-display text-lg font-extrabold tracking-tight text-ink">Book a slot</h3>
         <p className="mt-0.5 text-sm text-ink-2">
           Pick a date and duration, then confirm. Pay at the venue when you arrive.
         </p>
@@ -181,6 +205,23 @@ export function BookPanel({ venue, instanceKey }: { venue: WidgetConfig; instanc
               {formatLkr(displayTotal)}
             </p>
           </div>
+          <p className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-surface-2 px-3 py-2 text-xs text-ink-2">
+            <span>
+              Booking as <span className="font-semibold text-ink">{identityLabel}</span>
+            </span>
+            <button
+              type="button"
+              onClick={async () => {
+                await logout();
+                setUser(null);
+                setSelected({});
+                setStage("identity");
+              }}
+              className="font-semibold text-primary underline-offset-2 hover:underline"
+            >
+              Switch
+            </button>
+          </p>
           <Button className="mt-4 w-full" size="lg" disabled={!acceptsCash} loading={checkout.isPending} onClick={handleConfirm}>
             {checkout.isPending ? "Booking…" : "Confirm booking — pay at venue"}
           </Button>

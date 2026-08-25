@@ -6,7 +6,7 @@ const app = require('../app');
 
 const secret = new TextEncoder().encode('test-secret');
 const tokenFor = (uid) =>
-  new SignJWT({ uid }).setProtectedHeader({ alg: 'HS256' }).setIssuedAt().sign(secret);
+  new SignJWT({ uid, email: `${uid}@myslot.test`, email_verified: true }).setProtectedHeader({ alg: 'HS256' }).setIssuedAt().sign(secret);
 
 const PLAYER_TOKEN = tokenFor('demo-player-uid');
 let playerId;

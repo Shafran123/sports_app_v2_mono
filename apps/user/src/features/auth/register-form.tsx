@@ -59,7 +59,6 @@ export function RegisterForm() {
   );
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
   const [city, setCity] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -76,10 +75,6 @@ export function RegisterForm() {
       setError("Enter a valid email address.");
       return;
     }
-    if (phone.trim() && !/^\+?[\d\s()-]{8,15}$/.test(phone.trim())) {
-      setError("Enter a valid phone number.");
-      return;
-    }
     if (password.length < 6) {
       setError("Password must be at least 6 characters.");
       return;
@@ -89,7 +84,6 @@ export function RegisterForm() {
       await registerWithEmail(email.trim(), password);
       await authApi.updateMe(undefined, {
         name: name.trim(),
-        phone: phone.trim() || undefined,
         city: city.trim() || undefined
       });
       const me = await authApi.me();
@@ -154,19 +148,7 @@ export function RegisterForm() {
         </label>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block">
-            <span className="mb-1.5 block text-sm font-medium text-ink-2">Phone</span>
-            <Input
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+94 71 234 5678"
-              inputMode="tel"
-              autoComplete="tel"
-              className="h-12"
-            />
-          </label>
-          <label className="block">
-            <span className="mb-1.5 block text-sm font-medium text-ink-2">City</span>
+            <span className="mb-1.5 block text-sm font-medium text-ink-2">City (optional)</span>
             <Input
               type="text"
               value={city}

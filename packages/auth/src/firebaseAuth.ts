@@ -2,6 +2,9 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
+  sendPasswordResetEmail,
   GoogleAuthProvider,
   signOut,
   updatePassword,
@@ -40,6 +43,40 @@ export async function loginWithGoogle(): Promise<void> {
   const provider = new GoogleAuthProvider();
   const userCred = await signInWithPopup(getFirebaseAuth(), provider);
   await persistToken(userCred.user);
+}
+
+/**
+ * Google sign-in for cross-origin iframes (Booking Widget): popups are
+ * blocked in third-party contexts, so use the redirect flow. The page leaves
+ * to Google and returns to the embed URL; the embed must then call
+ * `finishGoogleRedirect()` on mount to settle the sign-in.
+ */
+export async function loginWithGoogleRedirect(): Promise<void> {
+  const provider = new GoogleAuthProvider();
+  await signInWithRedirect(getFirebaseAuth(), provider);
+}
+
+/**
+ * Complete a Google redirect sign-in that was started by
+ * `loginWithGoogleRedirect`. Returns true when a redirect sign-in was settled
+ * (the widget should then refresh / continue), false when there was none.
+ */
+export async function finishGoogleRedirect(): Promise<boolean> {
+  const auth = getFirebaseAuth();
+  try {
+    const result = await getRedirectResult(auth);
+    if (result?.user) {
+      await persistToken(result.user);
+      return true;
+    }
+  } catch {
+    // Not a redirect result (or it failed) — treat as no redirect sign-in.
+  }
+  return false;
+}
+
+export async function sendPasswordReset(email: string): Promise<void> {
+  await sendPasswordResetEmail(getFirebaseAuth(), email);
 }
 
 /** Widget sign-in (ADR-0028): the backend verifies the OTP and mints a custom

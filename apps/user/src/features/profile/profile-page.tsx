@@ -2,12 +2,13 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { LogOut, ShieldCheck } from "lucide-react";
+import { LogOut, MailCheck, ShieldCheck, X } from "lucide-react";
 import { auth as authApi, toApiFailure } from "@myslot/api";
 import { Avatar, Badge, Button, Card, Input, Toast } from "@myslot/ui";
 import type { User } from "@myslot/types";
 import { useAuth } from "@/context/auth";
 import { VerifyPhoneModal } from "@/features/verify-phone/verify-phone-modal";
+import { VerifyEmailModal } from "@/features/verify-email/verify-email-modal";
 
 interface Feedback {
   tone: "success" | "error";
@@ -45,6 +46,9 @@ function ProfileForm({ user, onLogout }: { user: User; onLogout: () => Promise<v
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [verifyOpen, setVerifyOpen] = useState(false);
   const [enteredPhone, setEnteredPhone] = useState(user.phone ?? "");
+  const [verifyEmailOpen, setVerifyEmailOpen] = useState(false);
+  const [enteredEmail, setEnteredEmail] = useState(user.email ?? "");
+  const [emailPromptDismissed, setEmailPromptDismissed] = useState(false);
 
   useEffect(() => {
     if (!feedback) return;
@@ -113,11 +117,65 @@ function ProfileForm({ user, onLogout }: { user: User; onLogout: () => Promise<v
         </div>
 
         <form onSubmit={onSubmit} className="mt-6 space-y-4">
+          {!me.email_verified_at && !emailPromptDismissed && (
+            <div className="flex items-start justify-between gap-3 rounded-2xl border border-accent/30 bg-accent-light px-4 py-3 text-sm text-accent">
+              <p className="flex items-start gap-2">
+                <MailCheck className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>
+                  Verify your email to get booking confirmations and your check-in QR by email.
+                </span>
+              </p>
+              <button
+                type="button"
+                aria-label="Dismiss"
+                onClick={() => setEmailPromptDismissed(true)}
+                className="shrink-0 rounded-full p-0.5 transition-colors hover:bg-surface"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+
           <div>
             <label htmlFor="name" className="mb-1.5 block text-sm font-medium text-ink">
               Name
             </label>
             <Input id="name" name="name" defaultValue={me.name ?? ""} placeholder="Your name" />
+          </div>
+          <div>
+            <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-ink">
+              Email
+            </label>
+            <div className="flex items-center gap-2">
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                defaultValue={me.email ?? ""}
+                placeholder="you@example.com"
+                autoComplete="email"
+                onChange={(e) => setEnteredEmail(e.target.value)}
+              />
+              {me.email_verified_at && enteredEmail.trim() === (user.email ?? "") ? (
+                <Badge variant="success" className="shrink-0">
+                  <ShieldCheck className="h-3 w-3" /> Verified
+                </Badge>
+              ) : (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="shrink-0"
+                  onClick={() => setVerifyEmailOpen(true)}
+                >
+                  Verify email
+                </Button>
+              )}
+            </div>
+            {!me.email_verified_at && enteredEmail.trim() && enteredEmail.trim() !== (user.email ?? "") ? (
+              <p className="mt-1.5 text-xs text-ink-2">
+                Changing your email requires verifying the new address first.
+              </p>
+            ) : null}
           </div>
           <div>
             <label htmlFor="phone" className="mb-1.5 block text-sm font-medium text-ink">
@@ -180,6 +238,16 @@ function ProfileForm({ user, onLogout }: { user: User; onLogout: () => Promise<v
         open={verifyOpen}
         onClose={() => setVerifyOpen(false)}
         onVerified={(verified) => setMe(verified)}
+      />
+
+      <VerifyEmailModal
+        open={verifyEmailOpen}
+        initialEmail={enteredEmail || me.email}
+        onClose={() => setVerifyEmailOpen(false)}
+        onVerified={(verified) => {
+          setMe(verified);
+          setEnteredEmail(verified.email ?? "");
+        }}
       />
     </main>
   );

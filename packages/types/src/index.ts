@@ -47,6 +47,7 @@ export const UserSchema = z.object({
   city: z.string().nullable(),
   role: ROLE,
   phone_verified_at: z.string().nullable(),
+  email_verified_at: z.string().nullable().optional(),
   onboarding_state: z.enum(["pending", "accepted", "grandfathered"]).optional(),
   must_change_password: z.boolean().optional()
 });
@@ -94,6 +95,7 @@ export const VenueSchema = z.object({
   accepts_cash: z.boolean().optional(),
   venue_tax_rate: z.number().optional(),
   advance_days: z.number().optional(),
+  cancel_cutoff_hours: z.number().optional(),
   sports: z.array(z.string()).optional(),
   visibility: z.enum(["public", "private"]).optional(),
   slug: z.string().nullable().optional(),
@@ -166,18 +168,6 @@ export const WidgetInstanceInputSchema = z.object({
   enabled: z.boolean().optional()
 });
 export type WidgetInstanceInput = z.infer<typeof WidgetInstanceInputSchema>;
-
-export const WidgetVerifySendSchema = z.object({
-  sent: z.boolean(),
-  resend_after_seconds: z.number()
-});
-export type WidgetVerifySend = z.infer<typeof WidgetVerifySendSchema>;
-
-export const WidgetVerifyConfirmSchema = z.object({
-  token: z.string(),
-  is_new: z.boolean()
-});
-export type WidgetVerifyConfirm = z.infer<typeof WidgetVerifyConfirmSchema>;
 
 export const VenueDetailSchema = VenueSchema.extend({
   courts: z.array(CourtSchema),
@@ -299,6 +289,7 @@ export const BookingSchema = z.object({
   id: z.string(),
   court_id: z.string(),
   user_id: z.string(),
+  venue_id: z.string().optional(),
   start_at: z.string(),
   end_at: z.string(),
   price_per_slot: z.number(),

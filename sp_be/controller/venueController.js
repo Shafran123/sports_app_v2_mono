@@ -318,7 +318,7 @@ exports.getVenueBySlug = async (req, res) => {
 exports.updateVenue = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, address, city, phone, photos, amenities, accepts_cash, venue_tax_rate } = req.body;
+    const { name, description, address, city, phone, photos, amenities, accepts_cash, venue_tax_rate, cancel_cutoff_hours } = req.body;
 
     const { rows: venueRows } = await pool.query(
       `select * from venues where id = $1`,
@@ -344,6 +344,14 @@ exports.updateVenue = async (req, res) => {
       }
     }
 
+    let cancelCutoff = null;
+    if (cancel_cutoff_hours !== undefined) {
+      cancelCutoff = Number(cancel_cutoff_hours);
+      if (!Number.isInteger(cancelCutoff) || cancelCutoff < 0 || cancelCutoff > 168) {
+        return fail(res, 400, 'VENUE_VALIDATION', 'cancel_cutoff_hours must be a whole number between 0 and 168');
+      }
+    }
+
     const { rows: updated } = await pool.query(
       `update venues set
          name = coalesce($2, name),
@@ -355,6 +363,7 @@ exports.updateVenue = async (req, res) => {
          amenities = coalesce($8::jsonb, amenities),
          accepts_cash = coalesce($9, accepts_cash),
          venue_tax_rate = coalesce($10, venue_tax_rate),
+         cancel_cutoff_hours = coalesce($11, cancel_cutoff_hours),
          updated_at = now()
        where id = $1
        returning *`,
@@ -368,7 +377,8 @@ exports.updateVenue = async (req, res) => {
         photos !== undefined ? JSON.stringify(photos) : null,
         amenities !== undefined ? JSON.stringify(amenities) : null,
         accepts_cash !== undefined ? !!accepts_cash : null,
-        venueTax
+        venueTax,
+        cancelCutoff
       ]
     );
 

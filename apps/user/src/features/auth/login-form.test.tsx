@@ -1,13 +1,12 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
-const { sendPhoneOtpMock, confirmPhoneOtpMock, loginWithGoogleMock, meMock, setUserMock, pushMock } = vi.hoisted(() => ({
-  sendPhoneOtpMock: vi.fn(),
-  confirmPhoneOtpMock: vi.fn(),
+const { loginWithEmailMock, sendPasswordResetMock, loginWithGoogleMock, setUserMock, pushMock } = vi.hoisted(() => ({
+  loginWithEmailMock: vi.fn(),
+  sendPasswordResetMock: vi.fn(),
   loginWithGoogleMock: vi.fn(),
-  meMock: vi.fn(),
   setUserMock: vi.fn(),
   pushMock: vi.fn()
 }));
@@ -17,19 +16,18 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@myslot/auth", () => ({
-  loginWithEmail: vi.fn(),
+  loginWithEmail: loginWithEmailMock,
   loginWithGoogle: loginWithGoogleMock,
-  sendPhoneOtp: sendPhoneOtpMock,
-  confirmPhoneOtp: confirmPhoneOtpMock
+  sendPasswordReset: sendPasswordResetMock
 }));
 
 vi.mock("@/context/auth", () => ({
-  useAuth: () => ({ user: { id: "u1" }, loading: false, logout: vi.fn(), setUser: setUserMock })
+  useAuth: () => ({ user: { id: "u1", phone_verified_at: "2026-08-22T10:00:00.000Z", email_verified_at: "2026-08-22T10:00:00.000Z" }, loading: false, logout: vi.fn(), setUser: setUserMock })
 }));
 
 vi.mock("@myslot/api", () => ({
-  auth: { me: meMock, verifyPhoneSend: vi.fn(), verifyPhoneConfirm: vi.fn() },
-  featureFlags: { get: vi.fn(async () => ({ phone_verification_required: true, sms_enabled: false, payhere_enabled: false, events_discovery_state: "enabled", brand_name: "MySlot.LK" })) },
+  auth: { me: vi.fn() },
+  featureFlags: { get: vi.fn(async () => ({ phone_verification_required: false, sms_enabled: false, payhere_enabled: false, events_discovery_state: "enabled", brand_name: "MySlot.LK" })) },
   toApiFailure: (e: unknown) => ({ message: (e as Error).message })
 }));
 
@@ -44,103 +42,75 @@ function renderForm() {
   );
 }
 
-async function openPhoneTab(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByRole("tab", { name: "Phone OTP" }));
-}
-
-describe("LoginForm — phone OTP tab", () => {
+describe("LoginForm — email + Google sign-in", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("shows the SMS disclosure line", async () => {
-    const user = userEvent.setup();
+  it("shows the email form and the Google button, with no tab chrome", () => {
     renderForm();
-    await openPhoneTab(user);
-    expect(screen.getByText(/Standard SMS rates apply/)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("you@example.com")).toBeInTheDocument();
+    expect(screen.queryByRole("tab")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /continue with google/i })).toBeInTheDocument();
   });
 
-  it("rejects a malformed phone number locally without calling Firebase", async () => {
-    const user = userEvent.setup();
+  it("renders no tab pill at all — the email form is the only surface", () => {
     renderForm();
-    await openPhoneTab(user);
-
-    await user.type(screen.getByRole("textbox"), "071 234 5678");
-    await user.click(screen.getByRole("button", { name: /Send OTP/i }));
-
-    expect(screen.getByRole("alert")).toHaveTextContent("Enter a valid phone number with country code.");
-    expect(sendPhoneOtpMock).not.toHaveBeenCalled();
+    expect(screen.queryByRole("tab", { name: /email/i })).not.toBeInTheDocument();
   });
 
-  it("normalizes a valid phone number before sending", async () => {
-    sendPhoneOtpMock.mockResolvedValue({ confirm: vi.fn() });
-    const user = userEvent.setup();
-    renderForm();
-    await openPhoneTab(user);
-
-    await user.type(screen.getByRole("textbox"), "+94 71 234 5678");
-    await user.click(screen.getByRole("button", { name: /Send OTP/i }));
-
-    expect(sendPhoneOtpMock).toHaveBeenCalledWith("+94712345678");
-    expect(screen.getByText(/6-digit code/)).toBeInTheDocument();
-  });
-
-  it("toggles the password field between hidden and visible", async () => {
+  it("signs in with email and password", async () => {
     const user = userEvent.setup();
     renderForm();
 
-    const password = screen.getByLabelText("Password");
-    expect(password).toHaveAttribute("type", "password");
+    await user.type(screen.getByPlaceholderText("you@example.com"), "asif@example.com");
+    await user.type(screen.getByPlaceholderText("••••••••"), "secret123");
+    await user.click(screen.getByRole("button", { name: /log in/i }));
 
-    await user.click(screen.getByRole("button", { name: "Show password" }));
-    expect(password).toHaveAttribute("type", "text");
-
-    await user.click(screen.getByRole("button", { name: "Hide password" }));
-    expect(password).toHaveAttribute("type", "password");
-  });
-});
-
-describe("LoginForm — Google sign-in verify prompt", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    loginWithGoogleMock.mockResolvedValue(undefined);
-  });
-
-  it("offers phone verification after Google sign-in when unverified", async () => {
-    meMock.mockResolvedValue({
-      id: "u1",
-      email: "g@example.com",
-      name: "Google User",
-      phone: null,
-      city: null,
-      role: "player",
-      phone_verified_at: null
+    await waitFor(() => {
+      expect(loginWithEmailMock).toHaveBeenCalledWith("asif@example.com", "secret123");
+      expect(pushMock).toHaveBeenCalledWith("/dashboard");
     });
-    const user = userEvent.setup();
-    renderForm();
-
-    const googleButton = screen.getByRole("button", { name: /Continue with Google|Sign in with Google|Google/i });
-    await user.click(googleButton);
-
-    expect(await screen.findByText("Verify your phone")).toBeInTheDocument();
-    expect(pushMock).not.toHaveBeenCalled();
   });
 
-  it("goes straight to the dashboard when the account already has a verified phone", async () => {
-    meMock.mockResolvedValue({
-      id: "u1",
-      email: "g@example.com",
-      name: "Google User",
-      phone: "+94771234567",
-      city: null,
-      role: "player",
-      phone_verified_at: "2026-08-22T10:00:00.000Z"
+  it("sends a password-reset email when requested", async () => {
+    const user = userEvent.setup();
+    const alertSpy = vi.spyOn(window, "alert").mockImplementation(() => {});
+    renderForm();
+
+    await user.type(screen.getByPlaceholderText("you@example.com"), "asif@example.com");
+    await user.click(screen.getByRole("button", { name: /forgot password/i }));
+
+    await waitFor(() => {
+      expect(sendPasswordResetMock).toHaveBeenCalledWith("asif@example.com");
+      expect(alertSpy).toHaveBeenCalled();
     });
+  });
+
+  it("shows an error when the email is missing on forgot-password", async () => {
     const user = userEvent.setup();
     renderForm();
 
-    await user.click(screen.getByRole("button", { name: /Google/i }));
+    await user.click(screen.getByRole("button", { name: /forgot password/i }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/enter the email you signed up with/i);
+    expect(sendPasswordResetMock).not.toHaveBeenCalled();
+  });
 
-    expect(pushMock).toHaveBeenCalledWith("/dashboard");
+  it("routes to the dashboard after a Google sign-in", async () => {
+    const user = userEvent.setup();
+    const meMock = vi.fn(async () => ({
+      id: "u1",
+      phone_verified_at: "2026-08-22T10:00:00.000Z",
+      email_verified_at: "2026-08-22T10:00:00.000Z",
+      role: "player"
+    }));
+    const { auth } = await import("@myslot/api");
+    (auth.me as typeof vi.fn).mockImplementation(meMock);
+    renderForm();
+
+    await user.click(screen.getByRole("button", { name: /continue with google/i }));
+    await waitFor(() => {
+      expect(pushMock).toHaveBeenCalledWith("/dashboard");
+    });
   });
 });

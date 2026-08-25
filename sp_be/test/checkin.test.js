@@ -5,7 +5,7 @@ const pool = require('../db');
 
 const secret = new TextEncoder().encode('test-secret');
 const tokenFor = (uid) =>
-  new SignJWT({ uid }).setProtectedHeader({ alg: 'HS256' }).setIssuedAt().sign(secret);
+  new SignJWT({ uid, email: `${uid}@myslot.test`, email_verified: true }).setProtectedHeader({ alg: 'HS256' }).setIssuedAt().sign(secret);
 
 const COURT_ID = 'aaaaaaaa-0000-0000-0000-000000000001';
 

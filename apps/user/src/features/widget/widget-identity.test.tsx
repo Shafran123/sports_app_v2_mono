@@ -5,29 +5,37 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { BookPanel } from "./book-panel";
 
-const { phoneSendMock, phoneConfirmMock, checkoutMock, loginCustomMock, setUserMock } = vi.hoisted(() => ({
-  phoneSendMock: vi.fn(),
-  phoneConfirmMock: vi.fn(),
+const { checkoutMock, meMock, updateMeMock, verifyPhoneSendMock, verifyPhoneConfirmMock, verifyEmailSendMock, verifyEmailConfirmMock } = vi.hoisted(() => ({
   checkoutMock: vi.fn(),
-  loginCustomMock: vi.fn(),
-  setUserMock: vi.fn()
+  meMock: vi.fn(),
+  updateMeMock: vi.fn(),
+  verifyPhoneSendMock: vi.fn(),
+  verifyPhoneConfirmMock: vi.fn(),
+  verifyEmailSendMock: vi.fn(),
+  verifyEmailConfirmMock: vi.fn()
 }));
 
 let ctxUser: Record<string, unknown> | null = null;
+let ctxLoading = false;
 
 vi.mock("@/context/auth", () => ({
-  useAuth: () => ({ user: ctxUser, loading: false, setUser: setUserMock, logout: vi.fn() })
+  useAuth: () => ({ user: ctxUser, loading: ctxLoading, setUser: setUserMock, logout: vi.fn() })
 }));
 
+const { setUserMock } = vi.hoisted(() => ({ setUserMock: vi.fn() }));
+
 vi.mock("@myslot/api", () => ({
-  widget: {
-    config: vi.fn(),
-    phoneSend: phoneSendMock,
-    phoneConfirm: phoneConfirmMock
-  },
-  bookings: { checkout: checkoutMock },
+  widget: { config: vi.fn() },
+  bookings: { checkout: checkoutMock, list: vi.fn(async () => []), get: vi.fn(), cancel: vi.fn() },
   venues: { availability: vi.fn() },
-  auth: { me: vi.fn(async () => ({ id: "u-fresh", phone: "+94771234567", phone_verified_at: "2026-08-22T10:00:00.000Z", role: "player" })) },
+  auth: {
+    me: meMock,
+    updateMe: updateMeMock,
+    verifyPhoneSend: verifyPhoneSendMock,
+    verifyPhoneConfirm: verifyPhoneConfirmMock,
+    verifyEmailSend: verifyEmailSendMock,
+    verifyEmailConfirm: verifyEmailConfirmMock
+  },
   toApiFailure: (e: { code?: string; message?: string }) => ({
     status: 0,
     code: e?.code ?? "UNKNOWN",
@@ -36,7 +44,12 @@ vi.mock("@myslot/api", () => ({
 }));
 
 vi.mock("@myslot/auth", () => ({
-  loginWithCustomToken: loginCustomMock
+  loginWithEmail: vi.fn(),
+  registerWithEmail: vi.fn(),
+  loginWithGoogleRedirect: vi.fn(),
+  sendPasswordReset: vi.fn(),
+  logoutFirebase: vi.fn(),
+  finishGoogleRedirect: vi.fn(async () => false)
 }));
 
 vi.mock("qrcode", () => ({
@@ -59,6 +72,7 @@ const baseConfig = {
   accepts_cash: true,
   venue_tax_rate: 0,
   advance_days: 14,
+  cancel_cutoff_hours: 2,
   sports: ["Badminton"],
   courts: [],
   hours: [],
@@ -88,6 +102,16 @@ const availability = {
   ]
 };
 
+const verifiedUser = {
+  id: "u1",
+  name: "T",
+  email: "t@example.com",
+  phone: "+94771234567",
+  phone_verified_at: "2026-08-22T10:00:00.000Z",
+  email_verified_at: "2026-08-22T10:00:00.000Z",
+  role: "player"
+};
+
 function renderPanel() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -105,39 +129,43 @@ function wrap(ui: ReactNode) {
 describe("BookPanel", () => {
   beforeEach(() => {
     ctxUser = null;
+    ctxLoading = false;
     vi.clearAllMocks();
-  });
-
-  it("shows the unified phone identity step for a fresh visitor", () => {
-    renderPanel();
-    expect(screen.getByRole("heading", { name: /verify to book/i })).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("077 123 4567")).toBeInTheDocument();
-  });
-
-  it("verifies the phone, signs the visitor in, and unlocks booking", async () => {
-    phoneSendMock.mockResolvedValue({ sent: true });
-    phoneConfirmMock.mockResolvedValue({ token: "custom-token", is_new: true });
-    renderPanel();
-
-    await userEvent.type(screen.getByPlaceholderText("077 123 4567"), "0771234567");
-    await userEvent.click(screen.getByRole("button", { name: /send code/i }));
-    await waitFor(() => {
-      expect(screen.getByPlaceholderText("6-digit code")).toBeInTheDocument();
-    });
-
-    // A fresh visitor has no session yet — the panel only moves on once the
-    // auth user is set (by the identity step), so set it here.
-    await userEvent.type(screen.getByPlaceholderText("6-digit code"), "123456");
-    await userEvent.click(screen.getByRole("button", { name: /verify & book/i }));
-
-    await waitFor(() => {
-      expect(phoneConfirmMock).toHaveBeenCalledWith("abc123", "+94771234567", "123456");
-      expect(loginCustomMock).toHaveBeenCalledWith("custom-token");
+    meMock.mockResolvedValue({
+      id: "u-fresh",
+      name: null,
+      email: null,
+      phone: null,
+      role: "player"
     });
   });
 
-  it("shows the booking flow directly for an already-verified player and books cash", async () => {
-    ctxUser = { id: "u1", name: "T", phone: "+94771234567", phone_verified_at: "2026-08-22T10:00:00.000Z", role: "player" };
+  it("shows a skeleton while auth is loading instead of flashing the login form", () => {
+    ctxLoading = true;
+    renderPanel();
+    // The misleading "Sign in to book" login UI must NOT appear during auth
+    // resolution — a placeholder skeleton is shown until the session settles.
+    expect(screen.queryByRole("heading", { name: /sign in to book/i })).not.toBeInTheDocument();
+    expect(screen.getByTestId("identity-skeleton")).toBeInTheDocument();
+  });
+
+  it("keeps the skeleton during loading even when the session is already verified", () => {
+    ctxLoading = true;
+    ctxUser = verifiedUser;
+    renderPanel();
+    expect(screen.queryByRole("heading", { name: /book a slot/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /complete your booking details/i })).not.toBeInTheDocument();
+    expect(screen.getByTestId("identity-skeleton")).toBeInTheDocument();
+  });
+
+  it("shows the sign-in step for an anonymous visitor", () => {
+    renderPanel();
+    expect(screen.getByRole("heading", { name: /sign in to book/i })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("you@example.com")).toBeInTheDocument();
+  });
+
+  it("a fully-verified player skips straight to the picker", async () => {
+    ctxUser = verifiedUser;
     const { venues } = await import("@myslot/api");
     (venues.availability as typeof vi.fn).mockResolvedValue(availability);
     checkoutMock.mockResolvedValue({
@@ -149,18 +177,11 @@ describe("BookPanel", () => {
       expect(screen.getByText(/book a slot/i)).toBeInTheDocument();
     });
 
-    // duration + slot pick
     await userEvent.selectOptions(screen.getByLabelText(/duration/i), "60");
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: /10:00 pm|10:00/i })).toBeDefined();
+      expect(screen.getByRole("button", { name: /2026|10:00/i })).toBeDefined();
     });
-    // select the first available slot chip via its aria-pressed state
-    const chips = screen.getAllByRole("button").filter((b) => b.getAttribute("aria-pressed") === null);
-    // fall back: click the slot button labelled with the start time
-    const slotButton = screen.getByRole("button", {
-      name: /2026|10:00/i
-    });
-    await userEvent.click(slotButton);
+    await userEvent.click(screen.getByRole("button", { name: /2026|10:00/i }));
 
     await waitFor(() => {
       expect(screen.getByRole("button", { name: /confirm booking — pay at venue/i })).toBeEnabled();
@@ -182,35 +203,64 @@ describe("BookPanel", () => {
   });
 });
 
-// The WidgetIdentity flow (ticket 03) drives the embed's first step.
+// The WidgetIdentity flow (ticket 08) drives the embed's first step.
 import { WidgetIdentity } from "./widget-identity";
 
 describe("WidgetIdentity", () => {
   beforeEach(() => {
+    ctxUser = null;
     vi.clearAllMocks();
+    meMock.mockResolvedValue({
+      id: "u-1",
+      name: "Asif",
+      email: "asif@example.com",
+      phone: "+94771234000",
+      phone_verified_at: "2026-08-22T10:00:00.000Z",
+      email_verified_at: "2026-08-22T10:05:00.000Z",
+      role: "player"
+    });
+    verifyPhoneSendMock.mockResolvedValue({ sent: true, resend_after_seconds: 60 });
+    verifyPhoneConfirmMock.mockResolvedValue({
+      id: "u-1",
+      name: "Asif",
+      email: "asif@example.com",
+      phone: "+94771234000",
+      phone_verified_at: "2026-08-22T10:00:00.000Z",
+      email_verified_at: "2026-08-22T10:05:00.000Z",
+      role: "player"
+    });
+    verifyEmailSendMock.mockResolvedValue({ sent: true, resend_after_seconds: 60 });
+    verifyEmailConfirmMock.mockResolvedValue({
+      id: "u-1",
+      name: "Asif",
+      email: "asif@example.com",
+      phone: "+94771234000",
+      phone_verified_at: "2026-08-22T10:00:00.000Z",
+      email_verified_at: "2026-08-22T10:05:00.000Z",
+      role: "player"
+    });
   });
 
-  it("sends the OTP and reveals the code step, then signs in with the returned token", async () => {
-    phoneSendMock.mockResolvedValue({ sent: true, resend_after_seconds: 60 });
-    const onDone = vi.fn();
-    wrap(<WidgetIdentity widgetKey="k1" onDone={onDone} />);
+  it("shows the sign-in form (email + Google) with a register link", () => {
+    wrap(<WidgetIdentity widgetKey="k1" onDone={vi.fn()} />);
+    expect(screen.getByRole("heading", { name: /sign in to book/i })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("you@example.com")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /continue with google/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /create an account/i })).toBeInTheDocument();
+  });
 
-    await userEvent.type(screen.getByPlaceholderText("077 123 4567"), "+94771234000");
-    await userEvent.click(screen.getByRole("button", { name: /send code/i }));
-
-    await waitFor(() => {
-      expect(phoneSendMock).toHaveBeenCalledWith("k1", "+94771234000");
-      expect(screen.getByPlaceholderText("6-digit code")).toBeInTheDocument();
-    });
-
-    phoneConfirmMock.mockResolvedValue({ token: "tk-1", is_new: false });
-    await userEvent.type(screen.getByPlaceholderText("6-digit code"), "112233");
-    await userEvent.click(screen.getByRole("button", { name: /verify & book/i }));
-
-    await waitFor(() => {
-      expect(phoneConfirmMock).toHaveBeenCalledWith("k1", "+94771234000", "112233");
-      expect(loginCustomMock).toHaveBeenCalledWith("tk-1");
-      expect(onDone).toHaveBeenCalled();
-    });
+  it("opens the details step when a returning player lacks a verified email", async () => {
+    ctxUser = {
+      id: "u-1",
+      name: "Asif",
+      email: "asif@example.com",
+      phone: "+94771234000",
+      phone_verified_at: "2026-08-22T10:00:00.000Z",
+      role: "player"
+    };
+    wrap(<WidgetIdentity widgetKey="k1" onDone={vi.fn()} />);
+    expect(screen.getByRole("heading", { name: /complete your booking details/i })).toBeInTheDocument();
+    expect(screen.getByText(/verified phone/i)).toBeInTheDocument();
+    expect(screen.getByText(/verified email/i)).toBeInTheDocument();
   });
 });

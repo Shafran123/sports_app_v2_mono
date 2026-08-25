@@ -25,7 +25,7 @@ The unique identifier of a Widget Instance, used in the embed URL (`/embed/<key>
 _Avoid_: widget key, widget_key (API name)
 
 **Venue**:
-A sports facility that lists courts for hire. Belongs to a **Business** (which a Venue Owner account manages), and has an address, photos, opening windows, a cancellation policy, and an advance-booking horizon. Lifecycle: pending → approved → (rejected / suspended / banned / archived).
+A sports facility that lists courts for hire. Belongs to a **Business** (which a Venue Owner account manages), and has an address, photos, opening windows, a cancellation policy, a **Cancel Cutoff**, and an advance-booking horizon. Lifecycle: pending → approved → (rejected / suspended / banned / archived).
 _Avoid_: Yard, facility, arena
 
 **Venue Suspension**:
@@ -41,7 +41,8 @@ A Venue that is bookable but not discoverable — absent from browse, search, an
 _Avoid_: hidden listing, private listing, ghost venue
 
 **Booking Widget**:
-The embeddable booking interface a Venue Owner publishes on their own website (iframe) to sell their Venues' courts to their own audience. Delivered as one or more **Widget Instances** per **Business**, each keyed by its own **Embed Key** and pinned to a **Default Venue** — so one embed always books the intended Venue, or lets the customer choose from the Business's approved Venues; tied to a per-Instance domain allowlist (Owner self-serve) so it only renders where the Owner authorized it. Offered to any Business; required for a Private Venue (that Venue's only public surface). The buyer verifies a phone (or signs in with a Player account) and books — online payment optional per the Owner's choice, otherwise cash at the venue. The widget exposes the Business's full booking engine (all courts, availability, Variable Pricing, Offers, Closed Dates). When online payments land (P2), the widget uses **embedded checkout** (hosted payment fields inside the iframe), not a redirect, so the flow stays in the iframe and lands back on its success screen.
+The embeddable booking interface a Venue Owner publishes on their own website (iframe) to sell their Venues' courts to their own audience. Delivered as one or more **Widget Instances** per **Business**, each keyed by its own **Embed Key** and pinned to a **Default Venue** — so one embed always books the intended Venue, or lets the customer choose from the Business's approved Venues; tied to a per-Instance domain allowlist (Owner self-serve) so it only renders where the Owner authorized it. Offered to any Business; required for a Private Venue (that Venue's only public surface). The widget signs the buyer in exactly like the app — email + password or Google (Firebase redirect in the iframe, not popup) — and a Player must hold a **Verified Phone** and a **Verified Email** before the picker unlocks; online payment optional per the Owner's choice, otherwise cash at the venue. The widget exposes the Business's full booking engine (all courts, availability, Variable Pricing, Offers, Closed Dates). When online payments land (P2), the widget uses **embedded checkout** (hosted payment fields inside the iframe), not a redirect, so the flow stays in the iframe and lands back on its success screen.
+_Note_: The widget renders the Business's brand with a persistent "Powered by MySlot.LK" attribution, and lets the signed-in Player view and cancel their own bookings for that Venue from inside the embed.
 _Avoid_: embed widget, booking iframe, widget (bare)
 
 **Branded Venue Page**:
@@ -89,7 +90,7 @@ _Note_: A booking has a payment method (online via PayHere, or cash collected at
 **QR Token**:
 A random, secret, single-use string minted when a Booking is created. Encoded in the player's check-in QR code; the venue consumes it by scanning and checking in. Re-scanning a consumed token returns "already used." Disclosed to the Booking's Player in their own app and in transactional emails sent to that player's inbox (booking confirmation, reminder, and bill); never surfaced to Venue Owners or in venue-facing read APIs. Disclosed only to the Booking's Player (in their own app) and consumed only by the Venue Owner of the Venue the Booking was made on — the check-in validates ownership of the Venue as well as the identity of the Token.
 _Avoid_: ticket number, booking ID (the Booking UUID is NOT the QR token)
-_Note_: For widget bookings the QR is also shown on the widget's success screen and sent by SMS/email to the verified phone/inbox — a fresh widget Player may never open their own app, but must be able to check in.
+_Note_: For widget bookings the QR is also shown on the widget's success screen and sent by SMS/email to the verified phone/**Verified Email** inbox — a fresh widget Player may never open their own app, but must be able to check in. Phone-only bookings receive only a QR link by SMS, not a rendered QR, which is why the widget requires a Verified Email.
 
 **Payment**:
 A recorded transfer of money for a Booking or Event Registration. Online payments come from PayHere; cash payments are recorded by the Venue Owner when collected. Status: pending / paid / failed / refunded. Cash payments never sit in pending — the owner records them as paid on collection.
@@ -107,7 +108,16 @@ _Avoid_: attendance
 A confirmed Booking whose slot passed without check-in or cancellation.
 
 **Cancellation**:
-Player-initiated termination of a Booking before its slot; refunded per policy tiers.
+Player-initiated termination of a Booking before its slot, allowed only up to the Venue's **Cancel Cutoff**. Online-paid bookings refund per the platform cancellation tiers; cash bookings have nothing to refund.
+_Avoid_: refund (cancellation is the act; a refund is a separate consequence)
+
+**Cancel Cutoff**:
+The Venue-level setting, in hours before a Booking's start, by which a Player may still self-cancel (default 2 hours). Past the cutoff a Booking can only be cancelled with the Venue Owner, not self-service. Distinct from the global cancellation tiers, which govern refunds, not the self-service window.
+_Avoid_: cancel window, cancel-block, cancel deadline
+
+**Verified Email**:
+An email address on a Player account proven to belong to that Player by passing an email OTP challenge sent by the backend (or attested by an email provider on Google sign-in). Both the Booking Widget and the app require a Verified Email to create Bookings — the QR must reach an inbox, since a phone-only Player receives only a QR *link* by SMS — and it unlocks email confirmations and reminders. A Google-verified email needs no OTP. Changing the email clears verified status until the new address is re-verified.
+_Avoid_: confirmed email, validated email, trusted inbox
 
 **Event**:
 A one-off sports activity (date, time, capacity, price) created by a Venue Owner or Admin. Sells registrations like tickets.
@@ -118,7 +128,7 @@ A paid ticket for an Event.
 _Avoid_: event booking
 
 **Player**:
-An end user who browses, books, and registers.
+An end user who browses, books, and registers. Signs in with email+password or Google; on first sign-in completes a details step collecting name, a **Verified Phone**, and a **Verified Email** before the first booking. Both verification attributes gate booking on every surface.
 _Avoid_: user, customer, member
 
 **Player Suspension**:
@@ -173,13 +183,8 @@ _Avoid_: owner notification, venue update
 A transactional email about a domain event — signup welcome, booking confirmation, booking reminder, booking alerts, venue approved/rejected. Sent fire-and-forget via Mailgun; never blocks the request.
 _Avoid_: marketing email, newsletter
 
-**Phone Sign-in**:
-Signing in to a Spots account using a one-time code received by SMS to the Player's phone number (Firebase Auth). Opportunistic — any account seeded this way can later be linked to richer sign-in methods. Distinct from **Phone Verification**: completing a Phone Sign-in does **not** verify the phone.
-_Avoid_: OTP login, SMS login (a code is not the sign-in; the phone number is)
-_Note_: Distinct from **SMS Notification**, which is an outbound transactional SMS about a Booking.
-
 **Verified Phone**:
-A phone number on a Player account proven to belong to that Player by passing an SMS OTP challenge sent by the Spots backend (SMSGo.lk), or by explicit Admin marking. Only a Verified Phone may be used to create court Bookings. A phone typed into a form, or used for Phone Sign-in, is not verified until the challenge completes. Changing the phone number clears verified status until the new number is re-verified.
+A phone number on a Player account proven to belong to that Player by passing an SMS OTP challenge sent by the Spots backend (SMSGo.lk), or by explicit Admin marking. A Player must hold a Verified Phone to create court Bookings — on both the app and the Booking Widget. A phone typed into a form is not verified until the challenge completes. Changing the phone number clears verified status until the new number is re-verified.
 _Avoid_: confirmed phone, validated phone, trusted number
 
 **SMS Notification**:

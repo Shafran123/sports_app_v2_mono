@@ -84,6 +84,7 @@ module.exports = {
   buildOwnerBookingHtml: emailTemplates.buildOwnerBookingHtml,
   buildReminderHtml: emailTemplates.buildReminderHtml,
   buildWelcomeHtml: emailTemplates.buildWelcomeHtml,
+  buildVerificationCodeHtml: emailTemplates.buildVerificationCodeHtml,
   buildVenueApprovedHtml: emailTemplates.buildVenueApprovedHtml,
   buildVenueRejectedHtml: emailTemplates.buildVenueRejectedHtml,
   buildBillHtml: emailTemplates.buildBillHtml,

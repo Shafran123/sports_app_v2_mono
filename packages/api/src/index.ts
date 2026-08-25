@@ -41,9 +41,7 @@ import {
   WidgetInstanceSchema,
   WidgetInstanceExtSchema,
   BusinessInfoSchema,
-  BusinessProfileSchema,
-  WidgetVerifyConfirmSchema,
-  WidgetVerifySendSchema
+  BusinessProfileSchema
 } from "@myslot/types";
 import type { OwnerAgreement, OwnerPlan, VenueBrand, WidgetInstanceInput } from "@myslot/types";
 export { TOKEN_KEY } from "./client";
@@ -116,6 +114,7 @@ export const venues = {
       amenities: string[];
       accepts_cash: boolean;
       venue_tax_rate: number;
+      cancel_cutoff_hours: number;
     }>,
     client: AxiosInstance = getClient()
   ) {
@@ -182,8 +181,21 @@ export const bookings = {
     const res = await client.post("/bookings/checkout", input);
     return parseData(CheckoutResultSchema, res.data.data ?? res.data);
   },
-  async list(status?: string, client: AxiosInstance = getClient()) {
-    const res = await client.get("/bookings", { params: status ? { status } : {} });
+  async list(
+    status?: string,
+    optsOrClient: { venue_id?: string } | AxiosInstance = {},
+    client: AxiosInstance = getClient()
+  ) {
+    // Backward-compatible: callers may pass the client as the second arg.
+    const isClient = typeof (optsOrClient as AxiosInstance).get === "function";
+    const opts = isClient ? {} : (optsOrClient as { venue_id?: string });
+    const realClient = isClient ? (optsOrClient as AxiosInstance) : client;
+    const res = await realClient.get("/bookings", {
+      params: {
+        status: status || undefined,
+        venue_id: opts.venue_id || undefined
+      }
+    });
     return parseList(BookingSchema, res.data.data ?? res.data);
   },
   async get(id: string, client: AxiosInstance = getClient()) {
@@ -273,24 +285,6 @@ export const widget = {
       params: opts.origin ? { origin: opts.origin } : {}
     });
     return parseData(WidgetInstanceConfigSchema, res.data.data ?? res.data);
-  },
-  async phoneSend(key: string, phone: string, client: AxiosInstance = getClient()) {
-    const res = await client.post(`/public/widget/${key}/phone/send`, { phone });
-    return parseData(WidgetVerifySendSchema, res.data.data ?? res.data);
-  },
-  async phoneConfirm(key: string, phone: string, code: string, client: AxiosInstance = getClient()) {
-    const res = await client.post(`/public/widget/${key}/phone/confirm`, { phone, code });
-    return parseData(WidgetVerifyConfirmSchema, res.data.data ?? res.data);
-  },
-  // Keyless identity for the branded page (per-venue, no instance): the OTP
-  // challenge itself is the security boundary; the server accepts both forms.
-  async phoneSendKeyless(phone: string, client: AxiosInstance = getClient()) {
-    const res = await client.post("/public/widget/phone/send", { phone });
-    return parseData(WidgetVerifySendSchema, res.data.data ?? res.data);
-  },
-  async phoneConfirmKeyless(phone: string, code: string, client: AxiosInstance = getClient()) {
-    const res = await client.post("/public/widget/phone/confirm", { phone, code });
-    return parseData(WidgetVerifyConfirmSchema, res.data.data ?? res.data);
   }
 };
 
@@ -312,6 +306,14 @@ export const auth = {
   },
   async verifyPhoneConfirm(phone: string, code: string, client: AxiosInstance = getClient()) {
     const res = await client.post("/auth/verify-phone/confirm", { phone, code });
+    return parseData(UserSchema, res.data.data ?? res.data);
+  },
+  async verifyEmailSend(email: string, client: AxiosInstance = getClient()) {
+    const res = await client.post("/auth/verify-email/send", { email });
+    return res.data.data as { sent: boolean; resend_after_seconds: number };
+  },
+  async verifyEmailConfirm(email: string, code: string, client: AxiosInstance = getClient()) {
+    const res = await client.post("/auth/verify-email/confirm", { email, code });
     return parseData(UserSchema, res.data.data ?? res.data);
   }
 };
