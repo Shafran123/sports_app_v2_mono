@@ -89,7 +89,8 @@ async function sendSms({ to, message }) {
         'Content-Type': 'application/json',
         'X-API-Key': process.env.SMSGO_API_KEY
       },
-      body: JSON.stringify({ to, message, mask: process.env.SMSGO_MASK || DEFAULT_MASK })
+      // SMSGo expects a bare national number ("9477…") — strip the E.164 "+".
+      body: JSON.stringify({ to: String(to).replace(/^\+/, ''), message, mask: process.env.SMSGO_MASK || DEFAULT_MASK })
     });
 
     if (!res.ok) {
@@ -98,8 +99,18 @@ async function sendSms({ to, message }) {
       return { success: false, error: `SMSGo ${res.status}` };
     }
 
+    // SMSGo returns { success: true, data: { id: "msg_…" } } — surface the id so
+    // the notification catalog can record it as the provider ref.
+    let providerId = null;
+    try {
+      const payload = await res.json();
+      providerId = payload?.data?.id || null;
+    } catch {
+      providerId = null;
+    }
+
     logger.info(`SMS sent successfully to ${to}`);
-    return { success: true, id: null };
+    return { success: true, id: providerId };
   } catch (err) {
     logger.error(`SMS exception: ${err.message}`);
     return { success: false, error: err.message };

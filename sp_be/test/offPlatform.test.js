@@ -33,8 +33,9 @@ const colomboDate = (daysFromNow) => {
 const isoColombo = (dateStr, timeStr) => `${dateStr}T${timeStr}:00+05:30`;
 
 function codeFromSms(phone) {
+  const wireTo = phone.replace(/^\+/, '');
   const call = posted.mock.calls.findLast(
-    ([, opts]) => typeof opts === 'object' && opts && JSON.parse(opts.body || '{}').to === phone
+    ([, opts]) => typeof opts === 'object' && opts && JSON.parse(opts.body || '{}').to === wireTo
   );
   if (!call) return null;
   const match = String(JSON.parse(call[1].body).message).match(/\b(\d{6})\b/);
@@ -121,7 +122,7 @@ describe('private venues + business scoping (tickets 01, 02)', () => {
     await enableSms();
     // SMSGo is exercised through the real fetch path; stub the network like
     // the notification suites do and capture what WOULD have been sent.
-    posted = vi.fn(async (_url, opts) => ({ ok: true, status: 200, text: async () => '' }));
+    posted = vi.fn(async (_url, opts) => ({ ok: true, status: 200, text: async () => '', json: async () => ({ success: true, data: { id: 'msg_widget' } }) }));
     vi.stubGlobal('fetch', posted);
     PLAYER_TOKEN = await tokenFor('widget-player-uid');
     OWNER_TOKEN = await tokenFor('widget-owner-uid');

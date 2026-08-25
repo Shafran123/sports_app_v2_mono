@@ -148,7 +148,7 @@ describe('notification catalog', () => {
     process.env.MAILGUN_API_KEY = 'mg-key';
     process.env.MAILGUN_DOMAIN = 'mg.example.com';
     process.env.SMSGO_API_KEY = 'sg-key';
-    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, text: async () => '' })));
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, text: async () => '', json: async () => ({ success: true, data: { id: 'msg_sms' } }) })));
 
     const booking = {
       id: 'catalog-2',
@@ -174,6 +174,9 @@ describe('notification catalog', () => {
     );
     expect(out.rows.length).toBe(4);
     expect(out.rows.every((r) => r.status === 'sent')).toBe(true);
+    const smsRows = out.rows.filter((r) => r.channel === 'sms');
+    expect(smsRows.length).toBe(2);
+    expect(smsRows.every((r) => r.provider_ref === 'msg_sms')).toBe(true);
   });
 
   it('a throwing transport never propagates and records failed', async () => {

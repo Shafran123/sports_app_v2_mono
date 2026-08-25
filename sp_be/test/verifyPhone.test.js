@@ -19,8 +19,9 @@ let token;
 let posted;
 
 function codeFromSms(phone) {
+  const wireTo = phone.replace(/^\+/, '');
   const call = posted.mock.calls.findLast(
-    ([, opts]) => JSON.parse(opts.body).to === phone
+    ([, opts]) => JSON.parse(opts.body).to === wireTo
   );
   if (!call) return null;
   const match = String(JSON.parse(call[1].body).message).match(/\b(\d{6})\b/);
@@ -76,7 +77,7 @@ describe('phone verification — SMSGo OTP challenge', () => {
     expect(posted).toHaveBeenCalledTimes(1);
     const [, opts] = posted.mock.calls[0];
     const body = JSON.parse(opts.body);
-    expect(body.to).toBe('+94771234567');
+    expect(body.to).toBe('94771234567');
     expect(body.mask).toBe('MYSLOT');
     expect(body.message).toContain('verification code');
     expect(codeFromSms('+94771234567')).toMatch(/^\d{6}$/);
@@ -252,7 +253,7 @@ describe('phone verification — SMSGo OTP challenge', () => {
     );
     expect(rows[0].n).toBe(0);
 
-    posted = vi.fn(async () => ({ ok: true, status: 200, text: async () => '' }));
+    posted = vi.fn(async () => ({ ok: true, status: 200, text: async () => '', json: async () => ({ success: true, data: { id: 'msg_otp' } }) }));
     vi.stubGlobal('fetch', posted);
     const again = await request(app)
       .post('/api/v1/auth/verify-phone/send')
