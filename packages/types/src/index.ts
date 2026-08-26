@@ -63,6 +63,14 @@ export type Sport = z.infer<typeof SportSchema>;
 
 /* ---------- Venues ---------- */
 
+export const BrandContactSchema = z.object({
+  phone: z.string().optional(),
+  email: z.string().optional(),
+  address: z.string().optional(),
+  hours: z.string().optional()
+});
+export type BrandContact = z.infer<typeof BrandContactSchema>;
+
 export const BrandSchema = z.object({
   colors: z
     .object({
@@ -72,7 +80,12 @@ export const BrandSchema = z.object({
     .optional(),
   logo_url: z.string().optional(),
   tagline: z.string().optional(),
-  about: z.string().optional()
+  about: z.string().optional(),
+  // Site-brand tokens (ADR-0031): hero + headline for the portfolio root,
+  // and the contact block mirrored in the footer/footer strip.
+  hero_image: z.string().optional(),
+  headline: z.string().optional(),
+  contact: BrandContactSchema.optional()
 });
 export type VenueBrand = z.infer<typeof BrandSchema>;
 
@@ -205,7 +218,13 @@ export const SiteVenueSchema = z.object({
   address: z.string().nullable(),
   photos: z.array(z.string()),
   sports: z.array(z.string()),
-  visibility: z.enum(["public", "private"]).optional()
+  visibility: z.enum(["public", "private"]).optional(),
+  // Coordinates fuel the auto Google-Maps link on the site's venue cards
+  // (ADR-0031): hidden when unset, never re-entered by the owner.
+  lat: z.number().nullable().optional(),
+  lng: z.number().nullable().optional(),
+  // Cheapest active court price, for the "from" caption on the cards.
+  min_price: z.number().nullable().optional()
 });
 export type SiteVenue = z.infer<typeof SiteVenueSchema>;
 

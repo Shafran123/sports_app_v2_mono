@@ -15,13 +15,19 @@ const router = express.Router();
 // table carries no sports column; they live in venue_sports).
 async function siteVenues(businessId) {
   const { rows } = await pool.query(
-    `select v.id, v.name, v.slug, v.city, v.address, v.photos, v.visibility,
-            coalesce((
+    `select v.id, v.name, v.slug, v.city, v.address, v.photos, v.visibility, v.lat, v.lng,
+            coalesce(court_stats.min_price, null) as min_price,
+coalesce((
               select jsonb_agg(s.name order by vs.sport_id)
               from venue_sports vs join sports s on s.id = vs.sport_id
               where vs.venue_id = v.id
             ), '[]'::jsonb) as sports
      from venues v
+     left join (
+       select venue_id, min(price_per_slot) as min_price
+       from courts where is_active
+       group by venue_id
+     ) court_stats on court_stats.venue_id = v.id
      where v.business_id = $1 and v.status = 'approved'
      order by v.created_at`,
     [businessId]

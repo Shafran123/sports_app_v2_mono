@@ -41,8 +41,32 @@ const config = (count = 2) => ({
     address: "1 Test Rd",
     photos: [],
     sports: ["Badminton"],
-    visibility: i === 1 ? "private" : "public"
+    visibility: i === 1 ? "private" : "public",
+    lat: i === 0 ? 6.9271 : null,
+    lng: i === 0 ? 79.8612 : null,
+    min_price: i === 0 ? 1000 : null
   }))
+});
+
+const siteBrand = (extra = {}) => ({
+  business: {
+    id: "b1",
+    name: "ABC Sports",
+    brand: {
+      colors: { primary: "#16a34a" },
+      logo_url: "https://cdn.test/logo.png",
+      tagline: "Book direct",
+      hero_image: "https://cdn.test/hero.jpg",
+      headline: "Colombo’s home of badminton",
+      about: "We run courts since 1998. ".repeat(12).trim(),
+      contact: { phone: "+94 77 123 4567", email: "hello@abc.lk", address: "12 Galle Rd, Colombo", hours: "Mon–Sun 6am–11pm" },
+      ...extra
+    }
+  },
+  venues: [
+    { id: "v1", name: "Venue 1", slug: "venue-1", city: "Colombo", address: "1 Test Rd", photos: [], sports: ["Badminton"], visibility: "public" },
+    { id: "v2", name: "Venue 2", slug: "venue-2", city: "Colombo", address: "2 Test Rd", photos: [], sports: ["Tennis"], visibility: "private" }
+  ]
 });
 
 function renderWithProvider(node: ReactNode) {
@@ -62,6 +86,16 @@ describe("SiteChrome", () => {
   it("hides the switch control for a single-venue business", () => {
     renderWithProvider(<SiteChrome config={config(1)}>body</SiteChrome>);
     expect(screen.queryByRole("link", { name: "Switch venue" })).toBeNull();
+  });
+
+  it("maps the brand colors onto the design tokens so the whole site is branded (ADR-0031)", () => {
+    const { container } = renderWithProvider(<SiteChrome config={config()}>body</SiteChrome>);
+    const root = container.firstElementChild as HTMLElement;
+    expect(root.style.getPropertyValue("--color-primary")).toBe("#16a34a");
+    expect(root.style.getPropertyValue("--color-accent")).toBe("#2563eb");
+    expect(root.style.getPropertyValue("--color-primary-hover")).toContain("color-mix");
+    expect(root.style.getPropertyValue("--color-primary-light")).toContain("color-mix");
+    expect(root.style.getPropertyValue("--brand-bg")).toContain("color-mix");
   });
 });
 
@@ -101,5 +135,43 @@ describe("SiteHome", () => {
     localStorage.setItem(`site-picker-dismissed-${window.location.hostname}`, "1");
     renderWithProvider(<SiteHome config={config()} />);
     expect(screen.queryByTestId("site-picker")).toBeNull();
+  });
+
+  it("renders the site-brand hero: hero image, headline, about and book-now CTA (ADR-0031)", () => {
+    renderWithProvider(<SiteHome config={siteBrand()} />);
+    const hero = screen.getByAltText("ABC Sports");
+    expect(hero).toHaveAttribute("src", "https://cdn.test/hero.jpg");
+    expect(screen.getByText("Colombo’s home of badminton")).toBeInTheDocument();
+    expect(screen.getByText(/We run courts since 1998/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Book now" })).toBeInTheDocument();
+  });
+
+  it("falls back to the logo/venue photo and tagline when no hero is set", () => {
+    renderWithProvider(<SiteHome config={config()} />);
+    expect(screen.getByAltText("ABC Sports")).toHaveAttribute("src", "https://cdn.test/logo.png");
+  });
+
+  it("renders the contact strip when contact fields exist and omits it otherwise", () => {
+    renderWithProvider(<SiteHome config={siteBrand()} />);
+    expect(screen.getByText("+94 77 123 4567")).toBeInTheDocument();
+    expect(screen.getByText("hello@abc.lk")).toBeInTheDocument();
+    expect(screen.getByText("Mon–Sun 6am–11pm")).toBeInTheDocument();
+  });
+
+  it("hides the contact strip when no contact fields are set", () => {
+    renderWithProvider(<SiteHome config={siteBrand({ contact: {} })} />);
+    expect(screen.queryByText("hello@abc.lk")).toBeNull();
+  });
+
+  it("links venue cards to Google Maps from lat/lng, hidden when unset (ADR-0031)", () => {
+    renderWithProvider(<SiteHome config={config()} />);
+    const directions = screen.getByRole("link", { name: /directions to venue 1/i });
+    expect(directions).toHaveAttribute("href", "https://www.google.com/maps/search/?api=1&query=6.9271,79.8612");
+    expect(screen.queryByRole("link", { name: /directions to venue 2/i })).toBeNull();
+  });
+
+  it("shows the cheapest court price on cards that have one (ADR-0031)", () => {
+    renderWithProvider(<SiteHome config={config()} />);
+    expect(screen.getByText("Rs 1,000")).toBeInTheDocument();
   });
 });

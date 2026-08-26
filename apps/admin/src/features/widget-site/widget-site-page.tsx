@@ -6,9 +6,9 @@
 // per-venue "Widget & page" tab — the widget is owned by the Business, not
 // the venue.
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { business, featureFlags, toApiFailure } from "@myslot/api";
+import { business, featureFlags, toApiFailure, uploads } from "@myslot/api";
 import {
   Badge,
   Button,
@@ -23,7 +23,7 @@ import {
   Skeleton,
   Textarea
 } from "@myslot/ui";
-import { Copy, Eye, Globe, Plus, Trash2, X } from "lucide-react";
+import { Copy, Globe, Plus, Trash2, X } from "lucide-react";
 import type { BusinessProfile, WidgetInstance, WidgetInstanceInput } from "@myslot/types";
 import { SiteRequestSection } from "./site-request-section";
 
@@ -80,7 +80,9 @@ export function WidgetSitePage() {
         </p>
       </div>
 
-      <BusinessEditor profile={profile} appOrigin={appOrigin} onSaved={invalidate} />
+      <BusinessBrandCard profile={profile} onSaved={invalidate} />
+
+      <SiteBrandCard profile={profile} onSaved={invalidate} />
 
       <SiteRequestSection />
 
@@ -142,7 +144,84 @@ export function WidgetSitePage() {
   );
 }
 
-function BusinessEditor({ profile, appOrigin, onSaved }: { profile: BusinessProfile; appOrigin: string; onSaved: () => void }) {
+function SingleImageField({
+  label,
+  value,
+  onChange
+}: {
+  label: string;
+  value: string;
+  onChange: (url: string) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
+
+  const pick = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const file = files[0];
+    if (!file) return;
+    setError("");
+    setUploading(true);
+    try {
+      const dataUrl = await readAsDataUrl(file);
+      const base64 = dataUrl.split(",")[1];
+      if (!base64) throw new Error("Could not read file as image");
+      const { url } = await uploads.upload({ filename: file.name, data: base64 });
+      onChange(url);
+    } catch (err) {
+      setError(toApiFailure(err).message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="sm:col-span-2">
+      <span className="mb-1.5 block text-xs font-medium text-ink-2">{label}</span>
+      <div className="flex items-center gap-2">
+        <Button type="button" variant="secondary" size="sm" onClick={() => inputRef.current?.click()} loading={uploading}>
+          {uploading ? "Uploading…" : "Upload image"}
+        </Button>
+        <Input value={value} onChange={(e) => onChange(e.target.value)} placeholder="https://cdn.example.com/image.jpg" aria-label={label} className="flex-1" />
+      </div>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        className="hidden"
+        onChange={(e) => {
+          void pick(e.target.files);
+          e.target.value = "";
+        }}
+      />
+      {value ? (
+        <div className="mt-2 flex items-center gap-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={value} alt="" className="h-16 w-28 rounded-xl border border-border object-cover" />
+          <Button type="button" variant="ghost" size="sm" onClick={() => onChange("")}>Remove</Button>
+        </div>
+      ) : null}
+      <p className="mt-2 text-xs text-ink-3">PNG, JPG or WebP · max 8MB</p>
+      {error && <p className="mt-2 text-sm text-error">{error}</p>}
+    </div>
+  );
+}
+
+function readAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("Could not read file"));
+    reader.readAsDataURL(file);
+  });
+}
+
+// The business-wide brand (ADR-0031): name, colors, logo, tagline, about —
+// shared with every widget and branded page. Sends the FULL brand object so a
+// site-brand save never clobbers these tokens (the backend replaces brand as
+// a whole).
+function BusinessBrandCard({ profile, onSaved }: { profile: BusinessProfile; onSaved: () => void }) {
   const queryClient = useQueryClient();
   const [name, setName] = useState(profile.name);
   const [primary, setPrimary] = useState(profile.brand?.colors?.primary ?? "");
@@ -158,17 +237,20 @@ function BusinessEditor({ profile, appOrigin, onSaved }: { profile: BusinessProf
       business.updateMe({
         name: name.trim() || undefined,
         brand: {
+          ...profile.brand,
           colors: {
             primary: primary.trim() || undefined,
             accent: accent.trim() || undefined
           },
-          logo_url: logoUrl.trim() || undefined,
-          tagline: tagline.trim() || undefined,
-          about: about.trim() || undefined
+          // Text/URL tokens send '' when cleared so the merge in updateProfile
+          // persists the removal (an undefined key would leave the old value).
+          logo_url: logoUrl.trim(),
+          tagline: tagline.trim(),
+          about: about.trim()
         }
       }),
     onSuccess: () => {
-      setNotice("Business saved. This brand is used across every widget and page.");
+      setNotice("Business brand saved. This name and look is used everywhere.");
       setError("");
       onSaved();
       void queryClient.invalidateQueries({ queryKey: ["business-me"] });
@@ -181,19 +263,11 @@ function BusinessEditor({ profile, appOrigin, onSaved }: { profile: BusinessProf
 
   return (
     <Card className="p-5 md:p-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="font-display text-lg font-extrabold tracking-tight text-ink">Your business brand</h2>
-          <p className="mt-0.5 text-sm text-ink-2">
-            The name and look shown in every widget and on every branded page. Your branded pages
-            live at <code className="rounded bg-surface-2 px-1">/{profile.venues[0]?.slug ?? "your-venue"}</code>.
-          </p>
-        </div>
-        {profile.venues[0]?.slug && appOrigin && (
-          <Button variant="ghost" size="sm" onClick={() => window.open(`${appOrigin}/${profile.venues![0]!.slug}`, "_blank")}>
-            <Eye className="h-4 w-4" /> Preview page
-          </Button>
-        )}
+      <div>
+        <h2 className="font-display text-lg font-extrabold tracking-tight text-ink">Business brand</h2>
+        <p className="mt-0.5 text-sm text-ink-2">
+          The name and look shown in every widget and on every branded page.
+        </p>
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -231,10 +305,7 @@ function BusinessEditor({ profile, appOrigin, onSaved }: { profile: BusinessProf
           <span className="mb-1.5 block text-xs font-medium text-ink-2">Tagline</span>
           <Input value={tagline} onChange={(e) => setTagline(e.target.value)} placeholder="Book your court in seconds" />
         </label>
-        <label className="block sm:col-span-2">
-          <span className="mb-1.5 block text-xs font-medium text-ink-2">Logo URL (https)</span>
-          <Input value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="https://theirsite.com/logo.png" />
-        </label>
+        <SingleImageField label="Logo URL" value={logoUrl} onChange={setLogoUrl} />
         <label className="block sm:col-span-2">
           <span className="mb-1.5 block text-xs font-medium text-ink-2">About</span>
           <Textarea value={about} onChange={(e) => setAbout(e.target.value)} rows={3} placeholder="Tell visitors what makes your venues special…" />
@@ -245,6 +316,94 @@ function BusinessEditor({ profile, appOrigin, onSaved }: { profile: BusinessProf
         <p className="text-xs text-ink-3">Prices and availability always come straight from your court setup — no double entry.</p>
         <Button onClick={() => save.mutate()} loading={save.isPending}>
           {save.isPending ? "Saving…" : "Save brand"}
+        </Button>
+      </div>
+      {notice && <p className="mt-3 rounded-xl bg-success-light px-3 py-2 text-sm text-success">{notice}</p>}
+      {error && <p className="mt-3 rounded-xl bg-error-light px-3 py-2 text-sm text-error">{error}</p>}
+    </Card>
+  );
+}
+
+// The dedicated-site presentation (ADR-0031): hero image, headline and the
+// contact block — rendered only on the Business's own site. Sends the FULL
+// brand object so the shared tokens survive the backend's whole-brand replace.
+function SiteBrandCard({ profile, onSaved }: { profile: BusinessProfile; onSaved: () => void }) {
+  const queryClient = useQueryClient();
+  const [hero, setHero] = useState(profile.brand?.hero_image ?? "");
+  const [headline, setHeadline] = useState(profile.brand?.headline ?? "");
+  const [phone, setPhone] = useState(profile.brand?.contact?.phone ?? "");
+  const [email, setEmail] = useState(profile.brand?.contact?.email ?? "");
+  const [address, setAddress] = useState(profile.brand?.contact?.address ?? "");
+  const [hours, setHours] = useState(profile.brand?.contact?.hours ?? "");
+  const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
+
+  const save = useMutation({
+    mutationFn: () =>
+      business.updateMe({
+        brand: {
+          ...profile.brand,
+          // '' clears (merge semantics), undefined would silently keep the
+          // stored value.
+          hero_image: hero.trim(),
+          headline: headline.trim(),
+          contact: {
+            phone: phone.trim(),
+            email: email.trim(),
+            address: address.trim(),
+            hours: hours.trim()
+          }
+        }
+      }),
+    onSuccess: () => {
+      setNotice("Site brand saved. Your dedicated site reflects this now.");
+      setError("");
+      onSaved();
+      void queryClient.invalidateQueries({ queryKey: ["business-me"] });
+    },
+    onError: (err) => {
+      setError(toApiFailure(err).message);
+      setNotice("");
+    }
+  });
+
+  return (
+    <Card className="p-5 md:p-6">
+      <div>
+        <h2 className="font-display text-lg font-extrabold tracking-tight text-ink">Site brand</h2>
+        <p className="mt-0.5 text-sm text-ink-2">
+          The hero, headline and contact shown on your dedicated site — at your own hostname.
+        </p>
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <SingleImageField label="Hero image URL" value={hero} onChange={setHero} />
+        <label className="block sm:col-span-2">
+          <span className="mb-1.5 block text-xs font-medium text-ink-2">Headline</span>
+          <Input value={headline} onChange={(e) => setHeadline(e.target.value)} placeholder="Colombo’s home of badminton" />
+        </label>
+        <label className="block">
+          <span className="mb-1.5 block text-xs font-medium text-ink-2">Contact phone</span>
+          <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+94 77 123 4567" />
+        </label>
+        <label className="block">
+          <span className="mb-1.5 block text-xs font-medium text-ink-2">Contact email</span>
+          <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="hello@yourvenue.lk" />
+        </label>
+        <label className="block sm:col-span-2">
+          <span className="mb-1.5 block text-xs font-medium text-ink-2">Contact address</span>
+          <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="12 Galle Rd, Colombo 03" />
+        </label>
+        <label className="block sm:col-span-2">
+          <span className="mb-1.5 block text-xs font-medium text-ink-2">Opening hours</span>
+          <Input value={hours} onChange={(e) => setHours(e.target.value)} placeholder="Mon–Sun 6am–11pm" />
+        </label>
+      </div>
+
+      <div className="mt-4 flex items-center justify-between gap-3">
+        <p className="text-xs text-ink-3">Evergreen details for visitors looking to reach you directly.</p>
+        <Button onClick={() => save.mutate()} loading={save.isPending}>
+          {save.isPending ? "Saving…" : "Save site brand"}
         </Button>
       </div>
       {notice && <p className="mt-3 rounded-xl bg-success-light px-3 py-2 text-sm text-success">{notice}</p>}

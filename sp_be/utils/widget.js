@@ -5,9 +5,13 @@ const crypto = require('node:crypto');
 // allowlist matching used by the embed route.
 
 const MAX_SLUG_LENGTH = 60;
-const MAX_BRAND_LENGTH = 120;
+const MAX_BRAND_LENGTH = 500;
 const HEX_COLOR = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 const SLUG_SAFE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+// Site-brand contact block (ADR-0031): free-text fields, length-capped, all
+// optional. Unknown keys are dropped like every brand token.
+const CONTACT_CAPS = { phone: 30, email: 120, address: 200, hours: 200 };
 
 // "Colombo Air Force Badminton Court" -> "colombo-air-force-badminton-court"
 // Falls back to a short random stem when the name has no usable characters.
@@ -60,11 +64,30 @@ function validateBrandToken(kind, value) {
   }
   if (kind === 'url') {
     if (typeof value !== 'string' || (value.length > 0 && !/^https:\/\/.+/.test(value.trim()))) {
-      throw Object.assign(new Error('Logo must be an https URL or empty'), { code: 'WIDGET_VALIDATION' });
+      throw Object.assign(new Error('Must be an https URL or empty'), { code: 'WIDGET_VALIDATION' });
     }
     return value.trim();
   }
   return undefined;
+}
+
+// The site-brand contact block: an object of optional, length-capped free-text
+// fields (phone, email, address, hours). Anything else is dropped.
+function sanitizeContact(contact) {
+  if (contact === undefined) return undefined;
+  if (typeof contact !== 'object' || Array.isArray(contact)) {
+    throw Object.assign(new Error('brand.contact must be an object'), { code: 'WIDGET_VALIDATION' });
+  }
+  const out = {};
+  for (const key of Object.keys(CONTACT_CAPS)) {
+    const value = contact[key];
+    if (value === undefined) continue;
+    if (typeof value !== 'string' || value.trim().length > CONTACT_CAPS[key]) {
+      throw Object.assign(new Error(`brand.contact.${key} must be a string of ${CONTACT_CAPS[key]} characters or fewer`), { code: 'WIDGET_VALIDATION' });
+    }
+    out[key] = value.trim();
+  }
+  return out;
 }
 
 // Validate the owner's brand object; returns a clean copy (unknown keys
@@ -86,6 +109,11 @@ function sanitizeBrand(brand) {
   if (brand.logo_url !== undefined) out.logo_url = validateBrandToken('url', brand.logo_url);
   if (brand.tagline !== undefined) out.tagline = validateBrandToken('short', brand.tagline);
   if (brand.about !== undefined) out.about = validateBrandToken('long', brand.about);
+  // Site-brand tokens (ADR-0031): hero image + headline for the portfolio
+  // root, plus the contact block. Same rules as the shared tokens.
+  if (brand.hero_image !== undefined) out.hero_image = validateBrandToken('url', brand.hero_image);
+  if (brand.headline !== undefined) out.headline = validateBrandToken('short', brand.headline);
+  if (brand.contact !== undefined) out.contact = sanitizeContact(brand.contact);
   return out;
 }
 

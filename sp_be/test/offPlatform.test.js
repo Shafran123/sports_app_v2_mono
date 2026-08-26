@@ -94,6 +94,29 @@ describe('widget helpers (unit)', () => {
     expect(sanitizeBrand(undefined)).toBeNull();
   });
 
+  it('sanitizes site-brand tokens (ADR-0031): hero, headline, long about, contact', () => {
+    const clean = sanitizeBrand({
+      tagline: 'Book direct',
+      hero_image: 'https://cdn.test/hero.jpg',
+      headline: '  Colombo’s home of badminton  ',
+      about: 'Paragraph one. '.repeat(30),
+      contact: { phone: '+94 77 123 4567', email: 'hello@abc.lk', address: '12 Galle Rd, Colombo', hours: 'Mon–Sun 6am–11pm' }
+    });
+    expect(clean.hero_image).toBe('https://cdn.test/hero.jpg');
+    expect(clean.headline).toBe('Colombo’s home of badminton');
+    expect(clean.about.length).toBe('Paragraph one. '.repeat(30).trim().length);
+    expect(clean.contact).toEqual({ phone: '+94 77 123 4567', email: 'hello@abc.lk', address: '12 Galle Rd, Colombo', hours: 'Mon–Sun 6am–11pm' });
+
+    // Bad https, overlong headline/about, malformed contact all rejected.
+    expect(() => sanitizeBrand({ hero_image: 'http://insecure.co/x.jpg' })).toThrow();
+    expect(() => sanitizeBrand({ headline: 'x'.repeat(81) })).toThrow();
+    expect(() => sanitizeBrand({ about: 'x'.repeat(501) })).toThrow();
+    expect(() => sanitizeBrand({ contact: 'phone only' })).toThrow();
+    // Unknown keys still dropped.
+    const dropped = sanitizeBrand({ hero_image: 'https://cdn.test/hero.jpg', bogus: 'nope' });
+    expect(dropped).toEqual({ hero_image: 'https://cdn.test/hero.jpg' });
+  });
+
   it('sanitizes the domain allowlist', () => {
     expect(sanitizeDomains(['TheSite.COM', 'https://thesite.com/', 'thesite.com'])).toEqual(['thesite.com']);
     expect(sanitizeDomains(['localhost:5173'])).toEqual(['localhost:5173']);
@@ -189,6 +212,45 @@ describe('private venues + business scoping (tickets 01, 02)', () => {
       .set('Authorization', `Bearer ${OWNER_TOKEN}`)
       .send({ brand: { colors: { primary: 'blue' } } });
     expect(bad.status).toBe(400);
+  });
+
+  it('round-trips site-brand fields (ADR-0031) through the profile endpoint', async () => {
+    const res = await request(app)
+      .patch('/api/v1/business/me')
+      .set('Authorization', `Bearer ${OWNER_TOKEN}`)
+      .send({
+        brand: {
+          hero_image: 'https://cdn.test/hero.jpg',
+          headline: 'Colombo’s home of badminton',
+          about: 'Paragraph one. '.repeat(20).trim(),
+          contact: { phone: '+94 77 123 4567', email: 'hello@abc.lk', address: '12 Galle Rd, Colombo', hours: 'Mon–Sun 6am–11pm' }
+        }
+      });
+    expect(res.status).toBe(200);
+    expect(res.body.data.brand.hero_image).toBe('https://cdn.test/hero.jpg');
+    expect(res.body.data.brand.headline).toBe('Colombo’s home of badminton');
+    expect(res.body.data.brand.contact.email).toBe('hello@abc.lk');
+    // Partial-brand semantics (ADR-0031): a site-brand patch never wipes the
+    // shared tokens set earlier.
+    expect(res.body.data.brand.tagline).toBe('Book direct');
+    expect(res.body.data.brand.colors.primary).toBe('#16a34a');
+
+    const badHero = await request(app)
+      .patch('/api/v1/business/me')
+      .set('Authorization', `Bearer ${OWNER_TOKEN}`)
+      .send({ brand: { hero_image: 'http://insecur.e/x.jpg' } });
+    expect(badHero.status).toBe(400);
+  });
+
+  it('clears a brand token with an explicit empty string, keeping the rest (ADR-0031)', async () => {
+    const res = await request(app)
+      .patch('/api/v1/business/me')
+      .set('Authorization', `Bearer ${OWNER_TOKEN}`)
+      .send({ brand: { headline: '' } });
+    expect(res.status).toBe(200);
+    expect(res.body.data.brand.headline).toBe('');
+    expect(res.body.data.brand.tagline).toBe('Book direct');
+    expect(res.body.data.brand.hero_image).toBe('https://cdn.test/hero.jpg');
   });
 
   it('keeps a private venue out of browse/list and direct detail', async () => {

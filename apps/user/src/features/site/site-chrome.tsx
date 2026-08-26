@@ -8,10 +8,25 @@ import { brandCssVars } from "@/features/widget/widget-theme";
 // Rendered by the (shell) layout when the current hostname is a live Site
 // Hostname — the marketplace chrome (PlayerNav/Footer/BottomTabs) is replaced,
 // not appended to.
+//
+// Brand-color mapping (ADR-0031): the app's booking flow styles itself with
+// the design tokens (--color-primary etc.). On a site host those tokens are
+// overridden with the Business's brand colors, so the venue detail page,
+// checkout and success screens — everything under the site host — render in
+// the Business's look with no per-page edits. The marketplace host keeps the
+// platform defaults.
+
+const BRAND_TOKEN_FALLBACKS = {
+  "--color-primary": "#16a34a",
+  "--color-accent": "#2563eb"
+} as const;
 
 export function SiteChrome({ config, children }: { config: SiteConfig; children: ReactNode }) {
   const { business, venues } = config;
-  const style = brandCssVars(business.brand);
+  const style = {
+    ...brandCssVars(business.brand),
+    ...brandTokenOverrides(business.brand?.colors)
+  };
   const multi = venues.length > 1;
 
   return (
@@ -61,4 +76,22 @@ export function SiteChrome({ config, children }: { config: SiteConfig; children:
       </footer>
     </div>
   );
+}
+
+// Map the Business's brand colors onto the app's design-token variables for
+// the whole site subtree. Hover/light variants are derived as CSS color-mix
+// values so they stay in the same hue as the chosen primary; the site's page
+// background resolves to a subtle tint of the brand so no hardcoded fallback
+// is left (ADR-0031).
+function brandTokenOverrides(colors: { primary?: string; accent?: string } | undefined): Record<string, string> {
+  const primary = colors?.primary || BRAND_TOKEN_FALLBACKS["--color-primary"];
+  const accent = colors?.accent || BRAND_TOKEN_FALLBACKS["--color-accent"];
+  return {
+    "--color-primary": primary,
+    "--color-primary-hover": `color-mix(in srgb, ${primary} 85%, black)`,
+    "--color-primary-light": `color-mix(in srgb, ${primary} 12%, white)`,
+    "--color-accent": accent,
+    "--color-accent-light": `color-mix(in srgb, ${accent} 12%, white)`,
+    "--brand-bg": `color-mix(in srgb, ${primary} 5%, #fafaf7)`
+  };
 }

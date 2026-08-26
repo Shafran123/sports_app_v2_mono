@@ -206,6 +206,20 @@ describe('site domain request workflow (ADR-0029)', () => {
     expect(res.body.data.venues[0].sports).toContain('Badminton');
   });
 
+  it('carries the site-brand fields in the public payload (ADR-0031)', async () => {
+    const saved = await request(app)
+      .patch('/api/v1/business/me')
+      .set('Authorization', `Bearer ${OWNER_TOKEN}`)
+      .send({ brand: { hero_image: 'https://cdn.test/hero.jpg', headline: 'Book direct at the home of badminton', contact: { phone: '+94 77 000 0000' } } });
+    expect(saved.status).toBe(200);
+
+    const res = await request(app).get(`/api/v1/public/site/by-hostname?host=site-test.lk`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.business.brand.hero_image).toBe('https://cdn.test/hero.jpg');
+    expect(res.body.data.business.brand.headline).toBe('Book direct at the home of badminton');
+    expect(res.body.data.business.brand.contact.phone).toBe('+94 77 000 0000');
+  });
+
   it('resolves the www twin and denies a non-live host', async () => {
     const www = await request(app).get(`/api/v1/public/site/by-hostname?host=www.site-test.lk`);
     expect(www.status).toBe(200);
@@ -290,6 +304,8 @@ describe('site domain request workflow (ADR-0029)', () => {
   it('unit: normalizeHostname and suggestSubdomain', () => {
     expect(siteDomains.normalizeHostname('WWW.ABC.lk.')).toBe('abc.lk');
     expect(siteDomains.normalizeHostname('abc.lk')).toBe('abc.lk');
+    // Dev browsers send the port; it must never break hostname matching.
+    expect(siteDomains.normalizeHostname('mysite.localhost:3000')).toBe('mysite.localhost');
     expect(siteDomains.suggestSubdomain('ABC Sports & Fitness')).toBe('abc-sports-fitness.myslot.lk');
   });
 });

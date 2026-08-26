@@ -55,7 +55,11 @@ async function ensureForOwner(ownerId, name, client = pool) {
 }
 
 // Validate + persist name/brand patches. brand is sanitized through the
-// shared token validator; unknown keys are dropped server-side.
+// shared token validator; unknown keys are dropped server-side. The brand
+// object MERGES over the stored brand (Partial semantics: a consumer that
+// sends only site-brand fields never loses the business tokens, and vice
+// versa — ADR-0031 keeps one shared brand object). Nested objects (colors,
+// contact) merge at their own level; sending an explicit empty string clears.
 async function updateProfile(businessId, patch, client = pool) {
   const { name, brand } = patch;
   let cleanBrand = null;
@@ -69,6 +73,16 @@ async function updateProfile(businessId, patch, client = pool) {
   if (name !== undefined && (typeof name !== 'string' || name.trim().length === 0 || name.trim().length > 80)) {
     throw Object.assign(new Error('Business name must be 1–80 characters'), { code: 'WIDGET_VALIDATION' });
   }
+
+  if (cleanBrand !== null) {
+    const current = await client.query(`select brand from businesses where id = $1`, [businessId]);
+    const base = (current.rows[0] && current.rows[0].brand) || {};
+    const merged = { ...base, ...cleanBrand };
+    if (cleanBrand.colors) merged.colors = { ...(base.colors || {}), ...cleanBrand.colors };
+    if (cleanBrand.contact) merged.contact = { ...(base.contact || {}), ...cleanBrand.contact };
+    cleanBrand = merged;
+  }
+
   const { rows } = await client.query(
     `update businesses set
        name = coalesce($2, name),

@@ -101,6 +101,49 @@ describe("WidgetSitePage (ticket 08)", () => {
     });
   });
 
+  it("renders the dedicated Site brand card (ADR-0031) alongside the business brand", async () => {
+    meMock.mockResolvedValue({
+      ...profile,
+      brand: {
+        colors: { primary: "#16a34a" },
+        tagline: "Book direct",
+        hero_image: "https://cdn.test/hero.jpg",
+        contact: { phone: "+94 77 000 0000", email: "hello@courtgroup.lk" }
+      }
+    });
+    wrap(<WidgetSitePage />);
+    await waitFor(() => {
+      expect(screen.getByText("Site brand")).toBeInTheDocument();
+    });
+    expect(screen.getByLabelText("Hero image URL")).toHaveValue("https://cdn.test/hero.jpg");
+    expect(screen.getByLabelText("Contact phone")).toHaveValue("+94 77 000 0000");
+    // The Preview button is gone — the site is previewed at its own hostname.
+    expect(screen.queryByRole("button", { name: /preview/i })).toBeNull();
+  });
+
+  it("saves site-brand fields (hero, headline, contact) via the profile endpoint", async () => {
+    wrap(<WidgetSitePage />);
+    await waitFor(() => {
+      expect(screen.getByText("Site brand")).toBeInTheDocument();
+    });
+    await userEvent.type(screen.getByLabelText("Hero image URL"), "https://cdn.test/hero-new.jpg");
+    await userEvent.type(screen.getByLabelText("Headline"), "The home of badminton in Colombo");
+    await userEvent.type(screen.getByLabelText("Contact email"), "hello@courtgroup.lk");
+    await userEvent.click(screen.getByRole("button", { name: "Save site brand" }));
+
+    await waitFor(() => {
+      expect(updateMeMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          brand: expect.objectContaining({
+            hero_image: "https://cdn.test/hero-new.jpg",
+            headline: "The home of badminton in Colombo",
+            contact: expect.objectContaining({ email: "hello@courtgroup.lk" })
+          })
+        })
+      );
+    });
+  });
+
   it("creates an instance from the dialog with a locked default", async () => {
     wrap(<WidgetSitePage />);
     await waitFor(() => {
