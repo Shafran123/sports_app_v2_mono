@@ -185,7 +185,19 @@ async function markLive(id, client = pool) {
      where id = $1 returning *`,
     [id]
   );
-  return rows[0] || null;
+  const row = rows[0] || null;
+  // Marketplace Listing default-off (ADR-0031): the site-live flip takes the
+  // Business's approved venues off the marketplace in the same transition.
+  // Best-effort next statement — the request update above is the commit
+  // point; a failure here leaves venues listed, never the site half-live.
+  if (row) {
+    await client.query(
+      `update venues set marketplace_listing = false, updated_at = now()
+       where business_id = $1 and status = 'approved' and marketplace_listing = true`,
+      [row.business_id]
+    );
+  }
+  return row;
 }
 
 async function reject(id, reason, client = pool) {
@@ -302,6 +314,22 @@ async function validateSiteHostname(client, venueId, hostname) {
   return { ok: true };
 }
 
+// Owner console toggle (ADR-0031): a venue of a live-site business flips its
+// Marketplace Listing on (sell dual-channel: site + marketplace) or back off.
+// Only approved venues of the Business may be toggled; non-live-site
+// businesses keep the default-on state and have nothing to toggle.
+async function setMarketplaceListing(businessId, venueId, enabled, client = pool) {
+  const { rows } = await client.query(
+    `update venues v set marketplace_listing = $3, updated_at = now()
+     from site_domain_requests r
+     where v.id = $2 and v.business_id = $1 and v.status = 'approved'
+       and r.business_id = $1 and r.status = 'live'
+     returning v.id, v.name, v.marketplace_listing`,
+    [businessId, venueId, !!enabled]
+  );
+  return rows[0] || null;
+}
+
 // Suggest a platform subdomain from the business name (e.g. "abc sports" →
 // abc-sports.myslot.lk) — the owner's default choice in the request form.
 function suggestSubdomain(businessName) {
@@ -327,6 +355,7 @@ module.exports = {
   listAll,
   liveByHostname,
   liveHostnames,
+  setMarketplaceListing,
   validateSiteHostname,
   displayHostname,
   suggestSubdomain

@@ -6,7 +6,8 @@ import type { VenueHours } from "@myslot/types";
 
 export const MyVenueSchema = VenueSchema.extend({
   court_count: z.number().int().optional(),
-  created_at: z.string().optional()
+  created_at: z.string().optional(),
+  marketplace_listing: z.boolean().optional()
 });
 export type MyVenue = z.infer<typeof MyVenueSchema>;
 

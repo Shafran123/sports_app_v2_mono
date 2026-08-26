@@ -45,10 +45,13 @@ import {
   SiteRequestSchema,
   SiteRequestEnvelopeSchema,
   SiteRequestInputSchema,
-  SiteConfigSchema
+  SiteConfigSchema,
+  SiteSessionSchema,
+  SiteCustomerSchema,
+  SiteCustomerSummarySchema
 } from "@myslot/types";
 import type { OwnerAgreement, OwnerPlan, VenueBrand, WidgetInstanceInput, SiteRequestInput } from "@myslot/types";
-export { TOKEN_KEY } from "./client";
+export { TOKEN_KEY, SITE_CUSTOMER_TOKEN_KEY, persistSiteToken, isOwnerSurface } from "./client";
 export { toApiFailure, getClient, setClient, createClient, type ApiFailure } from "./client";
 export { parseData, parseList, parsePaginated } from "./parse";
 export { submitPayHere, PAYHERE_CHECKOUT_URL, type PayHereUserFields } from "./payhere";
@@ -303,6 +306,56 @@ export const site = {
   }
 };
 
+// Site Customer auth (ADR-0030): per-Business identities for Dedicated Sites
+// and Booking Widgets — our own auth, never Firebase.
+export const siteCustomerAuth = {
+  async register(
+    input: { site_hostname: string; name: string; email: string; password: string },
+    client: AxiosInstance = getClient()
+  ) {
+    const res = await client.post("/site-auth/register", input);
+    return parseData(SiteSessionSchema, res.data.data ?? res.data);
+  },
+  async login(
+    input: { site_hostname: string; email: string; password: string },
+    client: AxiosInstance = getClient()
+  ) {
+    const res = await client.post("/site-auth/login", input);
+    return parseData(SiteSessionSchema, res.data.data ?? res.data);
+  },
+  async google(
+    input: { site_hostname: string; name?: string; email: string; google_sub: string },
+    client: AxiosInstance = getClient()
+  ) {
+    const res = await client.post("/site-auth/google", input);
+    return parseData(SiteSessionSchema, res.data.data ?? res.data);
+  },
+  async me(client: AxiosInstance = getClient()) {
+    const res = await client.get("/site-auth/me");
+    return parseData(SiteCustomerSchema, res.data.data ?? res.data);
+  },
+  async logout(client: AxiosInstance = getClient()) {
+    const res = await client.post("/site-auth/logout");
+    return res.data.data ?? res.data;
+  },
+  async verifyPhoneSend(phone: string, client: AxiosInstance = getClient()) {
+    const res = await client.post("/site-auth/verify-phone/send", { phone });
+    return res.data.data as { sent: boolean };
+  },
+  async verifyPhoneConfirm(phone: string, code: string, client: AxiosInstance = getClient()) {
+    const res = await client.post("/site-auth/verify-phone/confirm", { phone, code });
+    return res.data.data as { confirmed: boolean };
+  },
+  async verifyEmailSend(email: string, client: AxiosInstance = getClient()) {
+    const res = await client.post("/site-auth/verify-email/send", { email });
+    return res.data.data as { sent: boolean };
+  },
+  async verifyEmailConfirm(email: string, code: string, client: AxiosInstance = getClient()) {
+    const res = await client.post("/site-auth/verify-email/confirm", { email, code });
+    return res.data.data as { confirmed: boolean };
+  }
+};
+
 export const auth = {
   async me(client: AxiosInstance = getClient()) {
     const res = await client.get("/auth/me");
@@ -525,6 +578,18 @@ export const business = {
   async deleteWidgetInstance(id: string, client: AxiosInstance = getClient()) {
     const res = await client.delete(`/business/widget-instances/${id}`);
     return res.data;
+  },
+  // Customers directory (ADR-0030): the Business's Site Customers with
+  // booking aggregates; searchable.
+  async customers(client: AxiosInstance = getClient()) {
+    const res = await client.get("/business/customers");
+    return parseList(SiteCustomerSummarySchema, res.data.data ?? res.data);
+  },
+  // Marketplace Listing (ADR-0031): per-venue opt back into the marketplace
+  // once the Business's Dedicated Site is live (default off at site-live).
+  async setMarketplaceListing(venueId: string, enabled: boolean, client: AxiosInstance = getClient()) {
+    const res = await client.patch(`/business/venues/${venueId}/marketplace-listing`, { enabled });
+    return res.data.data ?? res.data;
   },
   // Dedicated Site request (ADR-0029): owner's own hostname workflow.
   async siteRequest(client: AxiosInstance = getClient()) {

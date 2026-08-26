@@ -273,6 +273,82 @@ describe('site domain request workflow (ADR-0029)', () => {
     expect(rows[0].site_hostname).toBe('www.site-test.lk');
   });
 
+  describe('marketplace listing default-off at site-live (ADR-0031, ticket 10)', () => {
+    let listingVenueId;
+    let listingCourtId;
+
+    beforeAll(async () => {
+      // Re-derive live via the real transition so markLive's venue flip runs.
+      await pool.query(`update site_domain_requests set status = 'requested' where id = $1`, [REQUEST_ID]);
+      const created = await createVenue(OWNER_TOKEN, 'Listing Check Venue');
+      listingVenueId = created.body.data.id;
+      const { rows } = await pool.query(`select id from courts where venue_id = $1`, [listingVenueId]);
+      listingCourtId = rows[0].id;
+      await request(app).post(`/api/v1/admin/venues/${listingVenueId}/approve`).set('Authorization', `Bearer ${ADMIN_TOKEN}`);
+      await request(app).post(`/api/v1/admin/sites/${REQUEST_ID}/mark-live`).set('Authorization', `Bearer ${ADMIN_TOKEN}`);
+    });
+
+    it('flips the site-live business venues off the marketplace and gates checkout', async () => {
+      const rows = await pool.query(`select marketplace_listing from venues where business_id = (select business_id from site_domain_requests where id = $1)`, [REQUEST_ID]);
+      for (const r of rows.rows) expect(r.marketplace_listing).toBe(false);
+
+      const withoutSite = await request(app)
+        .post('/api/v1/bookings/checkout')
+        .set('Authorization', `Bearer ${PLAYER_TOKEN}`)
+        .send({
+          court_id: listingCourtId,
+          start_at: isoColombo(colomboDate(2), '18:00'),
+          end_at: isoColombo(colomboDate(2), '19:00'),
+          payment_method: 'cash',
+          idempotency_key: `listing-off-${Date.now()}`
+        });
+      expect(withoutSite.status).toBe(403);
+      expect(withoutSite.body.error.code).toBe('MARKETPLACE_LISTING_OFF');
+
+      const withSite = await request(app)
+        .post('/api/v1/bookings/checkout')
+        .set('Authorization', `Bearer ${PLAYER_TOKEN}`)
+        .send({
+          court_id: listingCourtId,
+          start_at: isoColombo(colomboDate(2), '18:00'),
+          end_at: isoColombo(colomboDate(2), '19:00'),
+          payment_method: 'cash',
+          site_hostname: 'site-test.lk',
+          idempotency_key: `listing-site-${Date.now()}`
+        });
+      expect(withSite.status).toBe(201);
+    });
+
+    it('hides the venue from marketplace browse + detail while site-live; the owner toggle exempts it', async () => {
+      const browse = await request(app).get('/api/v1/venues');
+      expect(browse.body.data.some((v) => v.id === listingVenueId)).toBe(false);
+      const detail = await request(app).get(`/api/v1/venues/${listingVenueId}`);
+      expect(detail.status).toBe(404);
+
+      const toggle = await request(app)
+        .patch(`/api/v1/business/venues/${listingVenueId}/marketplace-listing`)
+        .set('Authorization', `Bearer ${OWNER_TOKEN}`)
+        .send({ enabled: true });
+      expect(toggle.status).toBe(200);
+      expect(toggle.body.data.marketplace_listing).toBe(true);
+
+      const back = await request(app).get('/api/v1/venues');
+      expect(back.body.data.some((v) => v.id === listingVenueId)).toBe(true);
+      const detailBack = await request(app).get(`/api/v1/venues/${listingVenueId}`);
+      expect(detailBack.status).toBe(200);
+    });
+
+    it('rejects toggling for a non-live business', async () => {
+      await pool.query(`update site_domain_requests set status = 'requested' where id = $1`, [REQUEST_ID]);
+      const denied = await request(app)
+        .patch(`/api/v1/business/venues/${listingVenueId}/marketplace-listing`)
+        .set('Authorization', `Bearer ${OWNER_TOKEN}`)
+        .send({ enabled: false });
+      expect(denied.status).toBe(404);
+      await request(app).post(`/api/v1/admin/sites/${REQUEST_ID}/mark-live`).set('Authorization', `Bearer ${ADMIN_TOKEN}`);
+    });
+  });
+
   it('rejects with a reason, then the owner edits and re-requests', async () => {
     const rejected = await request(app)
       .post(`/api/v1/admin/sites/${REQUEST_ID}/reject`)

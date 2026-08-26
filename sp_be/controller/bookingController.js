@@ -146,6 +146,45 @@ exports.checkout = async (req, res) => {
       if (siteScope.error) {
         return fail(res, siteScope.error.status, siteScope.error.code, siteScope.error.message);
       }
+    } else {
+      // Marketplace Listing (ADR-0031): without a site context, a venue of a
+      // live-site business is bookable on the marketplace ONLY when the owner
+      // opted it back in. Off-listing venues sell only via their own site.
+      const { rows: listing } = await client.query(
+        `select case when r.id is null then true else v.marketplace_listing end as listed
+         from venues v
+         left join site_domain_requests r
+           on r.business_id = v.business_id and r.status = 'live'
+         where v.id = $1`,
+        [court.venue_id]
+      );
+      if (listing[0] && !listing[0].listed) {
+        return fail(res, 403, 'MARKETPLACE_LISTING_OFF', 'This venue sells on its own site — book there instead');
+      }
+    }
+
+    // Site Customer bookings (ADR-0030): an owner surface books as a
+    // per-Business customer. Cash-only for now — holds and the online
+    // gateway stay platform-side; the site never invents a payment rail.
+    // The customer must belong to the venue's own Business, evidenced by a
+    // valid site_context (site_hostname validated above, or the widget
+    // instance already scoped to it).
+    const siteCustomer = req.user?.isSiteCustomer ? (req.siteCustomer || null) : null;
+    if (siteCustomer) {
+      let businessOk = false;
+      if (siteHostname || widgetInstanceKey) {
+        const { rows: affiliation } = await client.query(
+          `select v.business_id from venues v where v.id = $1`,
+          [court.venue_id]
+        );
+        businessOk = !!affiliation[0] && affiliation[0].business_id === siteCustomer.business_id;
+      }
+      if (!businessOk) {
+        return fail(res, 403, 'SITE_HOST_REQUIRED', 'This booking needs a valid site context for this venue');
+      }
+      if (req.body.payment_method !== 'cash') {
+        return fail(res, 409, 'PAYMENT_UNAVAILABLE', 'Online payment is not available on dedicated sites yet. Choose pay-at-venue instead.');
+      }
     }
 
     const now = new Date();
@@ -223,10 +262,10 @@ exports.checkout = async (req, res) => {
       await client.query('begin');
       try {
         const { rows: bookingRows } = await client.query(
-          `insert into bookings (court_id, user_id, start_at, end_at, price_per_slot, total_price, tax_rate, tax_amount, venue_tax_rate, venue_tax_amount, status, payment_method, player_name, player_phone, qr_token, idempotency_key, subtotal_amount, discount_amount, site_hostname)
-           values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'confirmed', 'cash', $11, $12, $13, $14, $15, $16, $17)
+          `insert into bookings (court_id, user_id, site_customer_id, start_at, end_at, price_per_slot, total_price, tax_rate, tax_amount, venue_tax_rate, venue_tax_amount, status, payment_method, player_name, player_phone, qr_token, idempotency_key, subtotal_amount, discount_amount, site_hostname)
+           values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'confirmed', 'cash', $12, $13, $14, $15, $16, $17, $18)
            returning *`,
-          [court_id, req.user.id, start, end, pricing.slots[0]?.base_price ?? court.price_per_slot, amount, split.platformRate, split.platformTax, split.venueRate, split.venueTax, req.user.name, req.user.phone, mintQrToken(), idempotency_key, pricing.subtotal, pricing.discount, siteHostname || null]
+          [court_id, siteCustomer ? null : req.user.id, siteCustomer ? siteCustomer.id : null, start, end, pricing.slots[0]?.base_price ?? court.price_per_slot, amount, split.platformRate, split.platformTax, split.venueRate, split.venueTax, siteCustomer ? (siteCustomer.name || req.user.name) : req.user.name, siteCustomer ? (siteCustomer.phone || req.user.phone) : req.user.phone, mintQrToken(), idempotency_key, pricing.subtotal, pricing.discount, siteHostname || null]
         );
         await client.query('commit');
         await publishBookingEvent('booking.created', bookingRows[0].id);

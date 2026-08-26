@@ -154,11 +154,44 @@ export const BusinessProfileSchema = BusinessInfoSchema.extend({
       name: z.string(),
       status: z.string(),
       visibility: z.enum(["public", "private"]),
-      slug: z.string().nullable()
+      slug: z.string().nullable(),
+      // Marketplace Listing (ADR-0031): per-venue opt-in, default off once
+      // the Business's site is live.
+      marketplace_listing: z.boolean().optional()
     })
   )
 });
 export type BusinessProfile = z.infer<typeof BusinessProfileSchema>;
+
+/* ---------- Site Customers (ADR-0030) ---------- */
+
+export const SiteCustomerSchema = z.object({
+  id: z.string(),
+  business_id: z.string(),
+  email: z.string(),
+  name: z.string().nullable(),
+  phone: z.string().nullable(),
+  email_verified_at: z.string().nullable(),
+  phone_verified_at: z.string().nullable()
+});
+export type SiteCustomer = z.infer<typeof SiteCustomerSchema>;
+
+export const SiteSessionSchema = z.object({
+  customer: SiteCustomerSchema,
+  token: z.string(),
+  expires_at: z.string()
+});
+export type SiteSession = z.infer<typeof SiteSessionSchema>;
+
+// Owner Console Customers directory row (ADR-0030): a Site Customer with
+// booking aggregates.
+export const SiteCustomerSummarySchema = SiteCustomerSchema.extend({
+  joined_at: z.string(),
+  booking_count: z.number(),
+  total_spend: z.number(),
+  last_booking_at: z.string().nullable()
+});
+export type SiteCustomerSummary = z.infer<typeof SiteCustomerSummarySchema>;
 
 /* ---------- Dedicated Sites (ADR-0029) ---------- */
 

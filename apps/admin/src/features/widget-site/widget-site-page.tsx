@@ -84,7 +84,7 @@ export function WidgetSitePage() {
 
       <SiteBrandCard profile={profile} onSaved={invalidate} />
 
-      <SiteRequestSection />
+      <SiteRequestSection profile={profile} />
 
       <Card className="p-5 md:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">

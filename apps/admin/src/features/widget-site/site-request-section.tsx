@@ -1,17 +1,18 @@
 "use client";
 
-// Owner console: the Dedicated Site section (ADR-0029). Request a site
-// hostname (your own domain or a myslot.lk subdomain), follow the DNS
+// Owner console: the Dedicated Site section (ADR-0029 + ADR-0031). Request a
+// site hostname (your own domain or a myslot.lk subdomain), follow the DNS
 // hand-off, watch the status, and re-request after a rejection. Every status
-// change also emails the owner.
+// change also emails the owner. While the site is live, the owner can opt
+// individual venues back into the marketplace (default off at site-live).
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { business, toApiFailure } from "@myslot/api";
 import { Badge, Button, Card, ErrorState, Input, SelectSheet } from "@myslot/ui";
 import { cn } from "@myslot/utils";
-import { Globe, RotateCcw } from "lucide-react";
-import type { SiteRequest } from "@myslot/types";
+import { Globe, RotateCcw, Store } from "lucide-react";
+import type { BusinessProfile, SiteRequest } from "@myslot/types";
 
 const STEPS = ["requested", "approved", "dns_pending", "verifying", "live"];
 const STEP_LABELS: Record<string, string> = {
@@ -22,7 +23,7 @@ const STEP_LABELS: Record<string, string> = {
   live: "Live"
 };
 
-export function SiteRequestSection() {
+export function SiteRequestSection({ profile }: { profile?: BusinessProfile }) {
   const qc = useQueryClient();
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -76,7 +77,12 @@ export function SiteRequestSection() {
       {!req ? (
         <RequestForm suggested={query.data?.suggested_subdomain ?? ""} onError={onError} onDone={() => { invalidate(); setNotice("Site request submitted — our team will review it."); }} />
       ) : (
-        <RequestStatus req={req} onError={onError} onDone={() => { invalidate(); setNotice("Updated."); }} />
+        <>
+          <RequestStatus req={req} onError={onError} onDone={() => { invalidate(); setNotice("Updated."); }} />
+          {req.status === "live" && profile && (
+            <MarketplaceListings profile={profile} onError={onError} onDone={() => { invalidate(); setNotice("Listing updated."); }} />
+          )}
+        </>
       )}
     </Card>
   );
@@ -222,6 +228,69 @@ function RequestStatus({ req, onError, onDone }: { req: SiteRequest; onError: (e
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// ADR-0031: while a Business's site is live its venues default OFF the
+// marketplace. This section lets the owner opt each approved venue back in
+// (or back out) — dual-channel selling.
+function MarketplaceListings({
+  profile,
+  onError,
+  onDone
+}: {
+  profile: BusinessProfile;
+  onError: (e: unknown) => void;
+  onDone: () => void;
+}) {
+  const qc = useQueryClient();
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const eligible = profile.venues.filter((v) => v.status === "approved");
+  if (eligible.length === 0) return null;
+
+  const toggle = (venue: BusinessProfile["venues"][number]) => {
+    setBusyId(venue.id);
+    business
+      .setMarketplaceListing(venue.id, !venue.marketplace_listing)
+      .then(() => {
+        onDone();
+        void qc.invalidateQueries({ queryKey: ["business-me"] });
+      })
+      .catch(onError)
+      .finally(() => setBusyId(null));
+  };
+
+  return (
+    <div className="mt-4 rounded-2xl border border-border bg-surface-2 p-4">
+      <h3 className="flex items-center gap-2 text-sm font-bold text-ink">
+        <Store className="h-4 w-4 text-ink-3" /> Marketplace listings
+      </h3>
+      <p className="mt-1 text-xs text-ink-3">
+        Your site is live, so your venues sell on it by default. Switch a venue on to also sell it on
+        the MySlot marketplace.
+      </p>
+      <ul className="mt-3 space-y-2">
+        {eligible.map((venue) => (
+          <li key={venue.id} className="flex items-center justify-between gap-3 rounded-xl bg-surface px-3 py-2">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-ink">{venue.name}</p>
+              <Badge variant={venue.marketplace_listing ? "success" : "neutral"}>
+                {venue.marketplace_listing ? "On marketplace" : "Site only"}
+              </Badge>
+            </div>
+            <Button
+              variant="secondary"
+              size="sm"
+              loading={busyId === venue.id}
+              onClick={() => toggle(venue)}
+            >
+              {venue.marketplace_listing ? "Remove from marketplace" : "Sell on the marketplace"}
+            </Button>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

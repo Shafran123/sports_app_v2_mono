@@ -160,6 +160,15 @@ exports.listVenues = async (req, res) => {
     const { search, sport, city, min_price, max_price, indoor, page = 1, limit = 20 } = req.query;
 
     const conditions = [`v.status = 'approved'`, `v.visibility = 'public'`];
+    // Marketplace Listing (ADR-0031): a live-site business's venues default
+    // off the marketplace; the owner may opt them back in per venue.
+    conditions.push(`(
+      v.marketplace_listing = true
+      or not exists (
+        select 1 from site_domain_requests r
+        where r.business_id = v.business_id and r.status = 'live'
+      )
+    )`);
     const values = [];
     let index = 1;
 
@@ -241,6 +250,16 @@ exports.getVenue = async (req, res) => {
         return fail(res, scope.error.status, scope.error.code, scope.error.message);
       }
       visibilityGate = "";
+    } else {
+      // Marketplace listing gate (ADR-0031): off for live-site businesses
+      // unless the owner opted the venue back in. A site context bypasses it.
+      visibilityGate += ` and (
+        v.marketplace_listing = true
+        or not exists (
+          select 1 from site_domain_requests r
+          where r.business_id = v.business_id and r.status = 'live'
+        )
+      )`;
     }
 
     const { rows } = await pool.query(

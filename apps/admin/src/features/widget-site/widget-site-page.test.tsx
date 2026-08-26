@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { WidgetSitePage } from "./widget-site-page";
 
-const { meMock, instancesMock, updateMeMock, createMock, updateMock, deleteMock, flagsMock } = vi.hoisted(
+const { meMock, instancesMock, updateMeMock, createMock, updateMock, deleteMock, flagsMock, siteRequestMock, setListingMock } = vi.hoisted(
   () => ({
     meMock: vi.fn(),
     instancesMock: vi.fn(),
@@ -12,7 +12,9 @@ const { meMock, instancesMock, updateMeMock, createMock, updateMock, deleteMock,
     createMock: vi.fn(),
     updateMock: vi.fn(),
     deleteMock: vi.fn(),
-    flagsMock: vi.fn()
+    flagsMock: vi.fn(),
+    siteRequestMock: vi.fn(),
+    setListingMock: vi.fn()
   })
 );
 
@@ -23,7 +25,9 @@ vi.mock("@myslot/api", () => ({
     widgetInstances: instancesMock,
     createWidgetInstance: createMock,
     updateWidgetInstance: updateMock,
-    deleteWidgetInstance: deleteMock
+    deleteWidgetInstance: deleteMock,
+    siteRequest: siteRequestMock,
+    setMarketplaceListing: setListingMock
   },
   featureFlags: { get: flagsMock },
   toApiFailure: (e: { code?: string; message?: string }) => ({
@@ -44,17 +48,25 @@ const profile = {
 };
 
 const instance = {
-  id: "inst-1",
-  business_id: "biz-1",
-  name: "Main website",
-  embed_key: "abc123def4567890abc123def4567890",
-  default_venue_id: "v1",
-  default_venue_name: "Smash Arena",
-  default_venue_status: "approved",
-  allow_venue_choice: false,
-  allowed_domains: ["thesite.com"],
-  enabled: true
-};
+    id: "inst-1",
+    business_id: "biz-1",
+    name: "Main website",
+    embed_key: "abc123def4567890abc123def4567890",
+    default_venue_id: "v1",
+    default_venue_name: "Smash Arena",
+    default_venue_status: "approved",
+    allow_venue_choice: false,
+    allowed_domains: ["thesite.com"],
+    enabled: true
+  };
+
+  // A live-site business's venue (marketplace listing off, per ADR-0031) so
+  // the listing toggle path is exercised.
+  const liveProfile = {
+    ...profile,
+    site_hostname: "courtgroup.lk",
+    venues: [{ ...profile.venues[0], marketplace_listing: false }]
+  };
 
 function wrap(node: React.ReactNode) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -193,6 +205,20 @@ describe("WidgetSitePage (ticket 08)", () => {
       expect(clipboard.writeText).toHaveBeenCalledWith(
         expect.stringContaining("http://localhost:3000/embed/abc123def4567890abc123def4567890")
       );
+    });
+  });
+
+  it("toggles a venue's marketplace listing for live-site businesses (ADR-0031)", async () => {
+    meMock.mockResolvedValue(liveProfile);
+    instancesMock.mockResolvedValue([]);
+    siteRequestMock.mockResolvedValue({ id: "sr-1", status: "live", hostname: "courtgroup.lk", hostname_kind: "custom" });
+    wrap(<WidgetSitePage />);
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /sell on the marketplace/i })).toBeInTheDocument();
+    });
+    await userEvent.click(screen.getByRole("button", { name: /sell on the marketplace/i }));
+    await waitFor(() => {
+      expect(setListingMock).toHaveBeenCalledWith("v1", true);
     });
   });
 });

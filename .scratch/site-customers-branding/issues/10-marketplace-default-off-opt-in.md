@@ -6,8 +6,8 @@
 
 **Status:** ready-for-agent
 
-- [ ] Migration: `venues.marketplace_listing boolean default true` (or derived state); site-live flips the Business's venue defaults off
-- [ ] Marketplace browse/booking queries exclude site-live venues whose listing is off; link-out to the site instead
-- [ ] Owner Console: per-venue Marketplace Listing toggle (on/off), visible for site-live Businesses, with the site-first default surfaced
-- [ ] Site-live flip is idempotent and does not touch confirmed marketplace bookings
-- [ ] Tests: default-off at site-live, opt-in dual-channel, opt-out, non-site Businesses unaffected
+- [x] Migration: `venues.marketplace_listing boolean default true` (or derived state); site-live flips the Business's venue defaults off
+- [x] Marketplace browse/booking queries exclude site-live venues whose listing is off; link-out to the site instead
+- [x] Owner Console: per-venue Marketplace Listing toggle (on/off), visible for site-live Businesses, with the site-first default surfaced
+- [x] Site-live flip is idempotent and does not touch confirmed marketplace bookings
+- [x] Tests: default-off at site-live, opt-in dual-channel, opt-out, non-site Businesses unaffected

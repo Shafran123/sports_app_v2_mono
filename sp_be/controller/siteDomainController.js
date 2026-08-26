@@ -152,6 +152,23 @@ exports.reject = async (req, res) => {
   }
 };
 
+exports.setMarketplaceListing = async (req, res) => {
+  try {
+    const business = await requireBusiness(req, res);
+    if (!business) return;
+    const { id } = req.params;
+    const enabled = req.body && req.body.enabled;
+    const row = await siteDomains.setMarketplaceListing(business.id, id, enabled);
+    if (!row) {
+      return fail(res, 404, 'VENUE_NOT_FOUND', 'Only approved venues of a live-site business can toggle marketplace listing');
+    }
+    ok(res, 200, row);
+  } catch (error) {
+    logger.error(`Error toggling marketplace listing: ${error.message}`);
+    fail(res, 500, 'INTERNAL_SERVER_ERROR', 'Something went wrong');
+  }
+};
+
 exports.verify = async (req, res) => {
   try {
     const row = await requireRequest(req, res);
