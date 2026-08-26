@@ -106,6 +106,7 @@ export function BookPanel({ venue, instanceKey, siteHostname }: { venue: WidgetC
         <WidgetIdentity
           widgetKey={instanceKey}
           siteHostname={siteHostname ?? null}
+          siteName={venue.business?.name ?? null}
           onDone={() => setStage("pick")}
         />
       );

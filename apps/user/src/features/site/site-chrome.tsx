@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { SiteConfig } from "@myslot/types";
@@ -34,10 +34,13 @@ const BRAND_TOKEN_FALLBACKS = {
 
 export function SiteChrome({ config, children }: { config: SiteConfig; children: ReactNode }) {
   const { business, venues } = config;
-  const style = {
-    ...brandCssVars(business.brand),
-    ...brandTokenOverrides(business.brand?.colors)
-  };
+  const style = useMemo(
+    () => ({
+      ...brandCssVars(business.brand),
+      ...brandTokenOverrides(business.brand?.colors)
+    }),
+    [business.brand]
+  );
   const multi = venues.length > 1;
   const pathname = usePathname();
   const router = useRouter();
@@ -45,12 +48,21 @@ export function SiteChrome({ config, children }: { config: SiteConfig; children:
 
   // Mark this surface as owner-hosted so the API client sends the Site
   // Customer session (own auth, ADR-0030) and the auth context stops watching
-  // Firebase.
+  // Firebase. The brand tokens are also mirrored onto <html> so surfaced
+  // portals — the Radix dialogs for sign-in, verify, venue choice — inherit
+  // the Business's colors even though they teleport to document.body outside
+  // this root's style subtree.
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      window.__SITE_HOST__ = true;
+    if (typeof window === "undefined") return;
+    window.__SITE_HOST__ = true;
+    const root = document.documentElement;
+    for (const [key, value] of Object.entries(style)) {
+      root.style.setProperty(key, value);
     }
-  }, []);
+    return () => {
+      for (const key of Object.keys(style)) root.style.removeProperty(key);
+    };
+  }, [style]);
 
   // Venue switching is a detail-page affordance (ADR-0032): the portfolio
   // root has its own grid and the legal pages have none, so the header

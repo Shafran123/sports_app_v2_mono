@@ -380,6 +380,9 @@ describe('site domain request workflow (ADR-0029)', () => {
       expect(back.body.data.some((v) => v.id === listingVenueId)).toBe(true);
       const detailBack = await request(app).get(`/api/v1/venues/${listingVenueId}`);
       expect(detailBack.status).toBe(200);
+      // The venue detail carries the owning Business's name so site surfaces
+      // (checkout sign-in gate) can brand their copy without a second request.
+      expect(detailBack.body.data.business_name).toBe('Site Sports Centre');
     });
 
     it('rejects toggling for a non-live business', async () => {

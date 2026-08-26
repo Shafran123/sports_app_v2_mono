@@ -361,7 +361,7 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
             Your booking is saved in the link — sign in to confirm your slot.
           </p>
           <div className="mt-5">
-            <WidgetIdentity siteHostname={siteHostname} onDone={() => {}} />
+            <WidgetIdentity siteHostname={siteHostname} siteName={venueQuery.data?.business_name ?? null} onDone={() => {}} />
           </div>
         </div>
       </main>

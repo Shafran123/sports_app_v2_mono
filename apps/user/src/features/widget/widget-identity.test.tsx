@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
@@ -262,5 +262,16 @@ describe("WidgetIdentity", () => {
     expect(screen.getByRole("heading", { name: /complete your booking details/i })).toBeInTheDocument();
     expect(screen.getByText(/verified phone/i)).toBeInTheDocument();
     expect(screen.getByText(/verified email/i)).toBeInTheDocument();
+  });
+
+  it("brands the sign-in copy to the Business on a live site (ADR-0030)", () => {
+    wrap(<WidgetIdentity siteHostname="courtgroup.lk" siteName="Court Group" onDone={vi.fn()} />);
+    expect(screen.getByRole("heading", { name: /sign in to book/i })).toBeInTheDocument();
+    expect(screen.getByText(/use your court group account to book/i)).toBeInTheDocument();
+    expect(screen.queryByText(/myslot/i)).toBeNull();
+    // The register side brands too.
+    fireEvent.click(screen.getByRole("button", { name: /create an account/i }));
+    expect(screen.getByText(/create an account at court group to book/i)).toBeInTheDocument();
+    expect(screen.queryByText(/myslot/i)).toBeNull();
   });
 });

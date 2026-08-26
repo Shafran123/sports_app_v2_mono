@@ -53,10 +53,12 @@ function toAppUser(customer: {
 export function WidgetIdentity({
   widgetKey,
   siteHostname,
+  siteName,
   onDone
 }: {
   widgetKey?: string;
   siteHostname?: string | null;
+  siteName?: string | null;
   onDone: () => void;
 }) {
   const { user, setUser } = useAuth();
@@ -340,7 +342,11 @@ export function WidgetIdentity({
             <div>
               <h3 className="pt-3 font-display text-lg font-extrabold tracking-tight text-ink">Sign in to book</h3>
               <p className="mt-0.5 text-sm text-ink-2">
-                Use your {widgetKey ? "MySlot.LK" : DEFAULT_BRAND_NAME} account — the same one you use in the app.
+                {siteMode
+                  ? siteName
+                    ? `Use your ${siteName} account to book.`
+                    : "Use your account at this venue to book."
+                  : `Use your ${DEFAULT_BRAND_NAME} account — the same one you use in the app.`}
               </p>
             </div>
 
@@ -404,7 +410,11 @@ export function WidgetIdentity({
             <div>
               <h3 className="pt-3 font-display text-lg font-extrabold tracking-tight text-ink">Create your account</h3>
               <p className="mt-0.5 text-sm text-ink-2">
-                One account for MySlot.LK — the app, the widget, and more.
+                {siteMode
+                  ? siteName
+                    ? `Create an account at ${siteName} to book.`
+                    : "Create an account at this venue to book."
+                  : "One account for MySlot.LK — the app, the widget, and more."}
               </p>
             </div>
 

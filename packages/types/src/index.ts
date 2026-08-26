@@ -304,7 +304,10 @@ export type WidgetInstanceInput = z.infer<typeof WidgetInstanceInputSchema>;
 export const VenueDetailSchema = VenueSchema.extend({
   courts: z.array(CourtSchema),
   sports: z.array(z.string()),
-  hours: z.array(VenueHoursSchema)
+  hours: z.array(VenueHoursSchema),
+  // The owning Business's public name — present on the venue detail so site
+  // surfaces can brand their identity steps without a second request.
+  business_name: z.string().optional()
 });
 export type VenueDetail = z.infer<typeof VenueDetailSchema>;
 

@@ -263,7 +263,10 @@ exports.getVenue = async (req, res) => {
     }
 
     const { rows } = await pool.query(
-      `select v.* from venues v where v.id = $1 and v.status = 'approved' ${visibilityGate}`,
+      `select v.*, b.name as business_name
+       from venues v
+       join businesses b on b.id = v.business_id
+       where v.id = $1 and v.status = 'approved' ${visibilityGate}`,
       [id]
     );
 
@@ -298,6 +301,7 @@ exports.getVenue = async (req, res) => {
 
     ok(res, 200, {
       ...venue,
+      business_name: rows[0].business_name,
       courts: courtsRes.rows,
       sports: sportsRes.rows.map((s) => s.name),
       hours: hoursRes.rows
