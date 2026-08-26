@@ -34,6 +34,17 @@ vi.mock("@/context/auth", () => ({
   })
 }));
 
+// The guest gate reuses the widget's identity flow; its internals are
+// covered by widget-identity.test.tsx. Here we only assert the routing.
+vi.mock("@/features/widget/widget-identity", () => ({
+  WidgetIdentity: ({ onDone }: { onDone: () => void }) => (
+    <div>
+      <h2>Sign in to book</h2>
+      <button onClick={onDone}>Continue as signed-in</button>
+    </div>
+  )
+}));
+
 vi.mock("@myslot/api", () => ({
   venues: {
     detail: vi.fn(),
@@ -104,11 +115,22 @@ const cashResult = {
 
 function renderPage() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+  const utils = render(
     <QueryClientProvider client={qc}>
       <CheckoutPage venueId="v1" />
     </QueryClientProvider>
   );
+  return {
+    ...utils,
+    rerender: (user: Record<string, unknown> | null) => {
+      ctxUser = user as never;
+      utils.rerender(
+        <QueryClientProvider client={qc}>
+          <CheckoutPage venueId="v1" />
+        </QueryClientProvider>
+      );
+    }
+  };
 }
 
 beforeEach(() => {
@@ -406,5 +428,41 @@ describe("CheckoutPage verified-phone gate", () => {
     renderPage();
 
     expect(await screen.findByText(/Verify your phone/)).toBeInTheDocument();
+  });
+
+  it("routes a guest through the sign-in gate, not the phone-verify modal (ADR-0030)", async () => {
+    ctxUser = null as never;
+    vi.mocked(venues.detail).mockResolvedValue(onlineVenue as never);
+
+    renderPage();
+
+    expect(await screen.findByText("Sign in to book")).toBeInTheDocument();
+    expect(screen.queryByText(/You need a verified phone to book/)).toBeNull();
+    expect(bookings.checkout).not.toHaveBeenCalled();
+  });
+
+  it("proceeds past the guest gate into checkout once the guest is signed in and verified", async () => {
+    ctxUser = null as never;
+    vi.mocked(venues.detail).mockResolvedValue(onlineVenue as never);
+    vi.mocked(bookings.checkout).mockResolvedValue(onlineResult as never);
+
+    const { rerender } = renderPage();
+    // Guest lands on the sign-in gate…
+    expect(await screen.findByText("Sign in to book")).toBeInTheDocument();
+    // …then signs in + verifies (the auth context flips from guest to a
+    // verified player, exactly as the real WidgetIdentity does via setUser).
+    rerender({
+      id: "u1",
+      name: "Test",
+      email: "t@spots.app",
+      role: "player",
+      phone: "+94771234567",
+      phone_verified_at: "2026-08-22T10:00:00.000Z"
+    });
+
+    await waitFor(() => expect(bookings.checkout).toHaveBeenCalled());
+    expect(bookings.checkout).toHaveBeenCalledWith(
+      expect.objectContaining({ payment_method: "online" })
+    );
   });
 });

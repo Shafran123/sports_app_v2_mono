@@ -12,6 +12,7 @@ import { useAuth } from "@/context/auth";
 import { currentHostname, isSiteHost } from "@/lib/site-host";
 import { submitPayHere } from "@myslot/api";
 import { VerifyPhoneModal } from "@/features/verify-phone/verify-phone-modal";
+import { WidgetIdentity } from "@/features/widget/widget-identity";
 import type { VenueOffer } from "@myslot/types";
 import { applyVenueOffer } from "@/features/venue-detail/selection";
 
@@ -20,7 +21,7 @@ type PaymentMethod = "online" | "cash";
 export function CheckoutPage({ venueId }: { venueId: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const [verifyOpen, setVerifyOpen] = React.useState(false);
 
   const { data: flags } = useQuery({
@@ -49,6 +50,10 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
   const rawVenueOfferValue = searchParams?.get("venue_offer_value");
 
   const incomplete = !courtId || !startAt || !endAt;
+  // Dedicated Site context (ADR-0029/0030): on a live site host the checkout
+  // (and its sign-in gate) carry the hostname so the server records the Site
+  // Customer and validates the venue is the business's own live site.
+  const siteHostname = isSiteHost(flags?.app_url) ? currentHostname() ?? undefined : undefined;
 
   const venueQuery = useQuery({
     queryKey: ["venue", venueId],
@@ -86,12 +91,15 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
         // Dedicated Site context (ADR-0029): bookings made on a live site host
         // carry the hostname (the server validates it is the venue's own live
         // site and stores it for allowance/reporting context).
-        site_hostname: isSiteHost(flags?.app_url) ? currentHostname() ?? undefined : undefined
+        site_hostname: siteHostname
       })
   });
 
   React.useEffect(() => {
     if (incomplete || venueQuery.isLoading || !flags) return;
+    // A guest has no account to verify against — the sign-in gate renders
+    // below and the verify modal is never auto-opened for them (ADR-0030).
+    if (!user) return;
     if (requiresVerification && !verified) {
       setVerifyOpen(true);
       return;
@@ -109,7 +117,7 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
     if (checkout.data || checkout.error) return;
     void checkout.mutate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [incomplete, venueQuery.isLoading, flags, chosen, acceptsCash, method, checkoutKey, verified, onlineAvailable, requiresVerification, effectiveMethod]);
+  }, [incomplete, venueQuery.isLoading, flags, chosen, acceptsCash, method, checkoutKey, verified, onlineAvailable, requiresVerification, effectiveMethod, user]);
 
   const result = checkout.data;
   const isCash = !!result?.booking;
@@ -321,6 +329,44 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
   const displaySubtotal = slotsCount && pricePerSlot ? slotsCount * pricePerSlot : 0;
   const venueOfferAdj = applyVenueOffer(displaySubtotal, venueOffer);
   const displayTotal = serverTotal ?? venueOfferAdj.total;
+
+  // A guest lands on the sign-in gate (ADR-0030): the widget's identity flow
+  // signs them in as a Site Customer on a live site host (or a platform
+  // player on the marketplace), then verifies phone/email as required. The
+  // checkout resumes once the session resolves.
+  if (!user) {
+    if (loading) {
+      return (
+        <main className="mx-auto max-w-3xl px-4 pb-24 pt-8">
+          <Skeleton className="h-6 w-40" />
+          <div className="mt-6 space-y-3">
+            <Skeleton className="h-12 w-full rounded-2xl" />
+            <Skeleton className="h-12 w-full rounded-2xl" />
+            <Skeleton className="h-11 w-full rounded-full" />
+          </div>
+        </main>
+      );
+    }
+    return (
+      <main className="mx-auto max-w-3xl px-4 pb-24 pt-8">
+        <Link
+          href={venueHref}
+          className="press inline-flex items-center gap-1.5 text-sm font-medium text-ink-2 hover:text-ink"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          {venueName || "Back to venue"}
+        </Link>
+        <div className="mt-5 rounded-3xl border border-border bg-surface p-6 shadow-soft md:p-8">
+          <p className="text-sm text-ink-2">
+            Your booking is saved in the link — sign in to confirm your slot.
+          </p>
+          <div className="mt-5">
+            <WidgetIdentity siteHostname={siteHostname} onDone={() => {}} />
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   if (!result) {
     const pausedAndNoCash = !onlineAvailable && !acceptsCash;
