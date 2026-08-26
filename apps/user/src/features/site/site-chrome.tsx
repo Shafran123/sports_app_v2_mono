@@ -82,13 +82,11 @@ export function SiteChrome({ config, children }: { config: SiteConfig; children:
               // eslint-disable-next-line @next/next/no-img-element
               <img src={business.brand.logo_url} alt="" className="h-10 w-auto shrink-0 object-contain md:h-11" />
             ) : null}
-            <p
-              className={`truncate font-display text-lg font-extrabold tracking-tight md:text-xl ${
-                isHome ? "text-white" : "text-ink"
-              }`}
-            >
-              {business.name}
-            </p>
+            {!isHome && (
+              <p className="truncate font-display text-lg font-extrabold tracking-tight text-ink md:text-xl">
+                {business.name}
+              </p>
+            )}
           </Link>
           <div className="ml-auto flex items-center gap-2">
             {multi && isVenuePage ? (
