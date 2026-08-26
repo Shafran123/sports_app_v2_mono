@@ -2,7 +2,14 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { auth as authApi, TOKEN_KEY } from "@myslot/api";
+import {
+  auth as authApi,
+  siteCustomerAuth,
+  persistSiteToken,
+  SITE_CUSTOMER_TOKEN_KEY,
+  isOwnerSurface,
+  TOKEN_KEY
+} from "@myslot/api";
 import type { Role, User } from "@myslot/types";
 import { watchAuth } from "./firebase";
 import { logoutFirebase } from "./firebaseAuth";
@@ -21,11 +28,51 @@ const AuthContext = createContext<AuthState>({
   setUser: () => {}
 });
 
+// The owner surface (Dedicated Site host / widget embed) signs people in as
+// Site Customers (ADR-0030) — our own per-Business accounts, never Firebase.
+// Map the Site Customer onto the app's user shape so the existing booking
+// flow (venue detail, checkout, holds) works unchanged: same verified gates,
+// same session singleton, token transport via the API client's Authorization.
+function toAppUser(customer: {
+  id: string;
+  email: string;
+  name: string | null;
+  phone: string | null;
+  email_verified_at: string | null;
+  phone_verified_at: string | null;
+}): User {
+  return {
+    id: customer.id,
+    role: "player",
+    email: customer.email,
+    name: customer.name,
+    phone: customer.phone,
+    city: null,
+    phone_verified_at: customer.phone_verified_at,
+    email_verified_at: customer.email_verified_at ?? null,
+    onboarding_state: "grandfathered"
+  };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (isOwnerSurface()) {
+      const token = window.localStorage.getItem(SITE_CUSTOMER_TOKEN_KEY);
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+      siteCustomerAuth
+        .me()
+        .then((customer) => setUser(toAppUser(customer)))
+        .catch(() => persistSiteToken(null))
+        .finally(() => setLoading(false));
+      return;
+    }
+
     const unsub = watchAuth(async (fbUser) => {
       if (!fbUser) {
         setUser(null);
@@ -50,6 +97,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = async () => {
+    if (isOwnerSurface()) {
+      try {
+        await siteCustomerAuth.logout();
+      } finally {
+        persistSiteToken(null);
+        setUser(null);
+      }
+      return;
+    }
     await logoutFirebase();
     setUser(null);
   };
@@ -61,6 +117,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth(): AuthState {
   return useContext(AuthContext);
+}
+
+/** Staff roles that may operate the console app. */
+export function isStaffRole(role: Role | undefined | null): boolean {
+  return role === "admin" || role === "venue_owner";
 }
 
 function Spinner() {
@@ -119,18 +180,17 @@ export function RequireAdmin({ children, redirectTo = "/" }: { children: ReactNo
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && user && user.role !== "admin") router.replace(redirectTo);
+    if (!loading && (!user || user.role !== "admin")) {
+      router.replace(redirectTo);
+    }
   }, [loading, user, router, redirectTo]);
 
-  if (loading) return null;
+  if (loading) return <Spinner />;
   if (!user || user.role !== "admin") return null;
   return <>{children}</>;
 }
 
-/**
- * Onboarding gate (ADR-0022): a provisioned venue owner who has not accepted
- * their agreement is redirected to the Plan & agreement page until they do.
- */
+/** Owner onboarding guard: redirects a console user whose agreement is pending. */
 export function RequireOnboarded({ children, redirectTo = "/plan" }: { children: ReactNode; redirectTo?: string }) {
   const { user, loading } = useAuth();
   const router = useRouter();
@@ -143,8 +203,4 @@ export function RequireOnboarded({ children, redirectTo = "/plan" }: { children:
   if (loading) return null;
   if (pending) return null;
   return <>{children}</>;
-}
-
-export function isStaffRole(role: Role | undefined | null): boolean {
-  return role === "admin" || role === "venue_owner";
 }

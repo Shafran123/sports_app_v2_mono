@@ -1,7 +1,10 @@
-import type { ReactNode } from "react";
+"use client";
+
+import { useEffect, type ReactNode } from "react";
 import Link from "next/link";
 import type { SiteConfig } from "@myslot/types";
 import { brandCssVars } from "@/features/widget/widget-theme";
+import { SiteAccountPanel } from "./site-account-panel";
 
 // The white-labeled chrome of a Dedicated Site (ADR-0029): Business brand
 // header + attribution footer around the app's venue pages and booking flow.
@@ -29,6 +32,15 @@ export function SiteChrome({ config, children }: { config: SiteConfig; children:
   };
   const multi = venues.length > 1;
 
+  // Mark this surface as owner-hosted so the API client sends the Site
+  // Customer session (own auth, ADR-0030) and the auth context stops watching
+  // Firebase.
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.__SITE_HOST__ = true;
+    }
+  }, []);
+
   return (
     <div style={style} className="flex min-h-screen flex-col bg-[var(--brand-bg,#fafaf7)] text-ink">
       <header className="sticky top-0 z-40 border-b border-border bg-surface/90 backdrop-blur">
@@ -47,7 +59,7 @@ export function SiteChrome({ config, children }: { config: SiteConfig; children:
               </p>
             ) : null}
           </Link>
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-2">
             {multi ? (
               <Link
                 href="/?pick=1"
@@ -56,6 +68,7 @@ export function SiteChrome({ config, children }: { config: SiteConfig; children:
                 Switch venue
               </Link>
             ) : null}
+            <SiteAccountPanel business={business} />
           </div>
         </div>
       </header>

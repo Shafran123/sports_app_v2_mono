@@ -6,8 +6,8 @@
 
 **Status:** ready-for-agent
 
-- [ ] Owner Console route + nav entry for Customers
-- [ ] Table: name, email, phone, joined, last booking, bookings count, total spend; search by name/email/phone
-- [ ] CSV export of the current filtered set
-- [ ] Strict per-Business scoping on the API (a Business can only ever see its own customers)
-- [ ] Tests: directory rows, search, export CSV shape, cross-Business access denied
+- [x] Owner Console route + nav entry for Customers
+- [x] Table: name, email, phone, joined, last booking, bookings count, total spend; search by name/email/phone
+- [x] CSV export of the current filtered set
+- [x] Strict per-Business scoping on the API (a Business can only ever see its own customers)
+- [x] Tests: directory rows, search, export CSV shape, cross-Business access denied

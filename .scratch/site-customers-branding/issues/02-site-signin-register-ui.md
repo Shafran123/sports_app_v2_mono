@@ -6,9 +6,9 @@
 
 **Status:** ready-for-agent
 
-- [ ] Register/sign-in screens in site chrome with Site Customer auth wired
-- [ ] Details + verification step (phone/email OTP) per Business, using site brand colors
-- [ ] A signed-in Site Customer's booking/session state is isolated to this Business (no cross-host session bleed)
-- [ ] Unauthenticated booking flow redirects to site sign-in like today's app flow
-- [ ] Widget-compatible: same token works via bearer transport (see 03)
-- [ ] Tests: register→verify→book on site host; sign-in state does not leak across hosts/businesses
+- [x] Register/sign-in screens in site chrome with Site Customer auth wired
+- [x] Details + verification step (phone/email OTP) per Business, using site brand colors
+- [x] A signed-in Site Customer's booking/session state is isolated to this Business (no cross-host session bleed)
+- [x] Unauthenticated booking flow redirects to site sign-in like today's app flow
+- [x] Widget-compatible: same token works via bearer transport (see 03)
+- [x] Tests: register→verify→book on site host; sign-in state does not leak across hosts/businesses

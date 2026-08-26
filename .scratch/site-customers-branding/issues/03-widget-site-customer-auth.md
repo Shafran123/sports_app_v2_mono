@@ -6,8 +6,8 @@
 
 **Status:** ready-for-agent
 
-- [ ] Widget sign-in/register uses Site Customer auth (email+password, Google)
-- [ ] Bearer-token transport for the site-customer session inside the iframe; validated against the Instance's Business
-- [ ] Widget booking gate requires Site Customer Verified Phone + Verified Email per Business
-- [ ] Widget's own-booking view/cancel renders for the signed-in Site Customer
-- [ ] Tests: widget booking as a Site Customer; two Businesses → independent customers; token rejected for another Business
+- [x] Widget sign-in/register uses Site Customer auth (email+password, Google)
+- [x] Bearer-token transport for the site-customer session inside the iframe; validated against the Instance's Business
+- [x] Widget booking gate requires Site Customer Verified Phone + Verified Email per Business
+- [x] Widget's own-booking view/cancel renders for the signed-in Site Customer
+- [x] Tests: widget booking as a Site Customer; two Businesses → independent customers; token rejected for another Business

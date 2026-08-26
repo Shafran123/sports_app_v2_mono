@@ -164,7 +164,12 @@ export function WidgetEmbed({ widgetKey }: { widgetKey: string }) {
           <div className="mx-auto max-w-lg px-4 pb-10">
             {/* key by venue+session: switching venues resets slot state, and
                 sign-out remounts so the identity step shows again */}
-            <BookPanel key={`${activeId}-${sessionKey}`} venue={activeVenue} instanceKey={widgetKey} />
+            <BookPanel
+              key={`${activeId}-${sessionKey}`}
+              venue={activeVenue}
+              instanceKey={widgetKey}
+              siteHostname={config?.business.site_hostname ?? null}
+            />
           </div>
         </>
       )}

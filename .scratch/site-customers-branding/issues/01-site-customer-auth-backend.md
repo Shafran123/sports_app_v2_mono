@@ -6,10 +6,10 @@
 
 **Status:** ready-for-agent
 
-- [ ] Migration: `site_customers` (business_id, email unique per business, password_hash, name, phone, email_verified, phone_verified, google_sub, created_at, updated_at) + indexes on (business_id, email)
-- [ ] Password hashing (bcrypt/argon2) + session token issue/verify middleware (`requireSiteCustomer`)
-- [ ] Sign-up validates uniqueness per Business only — same email at two Businesses is two independent accounts (ADR-0030 Q7)
-- [ ] OTP challenge scoped to a Business tenant; verification flags live on the Site Customer
-- [ ] Google sign-in endpoint maps `google_sub` to a Site Customer, creating one per Business if absent
-- [ ] Auth-required booking gate uses Site Customer verification (Verified Phone + Verified Email per Business)
-- [ ] Tests: cross-Business independence, per-Business re-verification, session expiry/renewal, Google mapping
+- [x] Migration: `site_customers` (business_id, email unique per business, password_hash, name, phone, email_verified, phone_verified, google_sub, created_at, updated_at) + indexes on (business_id, email)
+- [x] Password hashing (bcrypt/argon2) + session token issue/verify middleware (`requireSiteCustomer`)
+- [x] Sign-up validates uniqueness per Business only — same email at two Businesses is two independent accounts (ADR-0030 Q7)
+- [x] OTP challenge scoped to a Business tenant; verification flags live on the Site Customer
+- [x] Google sign-in endpoint maps `google_sub` to a Site Customer, creating one per Business if absent
+- [x] Auth-required booking gate uses Site Customer verification (Verified Phone + Verified Email per Business)
+- [x] Tests: cross-Business independence, per-Business re-verification, session expiry/renewal, Google mapping

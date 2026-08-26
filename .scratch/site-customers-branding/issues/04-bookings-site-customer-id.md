@@ -6,8 +6,8 @@
 
 **Status:** ready-for-agent
 
-- [ ] Migration: `bookings.site_customer_id uuid null references site_customers(id)`, check constraint exactly-one-of user_id/site_customer_id allowed (walk-in has neither)
-- [ ] Checkout paths on site host + widget persist `site_customer_id`
-- [ ] Booking allowance tally, reporting, check-in, QR, and notifications handle site-customer bookings identically
-- [ ] Site Customer booking history endpoint for the Customers directory (05) and the site's my-bookings surface
-- [ ] Tests: site-customer booking lifecycle end to end; allowance counting; no cross-Business data exposure
+- [x] Migration: `bookings.site_customer_id uuid null references site_customers(id)`, check constraint exactly-one-of user_id/site_customer_id allowed (walk-in has neither)
+- [x] Checkout paths on site host + widget persist `site_customer_id`
+- [x] Booking allowance tally, reporting, check-in, QR, and notifications handle site-customer bookings identically
+- [x] Site Customer booking history endpoint for the Customers directory (05) and the site's my-bookings surface
+- [x] Tests: site-customer booking lifecycle end to end; allowance counting; no cross-Business data exposure

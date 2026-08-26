@@ -30,7 +30,7 @@ import { WidgetIdentity } from "./widget-identity";
 
 type Stage = "identity" | "pick" | "booked";
 
-export function BookPanel({ venue, instanceKey }: { venue: WidgetConfig; instanceKey?: string }) {
+export function BookPanel({ venue, instanceKey, siteHostname }: { venue: WidgetConfig; instanceKey?: string; siteHostname?: string | null }) {
   const { user, setUser, logout, loading } = useAuth();
   const [stage, setStage] = useState<Stage>("identity");
   const [date, setDate] = useState(() => toDateKey(new Date()));
@@ -62,7 +62,10 @@ export function BookPanel({ venue, instanceKey }: { venue: WidgetConfig; instanc
         idempotency_key: checkoutKey,
         payment_method: "cash",
         player_phone: user?.phone ?? undefined,
-        widget_instance_key: instanceKey
+        widget_instance_key: instanceKey,
+        // ADR-0030: on an owner's surface the booking carries the site
+        // context so the backend records the Site Customer.
+        site_hostname: siteHostname ?? undefined
       })
   });
 
@@ -99,7 +102,13 @@ export function BookPanel({ venue, instanceKey }: { venue: WidgetConfig; instanc
     // Session is settled: only show identity when the booking gate is unmet.
     // A ready player falls through to the picker with no flicker.
     if (!ready) {
-      return <WidgetIdentity widgetKey={instanceKey} onDone={() => setStage("pick")} />;
+      return (
+        <WidgetIdentity
+          widgetKey={instanceKey}
+          siteHostname={siteHostname ?? null}
+          onDone={() => setStage("pick")}
+        />
+      );
     }
   }
 

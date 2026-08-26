@@ -50,7 +50,10 @@ exports.getWidgetConfig = async (req, res) => {
       business: {
         id: instance.business_id,
         name: instance.business_name,
-        brand: instance.business_brand || {}
+        brand: instance.business_brand || {},
+        // The Business's live Site Hostname (ADR-0030): when present, the
+        // widget signs the buyer in as a Site Customer of this Business.
+        site_hostname: instance.business_site_hostname || null
       },
       instance: {
         id: instance.id,

@@ -52,7 +52,31 @@ async function authenticate(req, res, next) {
     }
 
     const token = authHeader.slice(7);
-    const decoded = await verifyIdToken(token);
+    let decoded;
+    try {
+      decoded = await verifyIdToken(token);
+    } catch {
+      // Not a platform (Firebase) token — fall back to a Site Customer
+      // session (ADR-0030): owner surfaces (Dedicated Site / widget embed)
+      // sign people in as per-Business customers with our own auth.
+      const siteCustomers = require('../services/siteCustomers');
+      const customer = await siteCustomers.customerForToken(token);
+      if (!customer) {
+        return fail(res, 401, 'UNAUTHORIZED', 'Invalid or expired token.');
+      }
+      req.siteCustomer = customer;
+      req.user = {
+        id: customer.id,
+        isSiteCustomer: true,
+        role: 'player',
+        email: customer.email,
+        name: customer.name,
+        phone: customer.phone,
+        phone_verified_at: customer.phone_verified_at,
+        email_verified_at: customer.email_verified_at
+      };
+      return next();
+    }
 
     const user = await upsertUser(decoded.uid, decoded.email, decoded.name, {
       phone: decoded.phone_number,

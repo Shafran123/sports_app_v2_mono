@@ -12,7 +12,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { auth as authApi, toApiFailure, featureFlags } from "@myslot/api";
+import { auth as authApi, toApiFailure, featureFlags, siteCustomerAuth, persistSiteToken } from "@myslot/api";
 import {
   loginWithEmail,
   registerWithEmail,
@@ -27,14 +27,43 @@ import { GoogleLogo, VerifiedDetails } from "./identity-parts";
 
 type Phase = "signin" | "register" | "details";
 
+// Map a Site Customer onto the app user shape (ADR-0030): the booking gate
+// reads the same verified flags + name/phone/email fields.
+function toAppUser(customer: {
+  id: string;
+  email: string;
+  name: string | null;
+  phone: string | null;
+  email_verified_at: string | null;
+  phone_verified_at: string | null;
+}) {
+  return {
+    id: customer.id,
+    role: "player" as const,
+    email: customer.email,
+    name: customer.name,
+    phone: customer.phone,
+    city: null,
+    phone_verified_at: customer.phone_verified_at,
+    email_verified_at: customer.email_verified_at ?? null,
+    onboarding_state: "grandfathered" as const
+  };
+}
+
 export function WidgetIdentity({
   widgetKey,
+  siteHostname,
   onDone
 }: {
   widgetKey?: string;
+  siteHostname?: string | null;
   onDone: () => void;
 }) {
   const { user, setUser } = useAuth();
+  // ADR-0030: when the Business has a live Dedicated Site, the widget signs
+  // the buyer in as a Site Customer of that Business (own auth, per-Business
+  // verified gates). Without a live site the platform (Firebase) flow stays.
+  const siteMode = Boolean(siteHostname);
   const [phase, setPhase] = useState<Phase>(user ? "details" : "signin");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -75,9 +104,19 @@ export function WidgetIdentity({
     }
     setBusy(true);
     try {
-      await loginWithEmail(email.trim(), password);
-      const me = await authApi.me();
-      setUser(me);
+      if (siteMode) {
+        const session = await siteCustomerAuth.login({
+          site_hostname: siteHostname!,
+          email: email.trim(),
+          password
+        });
+        persistSiteToken(session.token);
+        setUser(toAppUser(session.customer));
+      } else {
+        await loginWithEmail(email.trim(), password);
+        const me = await authApi.me();
+        setUser(me);
+      }
       setPhase("details");
     } catch (err) {
       setError(toApiFailure(err).message);
@@ -103,10 +142,21 @@ export function WidgetIdentity({
     }
     setBusy(true);
     try {
-      await registerWithEmail(regEmail.trim(), regPassword);
-      await authApi.updateMe(undefined, { name: regName.trim() });
-      const me = await authApi.me();
-      setUser(me);
+      if (siteMode) {
+        const session = await siteCustomerAuth.register({
+          site_hostname: siteHostname!,
+          name: regName.trim(),
+          email: regEmail.trim(),
+          password: regPassword
+        });
+        persistSiteToken(session.token);
+        setUser(toAppUser(session.customer));
+      } else {
+        await registerWithEmail(regEmail.trim(), regPassword);
+        await authApi.updateMe(undefined, { name: regName.trim() });
+        const me = await authApi.me();
+        setUser(me);
+      }
       setPhase("details");
     } catch (err) {
       setError(toApiFailure(err).message);
@@ -150,12 +200,14 @@ export function WidgetIdentity({
 
   const saveName = async () => {
     if (!name.trim()) throw new Error("Enter your name.");
-    if (name.trim() !== (user?.name ?? "")) {
+    // Site Customers capture their name at registration; the platform user
+    // (marketplace path) updates via /auth/me.
+    if (!siteMode && name.trim() !== (user?.name ?? "")) {
       await authApi.updateMe(undefined, { name: name.trim() });
+      const me = await authApi.me();
+      setUser(me);
     }
-    const me = await authApi.me();
-    setUser(me);
-    return me;
+    return user;
   };
 
   const phoneReady = !!user?.phone_verified_at;
@@ -170,8 +222,12 @@ export function WidgetIdentity({
     }
     setBusy(true);
     try {
-      const result = await authApi.verifyPhoneSend(normalized);
-      setResendIn(result.resend_after_seconds);
+      if (siteMode) {
+        await siteCustomerAuth.verifyPhoneSend(normalized);
+      } else {
+        const result = await authApi.verifyPhoneSend(normalized);
+        setResendIn(result.resend_after_seconds);
+      }
       setPhoneSent(true);
       setError("");
     } catch (err) {
@@ -188,8 +244,14 @@ export function WidgetIdentity({
     }
     setBusy(true);
     try {
-      const me = await authApi.verifyPhoneConfirm(phone.trim(), phoneCode.trim());
-      setUser(me);
+      if (siteMode) {
+        await siteCustomerAuth.verifyPhoneConfirm(phone.trim(), phoneCode.trim());
+        const customer = await siteCustomerAuth.me();
+        setUser(toAppUser(customer));
+      } else {
+        const me = await authApi.verifyPhoneConfirm(phone.trim(), phoneCode.trim());
+        setUser(me);
+      }
       setPhoneCode("");
       setError("");
     } catch (err) {
@@ -207,8 +269,12 @@ export function WidgetIdentity({
     }
     setBusy(true);
     try {
-      const result = await authApi.verifyEmailSend(detailsEmail.trim());
-      setResendIn(result.resend_after_seconds);
+      if (siteMode) {
+        await siteCustomerAuth.verifyEmailSend(detailsEmail.trim());
+      } else {
+        const result = await authApi.verifyEmailSend(detailsEmail.trim());
+        setResendIn(result.resend_after_seconds);
+      }
       setEmailSent(true);
       setError("");
     } catch (err) {
@@ -225,8 +291,14 @@ export function WidgetIdentity({
     }
     setBusy(true);
     try {
-      const me = await authApi.verifyEmailConfirm(detailsEmail.trim(), emailCode.trim());
-      setUser(me);
+      if (siteMode) {
+        await siteCustomerAuth.verifyEmailConfirm(detailsEmail.trim(), emailCode.trim());
+        const customer = await siteCustomerAuth.me();
+        setUser(toAppUser(customer));
+      } else {
+        const me = await authApi.verifyEmailConfirm(detailsEmail.trim(), emailCode.trim());
+        setUser(me);
+      }
       setEmailCode("");
       setError("");
     } catch (err) {

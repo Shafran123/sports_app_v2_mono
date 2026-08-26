@@ -26,7 +26,9 @@ function effectiveScope(instance, eligibleIds) {
 // disabled keys read as null so the public API never leaks existence.
 async function instanceByEmbedKey(key, client = pool) {
   const { rows } = await client.query(
-    `select wi.*, b.name as business_name, b.brand as business_brand, b.owner_id as business_owner_id
+    `select wi.*, b.name as business_name, b.brand as business_brand, b.owner_id as business_owner_id,
+            (select r.hostname from site_domain_requests r
+             where r.business_id = b.id and r.status = 'live' limit 1) as business_site_hostname
      from widget_instances wi
      join businesses b on b.id = wi.business_id
      where wi.embed_key = $1 and wi.enabled`,
