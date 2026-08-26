@@ -57,6 +57,10 @@ export function SiteChrome({ config, children }: { config: SiteConfig; children:
   // chooser only appears on actual venue pages.
   const isVenuePage =
     venues.some((v) => v.slug && `/${v.slug}` === pathname) || /^\/venues\/[^/]+$/.test(pathname);
+  // On the home page the hero image reaches the very top of the viewport and
+  // the nav stacks over it, transparent over a dark shade — a classic
+  // full-bleed hero. Everywhere else the header is the solid sticky bar.
+  const isHome = pathname === "/";
   const openVenue = (id: string) => {
     setPickerOpen(false);
     const venue = venues.find((v) => v.id === id);
@@ -65,14 +69,24 @@ export function SiteChrome({ config, children }: { config: SiteConfig; children:
 
   return (
     <div style={style} className="flex min-h-screen flex-col bg-paper text-ink">
-      <header className="sticky top-0 z-40 border-b border-border bg-surface/90 backdrop-blur">
+      <header
+        className={
+          isHome
+            ? "absolute inset-x-0 top-0 z-40 border-b border-white/10 bg-gradient-to-b from-ink/55 to-transparent"
+            : "sticky top-0 z-40 border-b border-border bg-surface/90 backdrop-blur"
+        }
+      >
         <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-2.5 md:px-6 md:py-3">
           <Link href="/" className="flex min-w-0 items-center gap-2.5" aria-label={business.name}>
             {business.brand?.logo_url ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={business.brand.logo_url} alt="" className="h-10 w-auto shrink-0 object-contain md:h-11" />
             ) : null}
-            <p className="truncate font-display text-lg font-extrabold tracking-tight text-ink md:text-xl">
+            <p
+              className={`truncate font-display text-lg font-extrabold tracking-tight md:text-xl ${
+                isHome ? "text-white" : "text-ink"
+              }`}
+            >
               {business.name}
             </p>
           </Link>
@@ -96,7 +110,7 @@ export function SiteChrome({ config, children }: { config: SiteConfig; children:
                 </button>
               </>
             ) : null}
-            <SiteAccountPanel business={business} />
+            <SiteAccountPanel business={business} onDark={isHome} />
           </div>
         </div>
       </header>

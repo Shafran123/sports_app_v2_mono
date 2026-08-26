@@ -128,8 +128,13 @@ export function SiteCarousel({
         )}
 
         {overlay ? (
-          <div className="pointer-events-none absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-ink/70 via-ink/25 to-transparent">
-            <div className="pointer-events-auto max-w-6xl px-4 pb-10 md:px-6 md:pb-14">{overlay}</div>
+          <div className="pointer-events-none absolute inset-0">
+            {/* Top scrim: keeps a transparent nav (stacked over the hero)
+                readable on any slide. */}
+            <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-ink/75 via-ink/35 to-transparent" />
+            <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-ink/80 via-ink/30 to-transparent">
+              <div className="pointer-events-auto max-w-6xl px-4 pb-10 md:px-6 md:pb-14">{overlay}</div>
+            </div>
           </div>
         ) : null}
       </div>

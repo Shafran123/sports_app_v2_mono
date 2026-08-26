@@ -14,7 +14,7 @@ import { LogOut, User } from "lucide-react";
 
 type Mode = "signin" | "register";
 
-export function SiteAccountPanel({ business }: { business: BusinessInfo }) {
+export function SiteAccountPanel({ business, onDark = false }: { business: BusinessInfo; onDark?: boolean }) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>("signin");
   const [name, setName] = useState("");
@@ -128,7 +128,11 @@ export function SiteAccountPanel({ business }: { business: BusinessInfo }) {
           <button
             type="button"
             onClick={() => setOpen((o) => !o)}
-            className="flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-2 text-sm font-semibold text-ink-2 transition-colors hover:text-ink"
+            className={
+              onDark
+                ? "flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-3 py-2 text-sm font-semibold text-white backdrop-blur transition-colors hover:bg-white/20"
+                : "flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-2 text-sm font-semibold text-ink-2 transition-colors hover:text-ink"
+            }
           >
             <User className="h-4 w-4" /> <span className="max-w-28 truncate">{signedIn}</span>
           </button>
@@ -136,7 +140,7 @@ export function SiteAccountPanel({ business }: { business: BusinessInfo }) {
             type="button"
             aria-label="Sign out"
             onClick={() => void logout()}
-            className="rounded-full p-2 text-ink-3 transition-colors hover:text-error"
+            className={`rounded-full p-2 transition-colors ${onDark ? "text-white/70 hover:text-white" : "text-ink-3 hover:text-error"}`}
           >
             <LogOut className="h-4 w-4" />
           </button>
@@ -148,7 +152,11 @@ export function SiteAccountPanel({ business }: { business: BusinessInfo }) {
             setMode("signin");
             setOpen(true);
           }}
-          className="rounded-full border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink-2 transition-colors hover:text-ink"
+          className={
+            onDark
+              ? "rounded-full border border-white/30 bg-white/10 px-4 py-2 text-sm font-semibold text-white backdrop-blur transition-colors hover:bg-white/20"
+              : "rounded-full border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink-2 transition-colors hover:text-ink"
+          }
         >
           Sign in
         </button>

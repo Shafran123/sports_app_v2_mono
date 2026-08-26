@@ -15,7 +15,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Clock, Mail, MapPin, Navigation, Phone } from "lucide-react";
 import type { SiteConfig, SiteVenue } from "@myslot/types";
-import { Badge, Button } from "@myslot/ui";
+import { Badge } from "@myslot/ui";
 import { formatLkr } from "@myslot/utils";
 import { brandCssVars } from "@/features/widget/widget-theme";
 import { SiteCarousel, type CarouselSlide } from "./site-carousel";
@@ -65,21 +65,24 @@ export function SiteHome({ config }: { config: SiteConfig }) {
         ].filter((s) => s.src);
   const contact = brand?.contact;
   const hasContact = contact && SITE_CONTACT_ROWS.some(({ key }) => Boolean(contact?.[key]));
-  const scrollToVenues = () => document.getElementById("venues")?.scrollIntoView({ behavior: "smooth" });
 
-  // The hero overlay is the site's landing (ADR-0032 revamp): business name,
-  // headline, tagline and a Book now CTA over the carousel scrim — the old
-  // centered intro block under the hero is gone.
+  // The hero overlay is the site's landing (revamp): the business name with a
+  // short description under it — never a CTA. The venues grid right below is
+  // the booking entry point, and the gradient scrim keeps the text readable.
+  const description =
+    brand?.about ||
+    [brand?.headline, brand?.tagline].filter(Boolean).join(" — ") ||
+    `Book a court at ${business.name}`;
+  const capped =
+    description.length > 240 ? `${description.slice(0, 240).trimEnd()}…` : description;
   const heroOverlay = (
     <div className="max-w-2xl">
-      <h1 className="font-display text-3xl font-extrabold leading-tight tracking-tight text-white md:text-5xl">
+      <h1 className="font-display text-3xl font-extrabold leading-tight tracking-tight text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.45)] md:text-5xl">
         {business.name}
       </h1>
-      {brand?.headline && (
-        <p className="mt-2 text-base font-semibold text-white md:text-xl">{brand.headline}</p>
-      )}
-      {brand?.tagline && <p className="mt-1 text-sm text-white/80 md:text-base">{brand.tagline}</p>}
-      <Button className="mt-5" onClick={scrollToVenues}>Book now</Button>
+      <p className="mt-3 max-w-xl text-sm leading-relaxed text-white/90 [text-shadow:0_1px_2px_rgba(0,0,0,0.5)] md:text-base">
+        {capped}
+      </p>
     </div>
   );
 
@@ -93,20 +96,14 @@ export function SiteHome({ config }: { config: SiteConfig }) {
           className="h-[28rem] w-full md:h-[34rem]"
         />
       ) : (
-        // No image anywhere: a neutral brand panel keeps the hero from
-        // collapsing while still leading with the name + CTA.
-        <div className="bg-surface-2">
+        // No image anywhere: a dark brand panel keeps the hero from
+        // collapsing while the white header + overlay still read.
+        <div className="bg-ink">
           <div className="mx-auto max-w-6xl px-4 py-20 md:px-6 md:py-28">{heroOverlay}</div>
         </div>
       )}
 
       <div className="mx-auto max-w-6xl px-4 md:px-6">
-        {brand?.about && (
-          <p className="mx-auto mt-12 max-w-2xl whitespace-pre-line text-center text-sm leading-relaxed text-ink-2">
-            {brand.about}
-          </p>
-        )}
-
         <section id="venues" className="mt-12 scroll-mt-24">
           <h2 className="font-display text-xl font-extrabold tracking-tight text-ink md:text-2xl">
             Our venues

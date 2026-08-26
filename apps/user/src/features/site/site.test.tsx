@@ -140,7 +140,7 @@ describe("SiteHome", () => {
     expect(replace).toHaveBeenCalledWith("/venue-1");
   });
 
-  it("renders the hero gallery with captions, the headline and the book-now CTA (ADR-0032)", () => {
+  it("renders the hero gallery with captions and the name + description overlay (no CTA)", () => {
     renderWithProvider(
       <SiteHome
         config={siteBrand({
@@ -157,9 +157,13 @@ describe("SiteHome", () => {
     expect(screen.getAllByText("ABC Sports").length).toBeGreaterThan(0);
     expect(screen.getByText("Our main hall at dawn")).toBeInTheDocument();
     expect(screen.getByText("Tournament night")).toBeInTheDocument();
-    expect(screen.getByText("Colombo’s home of badminton")).toBeInTheDocument();
     expect(screen.getByText(/We run courts since 1998/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Book now" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Book now" })).toBeNull();
+  });
+
+  it("falls back to the about description when there is no about text", () => {
+    renderWithProvider(<SiteHome config={config()} />);
+    expect(screen.getByText("Book direct")).toBeInTheDocument();
   });
 
   it("falls back to the legacy hero image, then the logo, when no gallery is set", () => {
