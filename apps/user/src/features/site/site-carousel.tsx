@@ -132,12 +132,12 @@ export function SiteCarousel({
             {/* Top scrim: keeps a transparent nav (stacked over the hero)
                 readable on any slide. */}
             <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-ink/75 via-ink/35 to-transparent" />
-            <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-ink/80 via-ink/30 to-transparent">
-              {/* Same horizontal rhythm as the header's nav bar (max-w-6xl,
-                  mx-auto, px-4/6) so the hero text lines up with the chrome. */}
-              <div className="pointer-events-auto mx-auto max-w-6xl px-4 pb-10 md:px-6 md:pb-14">
-                {overlay}
-              </div>
+            {/* Bottom scrim + the brand block. Plain block positioning:
+                a flex-col parent would shrink the container to its content
+                and dead-center it — this must match the nav bar's own
+                centered max-w-6xl block instead. */}
+            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/80 via-ink/30 to-transparent">
+              <div className="mx-auto max-w-6xl px-4 pb-10 md:px-6 md:pb-14">{overlay}</div>
             </div>
           </div>
         ) : null}
