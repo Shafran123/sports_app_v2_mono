@@ -331,11 +331,17 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
   const displayTotal = serverTotal ?? venueOfferAdj.total;
 
   // Identity gate (ADR-0030): a guest lands on the sign-in flow, and on a
-  // live site host a signed-in-but-unverified Site Customer stays on it until
-  // they verify through the site's own OTP flow — the platform verify modal
-  // (which writes OTPs against the `users` table) must never fire for them.
+  // live site host a Site Customer stays on it until BOTH phone and email are
+  // verified — the server rejects a site booking with a missing verified email
+  // (VERIFIED_EMAIL_REQUIRED), and the fallback platform verify-email modal
+  // 500s on a site customer's id. The platform verify modal (which writes
+  // OTPs against the `users` table) must never fire for them.
   const siteHostActive = Boolean(siteHostname);
-  const gateActive = !user || (siteHostActive && requiresVerification && !verified);
+  const verifiedPhone = !!user?.phone_verified_at;
+  const verifiedEmail = !!user?.email_verified_at;
+  const gateActive =
+    !user ||
+    (siteHostActive && requiresVerification && (!verifiedPhone || !verifiedEmail));
   if (gateActive) {
     if (loading || !flags) {
       return (

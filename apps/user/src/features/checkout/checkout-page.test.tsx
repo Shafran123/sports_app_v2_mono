@@ -503,4 +503,30 @@ describe("CheckoutPage verified-phone gate", () => {
     expect(screen.queryByText(/You need a verified phone to book/)).toBeNull();
     expect(bookings.checkout).not.toHaveBeenCalled();
   });
+
+  it("keeps a phone-verified site customer in the gate until the email is verified (ADR-0030)", async () => {
+    ctxUser = null as never;
+    isSiteHostMock.mockReturnValue(true);
+    vi.mocked(venues.detail).mockResolvedValue(onlineVenue as never);
+
+    const { rerender } = renderPage();
+    expect(await screen.findByText("Sign in to book")).toBeInTheDocument();
+
+    // Phone is verified but email is not: the server would reject checkout
+    // with VERIFIED_EMAIL_REQUIRED (and the platform verify-email modal 500s
+    // on a site customer), so the site gate must stay up until both are done.
+    rerender({
+      id: "sc1",
+      name: "Pam",
+      email: "pam@site.test",
+      role: "player",
+      phone: "+94771713701",
+      phone_verified_at: "2026-08-26T10:00:00.000Z",
+      email_verified_at: null
+    });
+
+    expect(screen.getByText("Sign in to book")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Verify email" })).toBeNull();
+    expect(bookings.checkout).not.toHaveBeenCalled();
+  });
 });
