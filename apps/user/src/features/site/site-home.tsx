@@ -50,7 +50,8 @@ export function SiteHome({ config }: { config: SiteConfig }) {
   const brand = business.brand;
   // Site Gallery drives the hero (1-6 slides, optional captions); sites
   // without one fall back to the legacy hero image, then logo, then the
-  // first venue photo.
+  // first venue photo. When nothing exists, a neutral brand panel stands in
+  // so the name and CTA are always present.
   const slides: CarouselSlide[] =
     brand?.gallery?.length && brand.gallery.some((s) => s.image_url)
       ? brand.gallery
@@ -64,35 +65,44 @@ export function SiteHome({ config }: { config: SiteConfig }) {
         ].filter((s) => s.src);
   const contact = brand?.contact;
   const hasContact = contact && SITE_CONTACT_ROWS.some(({ key }) => Boolean(contact?.[key]));
+  const scrollToVenues = () => document.getElementById("venues")?.scrollIntoView({ behavior: "smooth" });
+
+  // The hero overlay is the site's landing (ADR-0032 revamp): business name,
+  // headline, tagline and a Book now CTA over the carousel scrim — the old
+  // centered intro block under the hero is gone.
+  const heroOverlay = (
+    <div className="max-w-2xl">
+      <h1 className="font-display text-3xl font-extrabold leading-tight tracking-tight text-white md:text-5xl">
+        {business.name}
+      </h1>
+      {brand?.headline && (
+        <p className="mt-2 text-base font-semibold text-white md:text-xl">{brand.headline}</p>
+      )}
+      {brand?.tagline && <p className="mt-1 text-sm text-white/80 md:text-base">{brand.tagline}</p>}
+      <Button className="mt-5" onClick={scrollToVenues}>Book now</Button>
+    </div>
+  );
 
   return (
-    <div style={style} className="mx-auto pb-24">
+    <div style={style} className="pb-24">
       {slides.length > 0 ? (
         <SiteCarousel
           slides={slides}
           alt={business.name}
-          className="h-72 w-full md:h-[28rem]"
+          overlay={heroOverlay}
+          className="h-[28rem] w-full md:h-[34rem]"
         />
-      ) : null}
+      ) : (
+        // No image anywhere: a neutral brand panel keeps the hero from
+        // collapsing while still leading with the name + CTA.
+        <div className="bg-surface-2">
+          <div className="mx-auto max-w-6xl px-4 py-20 md:px-6 md:py-28">{heroOverlay}</div>
+        </div>
+      )}
 
       <div className="mx-auto max-w-6xl px-4 md:px-6">
-        <div className="mt-10 text-center">
-          <h1 className="font-display text-3xl font-extrabold tracking-tight text-ink md:text-5xl">
-            {business.name}
-          </h1>
-          {brand?.headline && (
-            <p className="mt-1 font-medium" style={{ color: "var(--brand-primary, #16a34a)" }}>
-              {brand.headline}
-            </p>
-          )}
-          {brand?.tagline && <p className="mt-0.5 text-sm text-ink-2 md:text-base">{brand.tagline}</p>}
-          <Button className="mt-5" onClick={() => document.getElementById("venues")?.scrollIntoView({ behavior: "smooth" })}>
-            Book now
-          </Button>
-        </div>
-
         {brand?.about && (
-          <p className="mx-auto mt-8 max-w-2xl whitespace-pre-line text-center text-sm leading-relaxed text-ink-2">
+          <p className="mx-auto mt-12 max-w-2xl whitespace-pre-line text-center text-sm leading-relaxed text-ink-2">
             {brand.about}
           </p>
         )}

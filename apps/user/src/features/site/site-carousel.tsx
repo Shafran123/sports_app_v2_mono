@@ -1,12 +1,14 @@
 "use client";
 
-// The site hero gallery (ADR-0032): auto-rotating slide set with optional
-// captions, arrow + dot controls and touch swipe. Autoplay pauses on hover
-// and focus, stops while the tab is hidden, and never runs for users who
-// prefer reduced motion. Render all slides in a translated track so swiping
-// is cheap and images preload.
+// The site hero gallery (ADR-0032 + revamp): auto-rotating slide set that
+// accepts an optional persistent overlay (the Business name / headline / CTA
+// on the site home). Autoplay pauses on hover and focus, stops while the tab
+// is hidden, and never runs for users who prefer reduced motion. Slides keep
+// their caption as a compact pill (top-right) so it never collides with the
+// brand overlay. Render all slides in a translated track so swiping is cheap
+// and images preload.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 export type CarouselSlide = { src: string; caption?: string };
@@ -16,10 +18,12 @@ const AUTOPLAY_MS = 5000;
 export function SiteCarousel({
   slides,
   alt,
+  overlay,
   className = ""
 }: {
   slides: CarouselSlide[];
   alt: string;
+  overlay?: ReactNode;
   className?: string;
 }) {
   const [index, setIndex] = useState(0);
@@ -82,9 +86,9 @@ export function SiteCarousel({
                 loading={i === 0 ? "eager" : "lazy"}
               />
               {slide.caption ? (
-                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent px-4 pb-8 pt-10 md:px-6">
-                  <p className="max-w-2xl text-sm font-semibold leading-snug text-white md:text-lg">{slide.caption}</p>
-                </div>
+                <span className="absolute right-3 top-3 max-w-[70%] rounded-full bg-ink/55 px-3 py-1 text-xs font-medium text-white backdrop-blur md:right-5 md:top-5">
+                  {slide.caption}
+                </span>
               ) : null}
             </div>
           ))}
@@ -108,7 +112,7 @@ export function SiteCarousel({
             >
               <ChevronRight className="h-5 w-5" />
             </button>
-            <div className="absolute bottom-2.5 left-1/2 flex -translate-x-1/2 items-center gap-1.5">
+            <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1.5">
               {slides.map((_, i) => (
                 <button
                   key={i}
@@ -122,6 +126,12 @@ export function SiteCarousel({
             </div>
           </>
         )}
+
+        {overlay ? (
+          <div className="pointer-events-none absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-ink/70 via-ink/25 to-transparent">
+            <div className="pointer-events-auto max-w-6xl px-4 pb-10 md:px-6 md:pb-14">{overlay}</div>
+          </div>
+        ) : null}
       </div>
     </div>
   );

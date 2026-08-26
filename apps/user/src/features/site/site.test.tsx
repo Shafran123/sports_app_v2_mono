@@ -153,6 +153,8 @@ describe("SiteHome", () => {
     );
     const slides = screen.getAllByRole("img");
     expect(slides[0]).toHaveAttribute("src", "https://cdn.test/slide1.jpg");
+    // The brand block lives in the hero overlay now — no separate intro.
+    expect(screen.getAllByText("ABC Sports").length).toBeGreaterThan(0);
     expect(screen.getByText("Our main hall at dawn")).toBeInTheDocument();
     expect(screen.getByText("Tournament night")).toBeInTheDocument();
     expect(screen.getByText("Colombo’s home of badminton")).toBeInTheDocument();
