@@ -13,7 +13,7 @@ exports.getMe = async (req, res) => {
       return fail(res, 404, 'BUSINESS_NOT_FOUND', 'No business is set up for this account');
     }
     const { rows: venues } = await pool.query(
-      `select id, name, status, visibility, slug from venues
+      `select id, name, status, visibility, slug, marketplace_listing from venues
        where business_id = $1 order by created_at`,
       [business.id]
     );
