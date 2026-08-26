@@ -12,26 +12,23 @@ import { Badge } from "@myslot/ui";
 import type { WidgetConfig } from "@myslot/types";
 import { BookPanel } from "./book-panel";
 import { brandCssVars } from "./widget-theme";
+import { SiteCarousel } from "@/features/site/site-carousel";
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 export function BrandedVenuePage({ venue }: { venue: WidgetConfig }) {
   const brand = venue.business?.brand;
   const style = useMemo(() => brandCssVars(brand), [brand]);
-  const cover = venue.photos?.[0];
+  const photos = venue.photos?.length
+    ? venue.photos.map((src) => ({ src, caption: undefined }))
+    : [];
 
   return (
-    <div style={style} className="min-h-screen bg-[var(--brand-bg,#fafaf7)]">
-      {cover && (
-        <div className="relative h-52 w-full overflow-hidden md:h-80">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={cover} alt="" className="h-full w-full object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-        </div>
-      )}
+    <div style={style} className="min-h-screen bg-paper">
+      {photos.length > 0 && <SiteCarousel slides={photos} alt={venue.name} className="h-60 w-full md:h-96" />}
 
       <div className="mx-auto max-w-6xl px-4 pb-24 md:px-6">
-        <div className="-mt-16 relative z-10 md:-mt-24">
+        <div className="relative z-10 mt-6">
           <div className="overflow-hidden rounded-3xl border border-border bg-surface shadow-lift">
             <div className="p-6 md:p-8" style={{ borderTop: `6px solid var(--brand-primary, #16a34a)` }}>
               <div className="flex flex-wrap items-start justify-between gap-4">

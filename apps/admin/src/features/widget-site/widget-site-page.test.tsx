@@ -127,18 +127,21 @@ describe("WidgetSitePage (ticket 08)", () => {
     await waitFor(() => {
       expect(screen.getByText("Site brand")).toBeInTheDocument();
     });
-    expect(screen.getByLabelText("Hero image URL")).toHaveValue("https://cdn.test/hero.jpg");
+    // The legacy hero image seeds the first gallery slide (ADR-0032).
+    expect(screen.getByLabelText("Gallery slide 1 image URL")).toHaveValue("https://cdn.test/hero.jpg");
     expect(screen.getByLabelText("Contact phone")).toHaveValue("+94 77 000 0000");
     // The Preview button is gone — the site is previewed at its own hostname.
     expect(screen.queryByRole("button", { name: /preview/i })).toBeNull();
   });
 
-  it("saves site-brand fields (hero, headline, contact) via the profile endpoint", async () => {
+  it("saves site-brand fields (gallery, headline, contact) via the profile endpoint", async () => {
     wrap(<WidgetSitePage />);
     await waitFor(() => {
       expect(screen.getByText("Site brand")).toBeInTheDocument();
     });
-    await userEvent.type(screen.getByLabelText("Hero image URL"), "https://cdn.test/hero-new.jpg");
+    await userEvent.click(screen.getByRole("button", { name: /add slide/i }));
+    await userEvent.type(screen.getByLabelText("Gallery slide 1 image URL"), "https://cdn.test/hero-new.jpg");
+    await userEvent.type(screen.getByLabelText("Gallery slide 1 caption"), "Dawn at the main hall");
     await userEvent.type(screen.getByLabelText("Headline"), "The home of badminton in Colombo");
     await userEvent.type(screen.getByLabelText("Contact email"), "hello@courtgroup.lk");
     await userEvent.click(screen.getByRole("button", { name: "Save site brand" }));
@@ -147,9 +150,32 @@ describe("WidgetSitePage (ticket 08)", () => {
       expect(updateMeMock).toHaveBeenCalledWith(
         expect.objectContaining({
           brand: expect.objectContaining({
-            hero_image: "https://cdn.test/hero-new.jpg",
+            gallery: [
+              { image_url: "https://cdn.test/hero-new.jpg", caption: "Dawn at the main hall" }
+            ],
             headline: "The home of badminton in Colombo",
             contact: expect.objectContaining({ email: "hello@courtgroup.lk" })
+          })
+        })
+      );
+    });
+  });
+
+  it("saves Site Policies and shows up to six gallery slides (ADR-0032)", async () => {
+    wrap(<WidgetSitePage />);
+    await waitFor(() => {
+      expect(screen.getByText("Site policies")).toBeInTheDocument();
+    });
+    await userEvent.type(screen.getByLabelText("Privacy policy"), "We keep your data private.");
+    await userEvent.type(screen.getByLabelText("Terms & conditions"), "Bookings follow venue rules.");
+    await userEvent.click(screen.getByRole("button", { name: "Save policies" }));
+
+    await waitFor(() => {
+      expect(updateMeMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          brand: expect.objectContaining({
+            privacy_policy: "We keep your data private.",
+            terms_conditions: "Bookings follow venue rules."
           })
         })
       );

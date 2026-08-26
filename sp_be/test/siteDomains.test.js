@@ -220,6 +220,50 @@ describe('site domain request workflow (ADR-0029)', () => {
     expect(res.body.data.business.brand.contact.phone).toBe('+94 77 000 0000');
   });
 
+  it('sanitizes the Site Gallery and Site Policies in the brand (ADR-0032)', async () => {
+    const saved = await request(app)
+      .patch('/api/v1/business/me')
+      .set('Authorization', `Bearer ${OWNER_TOKEN}`)
+      .send({
+        brand: {
+          gallery: [
+            { image_url: 'https://cdn.test/slide1.jpg', caption: 'Main hall at dawn' },
+            { image_url: 'https://cdn.test/slide2.jpg', caption: '   padded caption   ' }
+          ],
+          privacy_policy: 'We keep your data private.',
+          terms_conditions: 'Bookings follow venue rules.'
+        }
+      });
+    expect(saved.status).toBe(200);
+
+    const res = await request(app).get(`/api/v1/public/site/by-hostname?host=site-test.lk`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.business.brand.gallery).toHaveLength(2);
+    expect(res.body.data.business.brand.gallery[0]).toEqual({
+      image_url: 'https://cdn.test/slide1.jpg',
+      caption: 'Main hall at dawn'
+    });
+    expect(res.body.data.business.brand.gallery[1]).toEqual({
+      image_url: 'https://cdn.test/slide2.jpg',
+      caption: 'padded caption'
+    });
+    expect(res.body.data.business.brand.privacy_policy).toBe('We keep your data private.');
+    expect(res.body.data.business.brand.terms_conditions).toBe('Bookings follow venue rules.');
+  });
+
+  it('rejects a gallery slide with a non-https image URL', async () => {
+    const bad = await request(app)
+      .patch('/api/v1/business/me')
+      .set('Authorization', `Bearer ${OWNER_TOKEN}`)
+      .send({
+        brand: {
+          gallery: [{ image_url: 'not-a-url' }]
+        }
+      });
+    expect(bad.status).toBe(400);
+    expect(bad.body.error.code).toBe('WIDGET_VALIDATION');
+  });
+
   it('resolves the www twin and denies a non-live host', async () => {
     const www = await request(app).get(`/api/v1/public/site/by-hostname?host=www.site-test.lk`);
     expect(www.status).toBe(200);

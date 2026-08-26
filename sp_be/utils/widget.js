@@ -6,6 +6,9 @@ const crypto = require('node:crypto');
 
 const MAX_SLUG_LENGTH = 60;
 const MAX_BRAND_LENGTH = 500;
+const MAX_POLICY_LENGTH = 20000;
+const MAX_GALLERY_SLIDES = 6;
+const MAX_CAPTION_LENGTH = 300;
 const HEX_COLOR = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 const SLUG_SAFE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
@@ -62,6 +65,22 @@ function validateBrandToken(kind, value) {
     }
     return value.trim();
   }
+  if (kind === 'policy') {
+    if (typeof value !== 'string' || value.trim().length > MAX_POLICY_LENGTH) {
+      throw Object.assign(new Error(`Policy text must be ${MAX_POLICY_LENGTH} characters or fewer`), {
+        code: 'WIDGET_VALIDATION'
+      });
+    }
+    return value.trim();
+  }
+  if (kind === 'caption') {
+    if (typeof value !== 'string' || value.trim().length > MAX_CAPTION_LENGTH) {
+      throw Object.assign(new Error(`Captions must be ${MAX_CAPTION_LENGTH} characters or fewer`), {
+        code: 'WIDGET_VALIDATION'
+      });
+    }
+    return value.trim();
+  }
   if (kind === 'url') {
     if (typeof value !== 'string' || (value.length > 0 && !/^https:\/\/.+/.test(value.trim()))) {
       throw Object.assign(new Error('Must be an https URL or empty'), { code: 'WIDGET_VALIDATION' });
@@ -114,6 +133,30 @@ function sanitizeBrand(brand) {
   if (brand.hero_image !== undefined) out.hero_image = validateBrandToken('url', brand.hero_image);
   if (brand.headline !== undefined) out.headline = validateBrandToken('short', brand.headline);
   if (brand.contact !== undefined) out.contact = sanitizeContact(brand.contact);
+  // Site Gallery (ADR-0032): 1-6 slides of image + optional caption. The
+  // owner's hero carousel; captions power the overlay text on the site home.
+  if (brand.gallery !== undefined) {
+    if (!Array.isArray(brand.gallery) || brand.gallery.length > MAX_GALLERY_SLIDES) {
+      throw Object.assign(new Error(`brand.gallery must be an array of at most ${MAX_GALLERY_SLIDES} slides`), {
+        code: 'WIDGET_VALIDATION'
+      });
+    }
+    out.gallery = brand.gallery.map((slide) => {
+      if (typeof slide !== 'object' || slide === null || Array.isArray(slide)) {
+        throw Object.assign(new Error('Each gallery slide must be an object'), { code: 'WIDGET_VALIDATION' });
+      }
+      if (slide.image_url === undefined) {
+        throw Object.assign(new Error('Each gallery slide needs an image_url'), { code: 'WIDGET_VALIDATION' });
+      }
+      const clean = { image_url: validateBrandToken('url', slide.image_url) };
+      if (slide.caption !== undefined) clean.caption = validateBrandToken('caption', slide.caption);
+      return clean;
+    });
+  }
+  // Site Policies (ADR-0032): per-business legal copy, capped generously so
+  // owners can paste a real policy without fighting character counts.
+  if (brand.privacy_policy !== undefined) out.privacy_policy = validateBrandToken('policy', brand.privacy_policy);
+  if (brand.terms_conditions !== undefined) out.terms_conditions = validateBrandToken('policy', brand.terms_conditions);
   return out;
 }
 

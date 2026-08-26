@@ -6,20 +6,27 @@ import type { ReactNode } from "react";
 import { SiteChrome } from "./site-chrome";
 import { SiteHome } from "./site-home";
 
-// The dedicated-site surfaces (ADR-0029): chrome renders the Business brand,
-// home lists every venue (Private included), and the first-visit picker opens
-// for multi-venue businesses.
+// The dedicated-site surfaces (ADR-0029 + ADR-0032): chrome renders the
+// Business brand, home lists every venue (Private included), the hero is the
+// Site Gallery carousel, and venue switching lives on detail pages only.
 
 const push = vi.hoisted(() => vi.fn());
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
+const replace = vi.hoisted(() => vi.fn());
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push, replace }),
+  usePathname: () => pathnameMock()
+}));
+
+const pathnameMock = vi.hoisted(() => vi.fn(() => "/"));
+
 vi.mock("@myslot/ui", async (importOriginal) => {
   const mod = await importOriginal<typeof import("@myslot/ui")>();
   return {
     ...mod,
     Dialog: ({ open, children }: { open: boolean; children: ReactNode }) =>
-      open ? <div data-testid="site-picker">{children}</div> : null,
+      open ? <div data-testid="venue-picker">{children}</div> : null,
     DialogContent: ({ children, title }: { children: ReactNode; title?: string }) => (
-      <div data-testid="site-picker-content">
+      <div data-testid="venue-picker-content">
         {title && <h2>{title}</h2>}
         {children}
       </div>
@@ -75,80 +82,92 @@ function renderWithProvider(node: ReactNode) {
 }
 
 describe("SiteChrome", () => {
-  it("renders the business brand and a switch-venue control for multi-venue businesses", () => {
+  beforeEach(() => {
+    pathnameMock.mockReturnValue("/");
+  });
+
+  it("renders the business brand, legal links and no switch control on the home page", () => {
     renderWithProvider(<SiteChrome config={config()}>body</SiteChrome>);
     expect(screen.getAllByText("ABC Sports").length).toBeGreaterThan(0);
-    // Header tagline + footer tagline both render the brand copy.
-    expect(screen.getAllByText("Book direct").length).toBeGreaterThan(0);
-    expect(screen.getByRole("link", { name: "Switch venue" })).toHaveAttribute("href", "/?pick=1");
+    expect(screen.getByRole("link", { name: "Privacy Policy" })).toHaveAttribute("href", "/privacy");
+    expect(screen.getByRole("link", { name: /Terms/ })).toHaveAttribute("href", "/terms");
+    expect(screen.queryByRole("button", { name: "Switch venue" })).toBeNull();
   });
 
-  it("hides the switch control for a single-venue business", () => {
+  it("shows the venue chooser only on venue pages of multi-venue businesses (ADR-0032)", async () => {
+    pathnameMock.mockReturnValue("/venue-1");
+    renderWithProvider(<SiteChrome config={config()}>body</SiteChrome>);
+    const switchBtn = screen.getByRole("button", { name: "Switch venue" });
+    await userEvent.click(switchBtn);
+    expect(screen.getByTestId("venue-picker")).toBeTruthy();
+    // Choosing navigates to the venue's slug page.
+    await userEvent.click(screen.getAllByText("Venue 2").at(-1)!);
+    expect(push).toHaveBeenCalledWith("/venue-2");
+  });
+
+  it("hides the switch control on venue pages of a single-venue business", () => {
+    pathnameMock.mockReturnValue("/venue-1");
     renderWithProvider(<SiteChrome config={config(1)}>body</SiteChrome>);
-    expect(screen.queryByRole("link", { name: "Switch venue" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Switch venue" })).toBeNull();
   });
 
-  it("maps the brand colors onto the design tokens so the whole site is branded (ADR-0031)", () => {
+  it("maps the brand colors onto the design tokens with a neutral page background (ADR-0032)", () => {
     const { container } = renderWithProvider(<SiteChrome config={config()}>body</SiteChrome>);
     const root = container.firstElementChild as HTMLElement;
     expect(root.style.getPropertyValue("--color-primary")).toBe("#16a34a");
     expect(root.style.getPropertyValue("--color-accent")).toBe("#2563eb");
     expect(root.style.getPropertyValue("--color-primary-hover")).toContain("color-mix");
     expect(root.style.getPropertyValue("--color-primary-light")).toContain("color-mix");
-    expect(root.style.getPropertyValue("--brand-bg")).toContain("color-mix");
+    expect(root.style.getPropertyValue("--brand-bg")).toBe("");
+    expect(root.className).toContain("bg-paper");
   });
 });
 
 describe("SiteHome", () => {
   beforeEach(() => {
-    // The vitest environment here has no real localStorage — SiteHome reads
-    // and writes a per-hostname dismissal key.
-    const store = new Map<string, string>();
-    Object.defineProperty(window, "localStorage", {
-      value: {
-        getItem: (k: string) => store.get(k) ?? null,
-        setItem: (k: string, v: string) => void store.set(k, v),
-        clear: () => store.clear()
-      },
-      configurable: true
-    });
     push.mockClear();
+    replace.mockClear();
   });
 
-  it("lists every venue of the business, private included", async () => {
+  it("lists every venue of the business, private included", () => {
     renderWithProvider(<SiteHome config={config()} />);
     expect(screen.getAllByText("Venue 1").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Venue 2").length).toBeGreaterThan(0);
   });
 
-  it("opens the venue picker on first visit and navigates on selection", async () => {
-    renderWithProvider(<SiteHome config={config()} />);
-    expect(screen.getByTestId("site-picker")).toBeTruthy();
-    // The venue name appears both on the page card and inside the picker —
-    // click the picker's copy.
-    const pickerVenue = screen.getAllByText("Venue 2").at(-1)!;
-    await userEvent.click(pickerVenue);
-    expect(push).toHaveBeenCalledWith("/venue-2");
+  it("redirects straight to the venue when the business has exactly one (ADR-0032)", () => {
+    renderWithProvider(<SiteHome config={config(1)} />);
+    expect(replace).toHaveBeenCalledWith("/venue-1");
   });
 
-  it("remembers dismissal so the picker does not auto-reopen", async () => {
-    localStorage.setItem(`site-picker-dismissed-${window.location.hostname}`, "1");
-    renderWithProvider(<SiteHome config={config()} />);
-    expect(screen.queryByTestId("site-picker")).toBeNull();
-  });
-
-  it("renders the site-brand hero: hero image, headline, about and book-now CTA (ADR-0031)", () => {
-    renderWithProvider(<SiteHome config={siteBrand()} />);
-    const hero = screen.getByAltText("ABC Sports");
-    expect(hero).toHaveAttribute("src", "https://cdn.test/hero.jpg");
+  it("renders the hero gallery with captions, the headline and the book-now CTA (ADR-0032)", () => {
+    renderWithProvider(
+      <SiteHome
+        config={siteBrand({
+          gallery: [
+            { image_url: "https://cdn.test/slide1.jpg", caption: "Our main hall at dawn" },
+            { image_url: "https://cdn.test/slide2.jpg", caption: "Tournament night" }
+          ]
+        })}
+      />
+    );
+    const slides = screen.getAllByRole("img");
+    expect(slides[0]).toHaveAttribute("src", "https://cdn.test/slide1.jpg");
+    expect(screen.getByText("Our main hall at dawn")).toBeInTheDocument();
+    expect(screen.getByText("Tournament night")).toBeInTheDocument();
     expect(screen.getByText("Colombo’s home of badminton")).toBeInTheDocument();
     expect(screen.getByText(/We run courts since 1998/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Book now" })).toBeInTheDocument();
   });
 
-  it("falls back to the logo/venue photo and tagline when no hero is set", () => {
-    renderWithProvider(<SiteHome config={config()} />);
-    expect(screen.getByAltText("ABC Sports")).toHaveAttribute("src", "https://cdn.test/logo.png");
+  it("falls back to the legacy hero image, then the logo, when no gallery is set", () => {
+    renderWithProvider(<SiteHome config={siteBrand()} />);
+    expect(screen.getByRole("img")).toHaveAttribute("src", "https://cdn.test/hero.jpg");
+  });
+
+  it("hides the hero entirely when no gallery, hero or logo exists", () => {
+    renderWithProvider(<SiteHome config={siteBrand({ logo_url: "", hero_image: "" })} />);
+    expect(screen.queryAllByRole("img")).toHaveLength(0);
   });
 
   it("renders the contact strip when contact fields exist and omits it otherwise", () => {

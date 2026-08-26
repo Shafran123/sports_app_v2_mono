@@ -71,6 +71,12 @@ export const BrandContactSchema = z.object({
 });
 export type BrandContact = z.infer<typeof BrandContactSchema>;
 
+export const BrandGallerySlideSchema = z.object({
+  image_url: z.string(),
+  caption: z.string().max(300).optional()
+});
+export type BrandGallerySlide = z.infer<typeof BrandGallerySlideSchema>;
+
 export const BrandSchema = z.object({
   colors: z
     .object({
@@ -85,7 +91,12 @@ export const BrandSchema = z.object({
   // and the contact block mirrored in the footer/footer strip.
   hero_image: z.string().optional(),
   headline: z.string().optional(),
-  contact: BrandContactSchema.optional()
+  contact: BrandContactSchema.optional(),
+  // Site Gallery + Site Policies (ADR-0032): the hero slide set with optional
+  // captions, and the business's own legal copy. All owned by the site host.
+  gallery: z.array(BrandGallerySlideSchema).max(6).optional(),
+  privacy_policy: z.string().optional(),
+  terms_conditions: z.string().optional()
 });
 export type VenueBrand = z.infer<typeof BrandSchema>;
 

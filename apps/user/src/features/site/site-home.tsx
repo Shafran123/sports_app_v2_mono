@@ -1,21 +1,24 @@
 "use client";
 
-// The Dedicated Site portfolio root (ADR-0029 + ADR-0031): Business hero
-// (hero image / headline / CTA), about, the auto-generated venues grid (each
-// card carries an auto Google-Maps link from its coordinates), and the
-// contact strip. A "pick a venue" popup opens on first visit when the
-// Business has 2+ approved venues, and reopens via /?pick=1 (the persistent
-// "Switch venue" control in the site header).
+// The Dedicated Site portfolio root (ADR-0029 + ADR-0031 + ADR-0032): a hero
+// carousel driven by the owner's Site Gallery (with per-slide captions), an
+// intro block (name / headline / tagline), about, the auto-generated venues
+// grid (each card carries an auto Google-Maps link from its coordinates),
+// the contact strip and the legal footer links.
+//
+// ADR-0032: no auto "pick a venue" popup and no /?pick=1 — venue switching
+// lives in the header of detail pages only. With exactly one approved venue
+// the home redirects straight to it.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Clock, Mail, MapPin, Navigation, Phone } from "lucide-react";
 import type { SiteConfig, SiteVenue } from "@myslot/types";
-import { Badge, Button, Dialog, DialogContent } from "@myslot/ui";
+import { Badge, Button } from "@myslot/ui";
 import { formatLkr } from "@myslot/utils";
 import { brandCssVars } from "@/features/widget/widget-theme";
-import { VenueStep } from "@/features/widget/venue-step";
+import { SiteCarousel, type CarouselSlide } from "./site-carousel";
 
 const SITE_CONTACT_ROWS = [
   { key: "phone", icon: Phone },
@@ -35,57 +38,44 @@ export function SiteHome({ config }: { config: SiteConfig }) {
   const { business, venues } = config;
   const style = useMemo(() => brandCssVars(business.brand), [business.brand]);
   const router = useRouter();
-  const [pickerOpen, setPickerOpen] = useState(false);
 
-  // First-visit popup: shown once per hostname per browser; /?pick=1 always
-  // reopens it (the header's "Switch venue" control).
+  // A single approved venue has nothing to browse: land on its page instead
+  // of an empty portfolio root (ADR-0032).
   useEffect(() => {
-    if (venues.length <= 1) return;
-    const dismissKey = `site-picker-dismissed-${window.location.hostname}`;
-    const forced = window.location.search.includes("pick=1");
-    if (forced) {
-      setPickerOpen(true);
-      return;
-    }
-    if (!localStorage.getItem(dismissKey)) setPickerOpen(true);
-  }, [venues.length]);
+    if (venues.length !== 1) return;
+    const venue = venues[0]!;
+    router.replace(venue.slug ? `/${venue.slug}` : `/venues/${venue.id}`);
+  }, [venues, router]);
 
   const brand = business.brand;
-  const cover = brand?.hero_image || brand?.logo_url || venues[0]?.photos?.[0];
+  // Site Gallery drives the hero (1-6 slides, optional captions); sites
+  // without one fall back to the legacy hero image, then logo, then the
+  // first venue photo.
+  const slides: CarouselSlide[] =
+    brand?.gallery?.length && brand.gallery.some((s) => s.image_url)
+      ? brand.gallery
+          .filter((s) => s.image_url)
+          .map((s) => ({ src: s.image_url, caption: s.caption || undefined }))
+      : [
+          {
+            src: brand?.hero_image || brand?.logo_url || venues[0]?.photos?.[0] || "",
+            caption: undefined
+          }
+        ].filter((s) => s.src);
   const contact = brand?.contact;
   const hasContact = contact && SITE_CONTACT_ROWS.some(({ key }) => Boolean(contact?.[key]));
-  const openVenue = (id: string) => {
-    setPickerOpen(false);
-    const venue = venues.find((v) => v.id === id);
-    if (venue?.slug) router.push(`/${venue.slug}`);
-  };
 
   return (
-    <div style={style} className="mx-auto max-w-6xl px-4 pb-24 md:px-6">
-      {cover ? (
-        <div className="relative mt-6 h-64 w-full overflow-hidden rounded-3xl md:h-96">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={cover} alt={business.name} className="h-full w-full object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
-          <div className="absolute inset-x-0 bottom-0 p-6 md:p-8">
-            <h1 className="font-display text-3xl font-extrabold tracking-tight text-white md:text-5xl">
-              {business.name}
-            </h1>
-            {brand?.headline && (
-              <p className="mt-1 text-sm font-semibold text-white/90 md:text-base">{brand.headline}</p>
-            )}
-            {brand?.tagline && (
-              <p className="mt-0.5 text-xs font-medium text-white/70 md:text-sm">{brand.tagline}</p>
-            )}
-            <Button
-              className="mt-4"
-              onClick={() => document.getElementById("venues")?.scrollIntoView({ behavior: "smooth" })}
-            >
-              Book now
-            </Button>
-          </div>
-        </div>
-      ) : (
+    <div style={style} className="mx-auto pb-24">
+      {slides.length > 0 ? (
+        <SiteCarousel
+          slides={slides}
+          alt={business.name}
+          className="h-72 w-full md:h-[28rem]"
+        />
+      ) : null}
+
+      <div className="mx-auto max-w-6xl px-4 md:px-6">
         <div className="mt-10 text-center">
           <h1 className="font-display text-3xl font-extrabold tracking-tight text-ink md:text-5xl">
             {business.name}
@@ -95,63 +85,53 @@ export function SiteHome({ config }: { config: SiteConfig }) {
               {brand.headline}
             </p>
           )}
-          {brand?.tagline && <p className="mt-0.5 text-sm text-ink-2">{brand.tagline}</p>}
+          {brand?.tagline && <p className="mt-0.5 text-sm text-ink-2 md:text-base">{brand.tagline}</p>}
           <Button className="mt-5" onClick={() => document.getElementById("venues")?.scrollIntoView({ behavior: "smooth" })}>
             Book now
           </Button>
         </div>
-      )}
 
-      {brand?.about && (
-        <p className="mx-auto mt-8 max-w-2xl whitespace-pre-line text-center text-sm leading-relaxed text-ink-2">
-          {brand.about}
-        </p>
-      )}
+        {brand?.about && (
+          <p className="mx-auto mt-8 max-w-2xl whitespace-pre-line text-center text-sm leading-relaxed text-ink-2">
+            {brand.about}
+          </p>
+        )}
 
-      <section id="venues" className="mt-12 scroll-mt-24">
-        <h2 className="font-display text-xl font-extrabold tracking-tight text-ink md:text-2xl">
-          Our venues
-        </h2>
-        <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {venues.map((venue) => (
-            <VenueCard key={venue.id} venue={venue} />
-          ))}
-        </div>
-      </section>
-
-      {hasContact && (
-        <section className="mt-12 rounded-3xl border border-border bg-surface p-6 shadow-soft md:p-8">
+        <section id="venues" className="mt-12 scroll-mt-24">
           <h2 className="font-display text-xl font-extrabold tracking-tight text-ink md:text-2xl">
-            Find us
+            Our venues
           </h2>
-          <ul className="mt-4 grid gap-3 sm:grid-cols-2">
-            {SITE_CONTACT_ROWS.filter(({ key }) => contact?.[key]).map(({ key, icon: Icon }) => (
-              <li key={key} className="flex items-center gap-2.5 text-sm text-ink-2">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-2 text-ink-2">
-                  <Icon className="h-4 w-4" />
-                </span>
-                {key === "email" && contact?.email ? (
-                  <a href={`mailto:${contact.email}`} className="font-medium text-ink transition-colors hover:text-primary">
-                    {contact.email}
-                  </a>
-                ) : (
-                  <span className="whitespace-pre-line">{contact?.[key]}</span>
-                )}
-              </li>
+          <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {venues.map((venue) => (
+              <VenueCard key={venue.id} venue={venue} />
             ))}
-          </ul>
+          </div>
         </section>
-      )}
 
-      <Dialog open={pickerOpen} onOpenChange={(open) => {
-        setPickerOpen(open);
-        if (!open) localStorage.setItem(`site-picker-dismissed-${window.location.hostname}`, "1");
-      }}>
-        <DialogContent title="Choose a venue" className="max-w-md">
-          <p className="mb-3 text-sm text-ink-2">Pick a venue to book. You can switch anytime.</p>
-          <VenueStep venues={venues} selectedId={null} onSelect={openVenue} />
-        </DialogContent>
-      </Dialog>
+        {hasContact && (
+          <section className="mt-12 rounded-3xl border border-border bg-surface p-6 shadow-soft md:p-8">
+            <h2 className="font-display text-xl font-extrabold tracking-tight text-ink md:text-2xl">
+              Find us
+            </h2>
+            <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+              {SITE_CONTACT_ROWS.filter(({ key }) => contact?.[key]).map(({ key, icon: Icon }) => (
+                <li key={key} className="flex items-center gap-2.5 text-sm text-ink-2">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-2 text-ink-2">
+                    <Icon className="h-4 w-4" />
+                  </span>
+                  {key === "email" && contact?.email ? (
+                    <a href={`mailto:${contact.email}`} className="font-medium text-ink transition-colors hover:text-primary">
+                      {contact.email}
+                    </a>
+                  ) : (
+                    <span className="whitespace-pre-line">{contact?.[key]}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+      </div>
     </div>
   );
 }
@@ -162,7 +142,7 @@ function VenueCard({ venue }: { venue: SiteVenue }) {
   return (
     <article className="press-raise group relative block overflow-hidden rounded-3xl border border-border bg-surface shadow-soft">
       {venue.photos?.[0] ? (
-        <div className="relative h-40 w-full overflow-hidden">
+        <div className="relative h-44 w-full overflow-hidden md:h-48">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={venue.photos[0]}
@@ -171,7 +151,7 @@ function VenueCard({ venue }: { venue: SiteVenue }) {
           />
         </div>
       ) : (
-        <div className="h-40 w-full bg-surface-2" />
+        <div className="h-44 w-full bg-surface-2 md:h-48" />
       )}
       {directions && (
         <a
@@ -186,7 +166,7 @@ function VenueCard({ venue }: { venue: SiteVenue }) {
         </a>
       )}
       <Link href={href} className="absolute inset-0" aria-label={venue.name} />
-      <div className="p-4">
+      <div className="p-5">
         <div className="flex items-start justify-between gap-2">
           <h3 className="truncate font-semibold tracking-tight text-ink">{venue.name}</h3>
           {venue.min_price != null && (

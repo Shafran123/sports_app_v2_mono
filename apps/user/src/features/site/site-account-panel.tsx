@@ -9,7 +9,7 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { siteCustomerAuth, persistSiteToken, toApiFailure } from "@myslot/api";
 import type { BusinessInfo } from "@myslot/types";
-import { Button, Input, PasswordInput } from "@myslot/ui";
+import { Button, Dialog, DialogContent, Input, PasswordInput } from "@myslot/ui";
 import { LogOut, User } from "lucide-react";
 
 type Mode = "signin" | "register";
@@ -154,98 +154,98 @@ export function SiteAccountPanel({ business }: { business: BusinessInfo }) {
         </button>
       )}
 
-      {open && signedIn && (
-        <div className="absolute right-0 top-12 z-50 w-72 rounded-2xl border border-border bg-surface p-4 shadow-lift">
-          <p className="text-sm font-bold text-ink">Your account</p>
-          <div className="mt-3 space-y-2 text-sm">
-            <p className="flex items-center justify-between text-ink-2">
-              Phone{" "}
-              <span className={verifiedPhone ? "font-semibold text-success" : "text-ink-3"}>
-                {verifiedPhone ? "Verified" : "Unverified"}
-              </span>
-            </p>
-            <p className="flex items-center justify-between text-ink-2">
-              Email{" "}
-              <span className={verifiedEmail ? "font-semibold text-success" : "text-ink-3"}>
-                {verifiedEmail ? "Verified" : "Unverified"}
-              </span>
-            </p>
-            {(!verifiedPhone || !verifiedEmail) && (
-              <p className="mt-2 rounded-xl bg-warning-light px-3 py-2 text-xs text-warning">
-                Verify both to book.
+{open && signedIn && (
+        <Dialog open onOpenChange={setOpen}>
+          <DialogContent title="Your account">
+            <div className="mt-3 space-y-2 text-sm">
+              <p className="flex items-center justify-between text-ink-2">
+                Phone{" "}
+                <span className={verifiedPhone ? "font-semibold text-success" : "text-ink-3"}>
+                  {verifiedPhone ? "Verified" : "Unverified"}
+                </span>
               </p>
-            )}
-            <Button size="sm" className="mt-2 w-full" onClick={() => setStep(verifiedPhone ? "email" : "phone")}>
-              Verify for booking
-            </Button>
-          </div>
-        </div>
+              <p className="flex items-center justify-between text-ink-2">
+                Email{" "}
+                <span className={verifiedEmail ? "font-semibold text-success" : "text-ink-3"}>
+                  {verifiedEmail ? "Verified" : "Unverified"}
+                </span>
+              </p>
+              {(!verifiedPhone || !verifiedEmail) && (
+                <p className="mt-2 rounded-xl bg-warning-light px-3 py-2 text-xs text-warning">
+                  Verify both to book.
+                </p>
+              )}
+              <Button size="sm" className="mt-2 w-full" onClick={() => setStep(verifiedPhone ? "email" : "phone")}>
+                Verify for booking
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
 
       {open && !signedIn && (
-        <div className="absolute right-0 top-12 z-50 w-80 rounded-2xl border border-border bg-surface p-5 shadow-lift">
-          {step === "auth" && (
-            <form onSubmit={(e) => void submitAuth(e)} className="space-y-3">
-              <div className="flex gap-1 rounded-full bg-surface-2 p-1">
-                {(["signin", "register"] as Mode[]).map((m) => (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() => setMode(m)}
-                    className={`flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${mode === m ? "bg-surface text-ink shadow-soft" : "text-ink-3"}`}
-                  >
-                    {m === "signin" ? "Sign in" : "Create account"}
-                  </button>
-                ))}
-              </div>
-              {mode === "register" && (
+        <Dialog open onOpenChange={setOpen}>
+          <DialogContent title={step === "auth" ? (mode === "signin" ? "Sign in" : "Create account") : step === "phone" ? "Verify your phone" : "Verify your email"}>
+            {step === "auth" && (
+              <form onSubmit={(e) => void submitAuth(e)} className="mt-3 space-y-3">
+                <div className="flex gap-1 rounded-full bg-surface-2 p-1">
+                  {(["signin", "register"] as Mode[]).map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setMode(m)}
+                      className={`flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${mode === m ? "bg-surface text-ink shadow-soft" : "text-ink-3"}`}
+                    >
+                      {m === "signin" ? "Sign in" : "Create account"}
+                    </button>
+                  ))}
+                </div>
+                {mode === "register" && (
+                  <label className="block">
+                    <span className="mb-1.5 block text-xs font-medium text-ink-2">Name</span>
+                    <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" />
+                  </label>
+                )}
                 <label className="block">
-                  <span className="mb-1.5 block text-xs font-medium text-ink-2">Name</span>
-                  <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" />
+                  <span className="mb-1.5 block text-xs font-medium text-ink-2">Email</span>
+                  <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
                 </label>
-              )}
-              <label className="block">
-                <span className="mb-1.5 block text-xs font-medium text-ink-2">Email</span>
-                <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
-              </label>
-              <label className="block">
-                <span className="mb-1.5 block text-xs font-medium text-ink-2">Password</span>
-                <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} />
-              </label>
-              {error && <p className="rounded-xl bg-error-light px-3 py-2 text-sm text-error">{error}</p>}
-              <Button type="submit" className="w-full" loading={busy} disabled={!email.trim() || password.length < 8}>
-                {mode === "signin" ? "Sign in" : "Create account"}
-              </Button>
-            </form>
-          )}
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-medium text-ink-2">Password</span>
+                  <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} />
+                </label>
+                {error && <p className="rounded-xl bg-error-light px-3 py-2 text-sm text-error">{error}</p>}
+                <Button type="submit" className="w-full" loading={busy} disabled={!email.trim() || password.length < 8}>
+                  {mode === "signin" ? "Sign in" : "Create account"}
+                </Button>
+              </form>
+            )}
 
-          {step === "phone" && (
-            <div className="space-y-3">
-              <p className="text-sm font-bold text-ink">Verify your phone</p>
-              <label className="block">
-                <span className="mb-1.5 block text-xs font-medium text-ink-2">Phone</span>
-                <Input value={cellphone} onChange={(e) => setCellphone(e.target.value)} placeholder="+94 77 123 4567" />
-              </label>
-              {notice && <p className="text-xs text-success">{notice}</p>}
-              <Button type="button" size="sm" variant="secondary" onClick={() => void sendPhone()}>Send code</Button>
-              <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="6-digit code" />
-              {error && <p className="rounded-xl bg-error-light px-3 py-2 text-sm text-error">{error}</p>}
-              <Button type="button" className="w-full" disabled={!code} onClick={() => void confirmPhone()}>Confirm</Button>
-            </div>
-          )}
+            {step === "phone" && (
+              <div className="mt-3 space-y-3">
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-medium text-ink-2">Phone</span>
+                  <Input value={cellphone} onChange={(e) => setCellphone(e.target.value)} placeholder="+94 77 123 4567" />
+                </label>
+                {notice && <p className="text-xs text-success">{notice}</p>}
+                <Button type="button" size="sm" variant="secondary" onClick={() => void sendPhone()}>Send code</Button>
+                <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="6-digit code" />
+                {error && <p className="rounded-xl bg-error-light px-3 py-2 text-sm text-error">{error}</p>}
+                <Button type="button" className="w-full" disabled={!code} onClick={() => void confirmPhone()}>Confirm</Button>
+              </div>
+            )}
 
-          {step === "email" && (
-            <div className="space-y-3">
-              <p className="text-sm font-bold text-ink">Verify your email</p>
-              <p className="text-xs text-ink-2">A code is on its way to {email}.</p>
-              {notice && <p className="text-xs text-success">{notice}</p>}
-              <Button type="button" size="sm" variant="secondary" onClick={() => void sendEmail()}>Resend code</Button>
-              <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="6-digit code" />
-              {error && <p className="rounded-xl bg-error-light px-3 py-2 text-sm text-error">{error}</p>}
-              <Button type="button" className="w-full" disabled={!code} onClick={() => void confirmEmail()}>Confirm &amp; continue</Button>
-            </div>
-          )}
-        </div>
+            {step === "email" && (
+              <div className="mt-3 space-y-3">
+                <p className="text-xs text-ink-2">We sent a code to {email} on sign-in.</p>
+                <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="6-digit code" />
+                {notice && <p className="text-xs text-success">{notice}</p>}
+                {error && <p className="rounded-xl bg-error-light px-3 py-2 text-sm text-error">{error}</p>}
+                <Button type="button" className="w-full" disabled={!code} onClick={() => void confirmEmail()}>Confirm &amp; continue</Button>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );
