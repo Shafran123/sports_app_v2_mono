@@ -33,7 +33,7 @@ const AuthContext = createContext<AuthState>({
 // Map the Site Customer onto the app's user shape so the existing booking
 // flow (venue detail, checkout, holds) works unchanged: same verified gates,
 // same session singleton, token transport via the API client's Authorization.
-function toAppUser(customer: {
+export function toAppUser(customer: {
   id: string;
   email: string;
   name: string | null;

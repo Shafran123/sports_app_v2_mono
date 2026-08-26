@@ -27,6 +27,8 @@ vi.mock("@/context/auth", () => ({
 
 vi.mock("@myslot/api", () => ({
   auth: { updateMe: updateMeMock, me: meMock, verifyPhoneSend: vi.fn(), verifyPhoneConfirm: vi.fn(), verifyEmailSend: vi.fn(), verifyEmailConfirm: vi.fn() },
+  siteCustomerAuth: { verifyPhoneSend: vi.fn(), verifyPhoneConfirm: vi.fn(), me: vi.fn() },
+  isOwnerSurface: () => false,
   featureFlags: { get: vi.fn(async () => ({ phone_verification_required: false, sms_enabled: false, payhere_enabled: false, events_discovery_state: "enabled", brand_name: "MySlot.LK" })) },
   toApiFailure: (e: unknown) => ({ message: (e as Error).message })
 }));

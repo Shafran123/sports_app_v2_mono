@@ -39,6 +39,8 @@ vi.mock("@myslot/api", () => ({
       brand_name: "MySlot.LK"
     }))
   },
+  siteCustomerAuth: { verifyPhoneSend: vi.fn(), verifyPhoneConfirm: vi.fn(), me: vi.fn() },
+  isOwnerSurface: () => false,
   toApiFailure: (e: { code?: string; message?: string }) => ({ status: 0, code: e?.code ?? "UNKNOWN", message: e?.message ?? "err" }),
   getClient: vi.fn(),
   setClient: vi.fn()

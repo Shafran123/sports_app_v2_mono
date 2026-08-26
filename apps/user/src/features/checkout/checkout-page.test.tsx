@@ -4,11 +4,13 @@ import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { CheckoutPage } from "./checkout-page";
 
-const { verifySendMock, verifyConfirmMock, setUserMock, useSearchParams } = vi.hoisted(() => ({
+const { verifySendMock, verifyConfirmMock, setUserMock, useSearchParams, isSiteHostMock, currentHostnameMock } = vi.hoisted(() => ({
   verifySendMock: vi.fn(),
   verifyConfirmMock: vi.fn(),
   setUserMock: vi.fn(),
-  useSearchParams: vi.fn()
+  useSearchParams: vi.fn(),
+  isSiteHostMock: vi.fn(() => false),
+  currentHostnameMock: vi.fn(() => "mysite.localhost")
 }));
 
 let ctxUser: Record<string, unknown> = {
@@ -32,6 +34,11 @@ vi.mock("@/context/auth", () => ({
     logout: vi.fn(),
     setUser: setUserMock
   })
+}));
+
+vi.mock("@/lib/site-host", () => ({
+  currentHostname: () => currentHostnameMock(),
+  isSiteHost: () => isSiteHostMock()
 }));
 
 // The guest gate reuses the widget's identity flow; its internals are
@@ -77,6 +84,12 @@ vi.mock("@myslot/api", () => ({
     verifyPhoneSend: verifySendMock,
     verifyPhoneConfirm: verifyConfirmMock
   },
+  siteCustomerAuth: {
+    verifyPhoneSend: vi.fn(),
+    verifyPhoneConfirm: vi.fn(),
+    me: vi.fn()
+  },
+  isOwnerSurface: () => isSiteHostMock(),
   submitPayHere: vi.fn(),
   toApiFailure: (e: { code?: string; message?: string }) => ({
     status: e?.code === "VERIFIED_PHONE_REQUIRED" ? 409 : 0,
@@ -464,5 +477,30 @@ describe("CheckoutPage verified-phone gate", () => {
     expect(bookings.checkout).toHaveBeenCalledWith(
       expect.objectContaining({ payment_method: "online" })
     );
+  });
+
+  it("keeps the sign-in gate mounted for a site customer until verified (ADR-0030)", async () => {
+    ctxUser = null as never;
+    isSiteHostMock.mockReturnValue(true);
+    vi.mocked(venues.detail).mockResolvedValue(onlineVenue as never);
+
+    const { rerender } = renderPage();
+    expect(await screen.findByText("Sign in to book")).toBeInTheDocument();
+
+    // The guest just registered as a Site Customer: the auth context flips
+    // to a signed-in-but-unverified user. On a site host the gate must stay
+    // (site verification), never auto-open the platform verify modal.
+    rerender({
+      id: "sc1",
+      name: "Pam",
+      email: "pam@site.test",
+      role: "player",
+      phone: "+94771713701",
+      phone_verified_at: null
+    });
+
+    expect(screen.getByText("Sign in to book")).toBeInTheDocument();
+    expect(screen.queryByText(/You need a verified phone to book/)).toBeNull();
+    expect(bookings.checkout).not.toHaveBeenCalled();
   });
 });

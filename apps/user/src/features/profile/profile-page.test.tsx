@@ -25,6 +25,8 @@ vi.mock("@myslot/api", () => ({
     verifyEmailSend: vi.fn(),
     verifyEmailConfirm: vi.fn()
   },
+  siteCustomerAuth: { verifyPhoneSend: vi.fn(), verifyPhoneConfirm: vi.fn(), me: vi.fn() },
+  isOwnerSurface: () => false,
   toApiFailure: (e: unknown) => ({ message: (e as Error).message })
 }));
 

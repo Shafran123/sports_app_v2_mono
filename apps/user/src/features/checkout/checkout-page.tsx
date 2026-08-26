@@ -330,12 +330,14 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
   const venueOfferAdj = applyVenueOffer(displaySubtotal, venueOffer);
   const displayTotal = serverTotal ?? venueOfferAdj.total;
 
-  // A guest lands on the sign-in gate (ADR-0030): the widget's identity flow
-  // signs them in as a Site Customer on a live site host (or a platform
-  // player on the marketplace), then verifies phone/email as required. The
-  // checkout resumes once the session resolves.
-  if (!user) {
-    if (loading) {
+  // Identity gate (ADR-0030): a guest lands on the sign-in flow, and on a
+  // live site host a signed-in-but-unverified Site Customer stays on it until
+  // they verify through the site's own OTP flow — the platform verify modal
+  // (which writes OTPs against the `users` table) must never fire for them.
+  const siteHostActive = Boolean(siteHostname);
+  const gateActive = !user || (siteHostActive && requiresVerification && !verified);
+  if (gateActive) {
+    if (loading || !flags) {
       return (
         <main className="mx-auto max-w-3xl px-4 pb-24 pt-8">
           <Skeleton className="h-6 w-40" />

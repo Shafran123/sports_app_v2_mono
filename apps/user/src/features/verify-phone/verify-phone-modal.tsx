@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { auth as authApi, toApiFailure } from "@myslot/api";
+import { auth as authApi, siteCustomerAuth, isOwnerSurface, toApiFailure } from "@myslot/api";
+import { toAppUser } from "@myslot/auth";
 import { Button, Dialog, DialogContent, Input } from "@myslot/ui";
 import type { User } from "@myslot/types";
 import { useAuth } from "@/context/auth";
@@ -14,6 +15,11 @@ interface VerifyPhoneModalProps {
 
 export function VerifyPhoneModal({ open, onClose, onVerified }: VerifyPhoneModalProps) {
   const { setUser } = useAuth();
+  // ADR-0030: on a Dedicated Site host (or widget embed) the session is a
+  // Site Customer — verification must use the per-Business site-auth
+  // endpoints, never the platform ones (those write OTPs against the `users`
+  // table and 500 on a site customer's id).
+  const siteMode = isOwnerSurface();
   const [phone, setPhone] = React.useState("");
   const [step, setStep] = React.useState<"phone" | "code">("phone");
   const [code, setCode] = React.useState("");
@@ -43,8 +49,11 @@ export function VerifyPhoneModal({ open, onClose, onVerified }: VerifyPhoneModal
     setBusy(true);
     setError("");
     try {
-      const result = await authApi.verifyPhoneSend(phone.trim());
-      setResendAfter(result.resend_after_seconds);
+      const result = siteMode
+        ? await siteCustomerAuth.verifyPhoneSend(phone.trim())
+        : await authApi.verifyPhoneSend(phone.trim());
+      // Site auth doesn't report a resend cooldown — default to the platform's.
+      setResendAfter((result as { resend_after_seconds?: number }).resend_after_seconds ?? 60);
       setStep("code");
     } catch (err) {
       setError(toApiFailure(err).message);
@@ -63,7 +72,10 @@ export function VerifyPhoneModal({ open, onClose, onVerified }: VerifyPhoneModal
     setBusy(true);
     setError("");
     try {
-      const me = await authApi.verifyPhoneConfirm(phone.trim(), code.trim());
+      const me = siteMode
+        ? (await siteCustomerAuth.verifyPhoneConfirm(phone.trim(), code.trim()),
+          toAppUser(await siteCustomerAuth.me()))
+        : await authApi.verifyPhoneConfirm(phone.trim(), code.trim());
       setUser(me);
       onVerified?.(me);
     } catch (err) {
