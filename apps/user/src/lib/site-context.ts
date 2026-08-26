@@ -14,7 +14,10 @@ const BACKEND = process.env.NEXT_PUBLIC_API_URL || "http://localhost:2400";
 
 export async function currentHost(): Promise<string> {
   const h = await headers();
-  return h.get("x-forwarded-host") || h.get("host") || "";
+  const raw = (h.get("x-forwarded-host") || h.get("host") || "").split(",")[0]?.trim() ?? "";
+  // Strip an explicit port (dev: `mysite.localhost:3000`) so hostname
+  // comparisons match the stored Site Hostname, which never carries one.
+  return raw.replace(/:\d+$/, "");
 }
 
 // Platform-owned subdomains (`<brand>.myslot.lk`) are teaser/staging surface:

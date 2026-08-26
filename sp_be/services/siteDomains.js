@@ -17,10 +17,12 @@ const CHECKLIST_DEFAULTS = [
   { key: 'links', label: 'Email / QR / PayHere links verified on the host', done: false }
 ];
 
-// Normalize a hostname for comparisons: lowercase, strip a trailing dot, and
-// peel a leading "www." (apex and www are the same site, ADR-0029 Q17).
+// Normalize a hostname for comparisons: lowercase, strip a trailing dot, peel
+// a leading "www." (apex and www are the same site, ADR-0029 Q17), and drop an
+// explicit port (a dev browser sends `Host: mysite.localhost:3000`; the stored
+// Site Hostname never carries a port).
 function normalizeHostname(hostname) {
-  return String(hostname || '').trim().toLowerCase().replace(/\.$/, '').replace(/^www\./, '');
+  return String(hostname || '').trim().toLowerCase().replace(/:\d+$/, '').replace(/\.$/, '').replace(/^www\./, '');
 }
 
 function isValidHostname(hostname) {

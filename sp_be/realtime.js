@@ -18,7 +18,7 @@ class Realtime {
         origin: async (origin, callback) => {
           if (!origin) return callback(null, true);
           const origins = await getAllowedOrigins(process.env);
-          const host = origin.replace(/^https?:\/\//, '').replace(/\/.*$/, '').toLowerCase();
+          const host = origin.replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/:\d+$/, '').toLowerCase();
           const allowed = origins.some((o) => {
             const oHost = o.replace(/^https?:\/\//, '').toLowerCase();
             return host === oHost || host.endsWith(`.${oHost}`);

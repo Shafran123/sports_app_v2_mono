@@ -40,15 +40,35 @@ async function getAllowedOrigins(env = process.env) {
 }
 
 // CORS origin function for express: resolves the live list per request and
-// admits exact or subdomain matches with credentials.
+// admits exact or subdomain matches with credentials. Entry matching follows
+// the widget allowlist rule: an entry WITHOUT a port matches the hostname on
+// any port (local dev `mysite.localhost:3000` matches a stored `mysite.localhost`);
+// an entry WITH a port must match both host and port exactly.
 function corsOrigin(env = process.env) {
   return async (origin, callback) => {
     if (!origin) return callback(null, true);
     const origins = await getAllowedOrigins(env);
-    const host = origin.replace(/^https?:\/\//, '').replace(/\/.*$/, '').toLowerCase();
+    let url;
+    try {
+      url = new URL(String(origin).includes('://') ? origin : `https://${origin}`);
+    } catch {
+      return callback(null, false);
+    }
+    const host = url.hostname.toLowerCase();
+    const port = url.port || null;
     const allowed = origins.some((o) => {
-      const oHost = o.replace(/^https?:\/\//, '').toLowerCase();
-      return host === oHost || host.endsWith(`.${oHost}`);
+      const oUrl = String(o).includes('://') ? o : `https://${o}`;
+      let oHost;
+      let oPort = null;
+      try {
+        const parsed = new URL(oUrl);
+        oHost = parsed.hostname.toLowerCase();
+        oPort = parsed.port || null;
+      } catch {
+        return false;
+      }
+      if (host !== oHost && !host.endsWith(`.${oHost}`)) return false;
+      return oPort === null || oPort === port;
     });
     callback(null, allowed);
   };
