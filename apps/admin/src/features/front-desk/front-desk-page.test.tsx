@@ -15,6 +15,10 @@ vi.mock("@/features/admin-calendar/booking-detail-dialog", () => ({
 }));
 vi.mock("./qr-scan-dialog", () => ({ QrScanDialog: () => null }));
 vi.mock("./quick-book-dialog", () => ({ QuickBookDialog: () => null }));
+vi.mock("@/hooks/use-realtime", () => ({
+  RealtimeBridge: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  useSocketStatus: () => "connected"
+}));
 
 import { business, venues } from "@myslot/api";
 
@@ -103,5 +107,38 @@ describe("front desk", () => {
     const card = await screen.findByRole("button", { name: /nimal/i });
     expect(within(card).getByText(/20 aug/i)).toBeInTheDocument();
     expect(within(card).getByText("6:30 PM")).toBeInTheDocument();
+  });
+
+  it("separates pending bookings into their own section for the owner to confirm", async () => {
+    vi.mocked(business.listBookings).mockResolvedValue({
+      data: [
+        makeBooking({ id: "b-pending", status: "pending", player_name: "Kumara" }),
+        makeBooking({ id: "b-confirmed", status: "confirmed", player_name: "Nimal" }),
+        makeBooking({ id: "b-completed", status: "completed", player_name: "Anusha" })
+      ],
+      meta: { total: 3 }
+    });
+    renderPage();
+
+    const pendingSection = await screen.findByRole("region", { name: /pending confirmation/i });
+    expect(within(pendingSection).getByText("Kumara")).toBeInTheDocument();
+    expect(within(pendingSection).queryByText("Nimal")).not.toBeInTheDocument();
+
+    const confirmedSection = screen.getByRole("region", { name: /confirmed bookings/i });
+    expect(within(confirmedSection).getByText("Nimal")).toBeInTheDocument();
+    expect(within(confirmedSection).queryByText("Kumara")).not.toBeInTheDocument();
+
+    const pastSection = screen.getByRole("region", { name: /earlier or finished/i });
+    expect(within(pastSection).getByText("Anusha")).toBeInTheDocument();
+  });
+
+  it("renders the socket status so the desk knows when updates stop", async () => {
+    vi.mocked(business.listBookings).mockResolvedValue({
+      data: [makeBooking()],
+      meta: { total: 1 }
+    });
+    renderPage();
+    await screen.findByRole("button", { name: /nimal/i });
+    expect(screen.getByRole("status")).toHaveTextContent("Live");
   });
 });

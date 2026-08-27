@@ -15,25 +15,25 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
 
   return (
     <RequireStaff>
-      {isAdmin || isPlanPage ? (
-        <>
-          <RealtimeBridge />
-          <div className="min-h-screen bg-paper text-ink lg:pl-64">
-            <AdminSidebar role={role} />
-            <main className="px-5 pb-28 pt-5 md:pb-12 lg:px-8 lg:pt-8">{children}</main>
-          </div>
-          <ConsoleBottomNav role={role} />
-        </>
-      ) : (
-        <RequireOnboarded>
-          <RealtimeBridge />
-          <div className="min-h-screen bg-paper text-ink lg:pl-64">
-            <AdminSidebar role={role} />
-            <main className="px-5 pb-28 pt-5 md:pb-12 lg:px-8 lg:pt-8">{children}</main>
-          </div>
-          <ConsoleBottomNav role={role} />
-        </RequireOnboarded>
-      )}
+      <RealtimeBridge>
+        {isAdmin || isPlanPage ? (
+          <>
+            <div className="min-h-screen bg-paper text-ink lg:pl-64">
+              <AdminSidebar role={role} />
+              <main className="px-5 pb-28 pt-5 md:pb-12 lg:px-8 lg:pt-8">{children}</main>
+            </div>
+            <ConsoleBottomNav role={role} />
+          </>
+        ) : (
+          <RequireOnboarded>
+            <div className="min-h-screen bg-paper text-ink lg:pl-64">
+              <AdminSidebar role={role} />
+              <main className="px-5 pb-28 pt-5 md:pb-12 lg:px-8 lg:pt-8">{children}</main>
+            </div>
+            <ConsoleBottomNav role={role} />
+          </RequireOnboarded>
+        )}
+      </RealtimeBridge>
     </RequireStaff>
   );
 }

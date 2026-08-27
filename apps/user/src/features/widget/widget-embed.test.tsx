@@ -5,18 +5,25 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { WidgetEmbed } from "./widget-embed";
 
-const { configMock, featureFlagsMock, bookingsListMock, bookingsGetMock, bookingsCancelMock } = vi.hoisted(() => ({
+const { configMock, featureFlagsMock, bookingsListMock, bookingsGetMock, bookingsCancelMock, siteGoogleMock, persistSiteTokenMock, setUserMock } = vi.hoisted(() => ({
   configMock: vi.fn(),
   featureFlagsMock: vi.fn(),
   bookingsListMock: vi.fn(),
   bookingsGetMock: vi.fn(),
-  bookingsCancelMock: vi.fn()
+  bookingsCancelMock: vi.fn(),
+  siteGoogleMock: vi.fn(),
+  persistSiteTokenMock: vi.fn(),
+  setUserMock: vi.fn()
 }));
 
 vi.mock("@myslot/api", () => ({
   widget: { config: configMock },
   featureFlags: { get: featureFlagsMock },
   bookings: { list: bookingsListMock, get: bookingsGetMock, cancel: bookingsCancelMock },
+  siteCustomerAuth: { google: siteGoogleMock },
+  persistSiteToken: persistSiteTokenMock,
+  TOKEN_KEY: "spots_token",
+  SITE_GOOGLE_PENDING_KEY: "site_google_pending",
   toApiFailure: (e: { code?: string; message?: string }) => ({
     status: 0,
     code: e?.code ?? "UNKNOWN",
@@ -34,13 +41,14 @@ vi.mock("@/context/auth", () => ({
   useAuth: () => ({
     user: { id: "u1", name: "Tester", email_verified_at: "2026-08-22T10:00:00.000Z", phone_verified_at: "2026-08-22T10:00:00.000Z" },
     loading: false,
-    setUser: vi.fn(),
+    setUser: setUserMock,
     logout: vi.fn()
   })
 }));
 
 vi.mock("@myslot/auth", () => ({
-  finishGoogleRedirect: vi.fn(async () => false)
+  finishGoogleRedirect: vi.fn(async () => null),
+  toAppUser: vi.fn((c) => c)
 }));
 
 const venue = (id: string, name: string) => ({
@@ -239,5 +247,39 @@ it("toggles the Your-bookings panel and requests the venue-scoped bookings", asy
     await waitFor(() => {
       expect(screen.getByTestId("book-panel")).toBeInTheDocument();
     });
+  });
+
+  it("settles a site-mode Google redirect as this Business's Site Customer, never persisting the Firebase token", async () => {
+    const { finishGoogleRedirect, toAppUser } = await import("@myslot/auth");
+    vi.mocked(finishGoogleRedirect).mockResolvedValue({ idToken: "google-id-token" });
+    vi.mocked(toAppUser).mockImplementation((c) => c);
+    window.sessionStorage.setItem("site_google_pending", "courtgroup.lk");
+    siteGoogleMock.mockResolvedValue({
+      token: "sc-token",
+      customer: { id: "sc-1", email: "g@pam.test", name: "G Pam", phone: null, email_verified_at: "2026-08-22T10:00:00.000Z", phone_verified_at: null }
+    });
+    configMock.mockResolvedValue(config({ default_venue_id: "v1", allow_venue_choice: false }, [venue("v1", "Smash Arena")]));
+
+    wrap(<WidgetEmbed widgetKey="k1" />);
+    await waitFor(() => {
+      expect(siteGoogleMock).toHaveBeenCalledWith({ site_hostname: "courtgroup.lk", id_token: "google-id-token" });
+    });
+    expect(persistSiteTokenMock).toHaveBeenCalledWith("sc-token");
+    expect(setUserMock).toHaveBeenCalledWith({ id: "sc-1", email: "g@pam.test", name: "G Pam", phone: null, email_verified_at: "2026-08-22T10:00:00.000Z", phone_verified_at: null });
+    expect(window.sessionStorage.getItem("site_google_pending")).toBeNull();
+    expect(window.localStorage.getItem("spots_token")).toBeNull();
+  });
+
+  it("settles a marketplace (non-site) Google redirect into the platform token", async () => {
+    const { finishGoogleRedirect } = await import("@myslot/auth");
+    vi.mocked(finishGoogleRedirect).mockResolvedValue({ idToken: "google-id-token" });
+    configMock.mockResolvedValue(config({ default_venue_id: "v1", allow_venue_choice: false }, [venue("v1", "Smash Arena")]));
+
+    wrap(<WidgetEmbed widgetKey="k1" />);
+    await waitFor(() => {
+      expect(window.localStorage.getItem("spots_token")).toBe("google-id-token");
+    });
+    expect(siteGoogleMock).not.toHaveBeenCalled();
+    expect(window.sessionStorage.getItem("site_google_pending")).toBeNull();
   });
 });

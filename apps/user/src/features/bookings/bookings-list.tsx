@@ -48,11 +48,13 @@ const EMPTY_STATE: Record<TabValue, { title: string; message: string }> = {
   }
 };
 
-const CANCELLABLE = new Set(["pending", "confirmed", "no_show", "failed"]);
+const CANCELLABLE = new Set(["pending", "confirmed"]);
 
 function matchesTab(booking: Booking, tab: TabValue): boolean {
-  if (tab === "cancelled") return booking.status === "cancelled";
-  if (tab === "past") return ["checked_in", "completed", "no_show", "failed"].includes(booking.status);
+  if (tab === "cancelled") {
+    return ["cancelled", "cancelled_by_user", "cancelled_by_owner", "cancelled_by_admin", "cancelled_auto"].includes(booking.status);
+  }
+  if (tab === "past") return ["completed", "no_show"].includes(booking.status);
   return ["pending", "confirmed"].includes(booking.status);
 }
 

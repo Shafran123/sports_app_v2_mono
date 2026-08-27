@@ -64,7 +64,7 @@ describe('booking history and cancellation', () => {
       .set('Authorization', `Bearer ${PLAYER_TOKEN}`);
 
     expect(res.status).toBe(200);
-    expect(res.body.data.status).toBe('cancelled');
+    expect(res.body.data.status).toBe('cancelled_by_user');
     expect(res.body.data.refund_amount).toBe(1500);
     expect(res.body.data.refund_pct).toBe(100);
   });
@@ -125,7 +125,7 @@ describe('booking history and cancellation', () => {
       .set('Authorization', `Bearer ${OWNER_TOKEN}`);
 
     expect(res.status).toBe(200);
-    expect(res.body.data.status).toBe('cancelled');
+    expect(res.body.data.status).toBe('cancelled_by_owner');
   });
 
   it('owner sees their venue bookings for a date', async () => {

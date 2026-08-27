@@ -23,7 +23,7 @@ describe("Button", () => {
 describe("StatusPill", () => {
   it("maps status to a tone and prettifies the label", () => {
     render(<StatusPill status="no_show" />);
-    expect(screen.getByText("no show")).toHaveClass("bg-surface-2");
+    expect(screen.getByText("No-show")).toHaveClass("bg-surface-2");
   });
 });
 

@@ -9,7 +9,8 @@ const { brandTokens } = require('./brandContext');
 
 // Booking-key emails that carry the player's inline check-in QR. QR is never
 // rendered on owner/admin roles (guarded in the email loop + confirmed here).
-const QR_KEYS = new Set(['booking.confirmed', 'booking.reminder', 'booking.bill']);
+// The bill carries no QR (ADR-0041) — the confirmation/reminder are the pass.
+const QR_KEYS = new Set(['booking.confirmed', 'booking.reminder']);
 
 // First token of the booking's player name for subject personalization.
 function firstNameOf(booking) {
@@ -177,6 +178,32 @@ const MESSAGES = {
       : smsService.buildOwnerBookingSms(ctx.payload.booking, ctx.brand)
   },
 
+  'booking.pending': {
+    email: ['player', 'owner'],
+    sms: ['player', 'owner'],
+    inApp: ['player'],
+    recipients: recipientsForBooking,
+    buildInApp: () => ({ type: 'booking_pending', title: 'Booking received', body: 'Your booking is awaiting the venue\'s confirmation.' }),
+    buildEmail: (ctx, role) => {
+      if (role === 'owner') {
+        const built = emailService.buildOwnerBookingHtml(ctx.payload.booking, ctx.brand, { tokens: ctx.tokens });
+        return { subject: `Booking request — ${ctx.payload.booking.venue_name || 'your venue'}`, html: built.html, text: built.text };
+      }
+      const first = firstNameOf(ctx.payload.booking);
+      const built = emailService.buildPendingBookingHtml(ctx.payload.booking, ctx.brand, { tokens: ctx.tokens });
+      return {
+        subject: first
+          ? `${first}, we've received your booking request at ${ctx.payload.booking.venue_name || 'the venue'}`
+          : `Booking request received — ${ctx.payload.booking.venue_name || 'your booking'}`,
+        html: built.html,
+        text: built.text
+      };
+    },
+    buildSms: (ctx, role) => role === 'player'
+      ? smsService.buildPendingBookingSms(ctx.payload.booking, ctx.brand)
+      : smsService.buildOwnerPendingBookingSms(ctx.payload.booking, ctx.brand)
+  },
+
   'booking.reminder': {
     email: ['player'],
     sms: ['player'],
@@ -207,14 +234,13 @@ const MESSAGES = {
       const pdf = await billService.bookingBillPdf(ctx.payload.bookingId);
       if (!pdf) return null;
       const attachments = [{ filename: `spots-bill-${booking.id.slice(0, 8)}.pdf`, content: pdf, contentType: 'application/pdf' }];
-      let qr;
-      if (booking.qr_token) qr = { cid: 'booking-qr.png', png: await emailTemplates.qrPng(booking.qr_token) };
       // The bill reloads its own booking (the dispatch payload only carries
-      // the id), so resolve the Business branding from the reloaded row.
+      // the id), so resolve the Business branding from the reloaded row and
+      // pick up the invoice number allocated on first render.
+      booking.invoice_number = (await billService.loadBookingForBill(ctx.payload.bookingId))?.invoice_number || booking.invoice_number;
       const brand = booking.business_name || ctx.brand;
       const tokens = booking.business_name ? brandTokens(booking.business_brand, ctx.brand) : ctx.tokens;
-      const built = emailService.buildBillHtml(booking, brand, { ...(qr ? { qr: { cid: qr.cid } } : {}), tokens });
-      if (qr) attachments.push({ filename: 'booking-qr.png', content: qr.png, contentType: 'image/png', inline: true });
+      const built = emailService.buildBillHtml(booking, brand, { tokens });
       return {
         to: booking.user_email,
         subject: `Your bill — ${booking.venue_name || 'booking'}`,
@@ -302,7 +328,7 @@ const MESSAGES = {
   'booking.walkin_created': {
     sms: ['player'],
     recipients: recipientsForBooking,
-    buildSms: (ctx) => smsService.buildWalkinSms(ctx.payload.booking, ctx.brand)
+    buildSms: (ctx) => smsService.buildWalkinSms(ctx.payload.booking, ctx.brand, { billUrl: ctx.billUrl })
   },
 
   'event.registered': {
@@ -660,13 +686,26 @@ async function dispatch(key, payload, opts = {}) {
             // QR SMS (booking.confirmed/reminder): the player's SMS carries
             // the QR link (the token is loaded only for the player recipient,
             // never owner/admin roles). The SMS text is the bearer disclosure.
-            const ctx = { payload, key, role, brand, tokens, qrUrl: null };
+            // Walk-in bookings (key 'booking.walkin_created') get their bill
+            // download link instead — the bill carries no QR (ADR-0041).
+            const ctx = { payload, key, role, brand, tokens, qrUrl: null, billUrl: null };
             if (role === 'player' && QR_KEYS.has(key) && rec.phone === payload.booking?.user_phone && payload.booking?.id) {
               try {
                 const token = await loadQrToken(payload.booking.id);
                 if (token) ctx.qrUrl = smsService.bookingQrUrl(payload.booking.id, token);
               } catch (err) {
                 logger.error(`QR SMS link load failed for ${key} player (sent without link): ${err.message}`);
+              }
+            }
+            if (role === 'player' && key === 'booking.walkin_created' && payload.booking?.id) {
+              const targetPhone = payload.booking.player_phone || payload.booking.user_phone;
+              if (targetPhone && rec.phone === targetPhone) {
+                try {
+                  const token = await loadQrToken(payload.booking.id);
+                  if (token) ctx.billUrl = smsService.bookingBillUrl(payload.booking.id, token);
+                } catch (err) {
+                  logger.error(`Bill SMS link load failed for ${key} player (sent without link): ${err.message}`);
+                }
               }
             }
             message = await def.buildSms(ctx, role);

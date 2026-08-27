@@ -20,7 +20,16 @@ function computeRefundPct(tiers, hoursBefore) {
   return 0;
 }
 
-async function cancelBooking(client, bookingId, actorUserId, actorRole, siteCustomerId) {
+// Cancel a booking inside the caller's transaction. `actor` names who is
+// cancelling: 'user' (player/site customer self-cancel), 'owner', 'admin',
+// or 'auto' (the Pending Auto-cancel timer).
+//
+// Refund policy (ADR-0038/0040): a *pending* booking has had no service
+// rendered, so it always refunds 100% regardless of tier — cancelling it
+// (by any actor, including the timer) returns the full amount. A *confirmed*
+// booking refunds per the platform cancellation tiers. Only the player's own
+// cancel is bound by the venue Cancel Cutoff.
+async function cancelBooking(client, bookingId, actorUserId, actorRole, siteCustomerId, actor = 'user') {
   const { rows } = await client.query(
     `select * from bookings where id = $1 for update`,
     [bookingId]
@@ -31,7 +40,7 @@ async function cancelBooking(client, bookingId, actorUserId, actorRole, siteCust
   const booking = rows[0];
 
   const isOwnerActor =
-    actorRole === 'venue_owner' || actorRole === 'admin';
+    actorRole === 'venue_owner' || actorRole === 'admin' || actor === 'auto';
 
   // A Site Customer may cancel the bookings under their own per-Business
   // account (site_customer_id), just like a Player cancels their own.
@@ -39,38 +48,51 @@ async function cancelBooking(client, bookingId, actorUserId, actorRole, siteCust
     return { error: { status: 403, code: 'FORBIDDEN', message: 'You cannot cancel this booking' } };
   }
 
-  if (booking.status !== 'confirmed') {
+  if (!['pending', 'confirmed'].includes(booking.status)) {
     return { error: { status: 409, code: 'BOOKING_NOT_CANCELLABLE', message: 'This booking cannot be cancelled' } };
   }
 
   const now = new Date();
   const hoursBefore = (new Date(booking.start_at) - now) / 3600000;
 
-  // Cancel Cutoff (per venue): players self-cancel only while the booking
-  // start is at least the venue's cutoff away. Venue owners and admins are
-  // not bound by it — they cancel for operational reasons.
-  const { rows: venueRows } = await client.query(
-    `select cancel_cutoff_hours from venues where id = $1`,
-    [booking.venue_id]
-  );
-  const cancelCutoffHours = venueRows[0]?.cancel_cutoff_hours ?? 2;
-  if (!isOwnerActor && hoursBefore < cancelCutoffHours) {
-    return {
-      error: {
-        status: 409,
-        code: 'CANCEL_CUTOFF',
-        message: `Bookings can be self-cancelled up to ${cancelCutoffHours} hour${cancelCutoffHours === 1 ? '' : 's'} before the start. Please contact the venue.`
-      }
-    };
+  // Cancel Cutoff (per venue): a confirmed booking self-cancels only while the
+  // start is at least the venue's cutoff away. Pending bookings self-cancel
+  // freely (no service was confirmed), and owners/admins/timer are never bound.
+  if (actor === 'user' && !isOwnerActor && booking.status === 'confirmed') {
+    const { rows: venueRows } = await client.query(
+      `select cancel_cutoff_hours from venues where id = $1`,
+      [booking.venue_id]
+    );
+    const cancelCutoffHours = venueRows[0]?.cancel_cutoff_hours ?? 2;
+    if (hoursBefore < cancelCutoffHours) {
+      return {
+        error: {
+          status: 409,
+          code: 'CANCEL_CUTOFF',
+          message: `Bookings can be self-cancelled up to ${cancelCutoffHours} hour${cancelCutoffHours === 1 ? '' : 's'} before the start. Please contact the venue.`
+        }
+      };
+    }
   }
 
-  const tiers = await getTiers();
-  const refundPct = computeRefundPct(tiers, hoursBefore);
+  // A pending booking always refunds in full (nothing was delivered yet).
+  const refundPct = booking.status === 'pending' ? 100 : computeRefundPct(await getTiers(), hoursBefore);
   const refundAmount = Math.round((booking.total_price * refundPct) / 100);
+  // The canceller (ADR-0038): the explicit actor wins; otherwise derive it from
+  // the caller's role — an owner or admin cancelling (even via the player
+  // route) is recorded as such, never as a player cancel.
+  const cancelStatus =
+    actor === 'auto'
+      ? 'cancelled_auto'
+      : actor === 'admin' || (actorRole === 'admin' && actor !== 'owner')
+        ? 'cancelled_by_admin'
+        : actor === 'owner' || actorRole === 'venue_owner'
+          ? 'cancelled_by_owner'
+          : 'cancelled_by_user';
 
   await client.query(
-    `update bookings set status = 'cancelled', cancelled_at = now(), updated_at = now() where id = $1`,
-    [bookingId]
+    `update bookings set status = $2, cancelled_at = now(), updated_at = now() where id = $1`,
+    [bookingId, cancelStatus]
   );
 
   if (refundAmount > 0) {
@@ -86,7 +108,7 @@ async function cancelBooking(client, bookingId, actorUserId, actorRole, siteCust
     }
   }
 
-  return { ...booking, status: 'cancelled', refund_amount: refundAmount, refund_pct: refundPct, hours_before: hoursBefore };
+  return { ...booking, status: cancelStatus, refund_amount: refundAmount, refund_pct: refundPct, hours_before: hoursBefore };
 }
 
 module.exports = { computeRefundPct, cancelBooking, getTiers };

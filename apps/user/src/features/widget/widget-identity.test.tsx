@@ -5,14 +5,16 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { BookPanel } from "./book-panel";
 
-const { checkoutMock, meMock, updateMeMock, verifyPhoneSendMock, verifyPhoneConfirmMock, verifyEmailSendMock, verifyEmailConfirmMock } = vi.hoisted(() => ({
+const { checkoutMock, meMock, updateMeMock, verifyPhoneSendMock, verifyPhoneConfirmMock, verifyEmailSendMock, verifyEmailConfirmMock, siteGoogleMock, persistSiteTokenMock } = vi.hoisted(() => ({
   checkoutMock: vi.fn(),
   meMock: vi.fn(),
   updateMeMock: vi.fn(),
   verifyPhoneSendMock: vi.fn(),
   verifyPhoneConfirmMock: vi.fn(),
   verifyEmailSendMock: vi.fn(),
-  verifyEmailConfirmMock: vi.fn()
+  verifyEmailConfirmMock: vi.fn(),
+  siteGoogleMock: vi.fn(),
+  persistSiteTokenMock: vi.fn()
 }));
 
 let ctxUser: Record<string, unknown> | null = null;
@@ -36,6 +38,9 @@ vi.mock("@myslot/api", () => ({
     verifyEmailSend: verifyEmailSendMock,
     verifyEmailConfirm: verifyEmailConfirmMock
   },
+  siteCustomerAuth: { google: siteGoogleMock },
+  persistSiteToken: persistSiteTokenMock,
+  SITE_GOOGLE_PENDING_KEY: "site_google_pending",
   toApiFailure: (e: { code?: string; message?: string }) => ({
     status: 0,
     code: e?.code ?? "UNKNOWN",
@@ -47,9 +52,10 @@ vi.mock("@myslot/auth", () => ({
   loginWithEmail: vi.fn(),
   registerWithEmail: vi.fn(),
   loginWithGoogleRedirect: vi.fn(),
+  loginWithGooglePopup: vi.fn(),
   sendPasswordReset: vi.fn(),
   logoutFirebase: vi.fn(),
-  finishGoogleRedirect: vi.fn(async () => false)
+  finishGoogleRedirect: vi.fn(async () => null)
 }));
 
 vi.mock("qrcode", () => ({
@@ -288,5 +294,44 @@ describe("WidgetIdentity", () => {
     fireEvent.click(screen.getByRole("button", { name: /create an account/i }));
     expect(screen.getByText(/create an account at court group to book/i)).toBeInTheDocument();
     expect(screen.queryByText(/myslot/i)).toBeNull();
+  });
+
+  it("resolves a site-mode Google sign-in (popup) as this Business's Site Customer, never a Player (ADR-0030)", async () => {
+    const { loginWithGooglePopup } = await import("@myslot/auth");
+    vi.mocked(loginWithGooglePopup).mockResolvedValue({ idToken: "id-token-1" });
+    siteGoogleMock.mockResolvedValue({
+      token: "sc-token",
+      customer: {
+        id: "sc-1",
+        business_id: "biz-1",
+        email: "g@pam.test",
+        name: "G Pam",
+        phone: null,
+        email_verified_at: "2026-08-22T10:00:00.000Z",
+        phone_verified_at: null
+      }
+    });
+    wrap(<WidgetIdentity siteHostname="courtgroup.lk" siteName="Court Group" onDone={vi.fn()} />);
+    await userEvent.click(screen.getByRole("button", { name: /continue with google/i }));
+
+    await waitFor(() => {
+      expect(loginWithGooglePopup).toHaveBeenCalledTimes(1);
+      expect(siteGoogleMock).toHaveBeenCalledWith({ site_hostname: "courtgroup.lk", id_token: "id-token-1" });
+      expect(persistSiteTokenMock).toHaveBeenCalledWith("sc-token");
+      expect(setUserMock).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "sc-1", role: "player", email: "g@pam.test" })
+      );
+    });
+  });
+
+  it("site-mode widget embed stashes the hostname and uses the redirect flow (popups blocked in iframes)", async () => {
+    const { loginWithGoogleRedirect } = await import("@myslot/auth");
+    wrap(<WidgetIdentity widgetKey="k1" siteHostname="courtgroup.lk" siteName="Court Group" onDone={vi.fn()} />);
+    await userEvent.click(screen.getByRole("button", { name: /continue with google/i }));
+    await waitFor(() => {
+      expect(loginWithGoogleRedirect).toHaveBeenCalledTimes(1);
+      expect(window.sessionStorage.getItem("site_google_pending")).toBe("courtgroup.lk");
+      expect(siteGoogleMock).not.toHaveBeenCalled();
+    });
   });
 });

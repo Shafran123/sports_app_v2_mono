@@ -7,7 +7,7 @@ import { formatDateLong, formatLkr, formatTime12 } from "@myslot/utils";
 import { toApiFailure } from "@myslot/api";
 import type { Booking, CourtAvailability, Slot } from "@myslot/types";
 import { useBookingActions } from "@/features/admin-bookings/use-booking-actions";
-import { SHEET_CLASS } from "@myslot/ui";
+import { SHEET_CLASS, statusLabel } from "@myslot/ui";
 
 function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -49,7 +49,8 @@ export function BookingDetailDialog({
 
   const isCash = booking?.payment_method === "cash";
   const cashPaid = isCash && booking?.paid_at;
-  const showMarkPaid = isCash && !cashPaid && (booking?.status === "confirmed" || booking?.status === "checked_in");
+  const showMarkPaid =
+    isCash && !cashPaid && ["pending", "confirmed", "completed"].includes(booking?.status ?? "");
 
   return (
     <Dialog
@@ -97,7 +98,50 @@ export function BookingDetailDialog({
               <div className="rounded-2xl bg-error-light px-4 py-3 text-sm text-error">{failureInfo.message}</div>
             )}
 
-            {booking.status === "confirmed" ? (
+            {booking.status === "pending" ? (
+              <div className="flex flex-wrap justify-end gap-2 pt-1">
+                <Button
+                  onClick={() => actions.confirm.mutate(booking.id)}
+                  loading={actions.confirm.isPending}
+                  disabled={busy}
+                >
+                  Confirm booking
+                </Button>
+                {showMarkPaid && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => actions.markPaid.mutate(booking.id)}
+                    loading={actions.markPaid.isPending}
+                    disabled={busy}
+                  >
+                    <Banknote className="h-4 w-4" /> Mark paid
+                  </Button>
+                )}
+                <Button
+                  variant="secondary"
+                  onClick={() => actions.markNoShow.mutate(booking.id)}
+                  loading={actions.markNoShow.isPending}
+                  disabled={busy}
+                >
+                  Mark no-show
+                </Button>
+                <Button
+                  variant={armed ? "destructive" : "secondary"}
+                  onClick={() => {
+                    if (armed) {
+                      actions.cancel.mutate(booking.id);
+                    } else {
+                      setArmed(true);
+                      setTimeout(() => setArmed(false), 5000);
+                    }
+                  }}
+                  loading={actions.cancel.isPending}
+                  disabled={busy}
+                >
+                  {armed ? "Tap again to cancel" : "Cancel booking"}
+                </Button>
+              </div>
+            ) : booking.status === "confirmed" ? (
               <div className="flex flex-wrap justify-end gap-2 pt-1">
                 {showMarkPaid && (
                   <Button
@@ -140,10 +184,10 @@ export function BookingDetailDialog({
                   {armed ? "Tap again to cancel" : "Cancel booking"}
                 </Button>
               </div>
-            ) : booking.status === "checked_in" ? (
+            ) : booking.status === "completed" ? (
               <div className="space-y-2">
                 <p className="flex items-center gap-2 rounded-2xl bg-success-light px-4 py-3 text-sm text-success">
-                  <CheckCheck className="h-4 w-4" /> Checked in
+                  <CheckCheck className="h-4 w-4" /> Completed
                   {booking.checked_in_at ? ` at ${formatTime12(booking.checked_in_at)}` : ""}
                 </p>
                 {showMarkPaid && (
@@ -160,7 +204,7 @@ export function BookingDetailDialog({
               </div>
             ) : (
               <p className="rounded-2xl bg-surface-2 px-4 py-3 text-sm text-ink-2">
-                This booking is {booking.status.replace("_", " ")} and needs no action.
+                This booking is {statusLabel(booking.status)} and needs no action.
               </p>
             )}
           </div>

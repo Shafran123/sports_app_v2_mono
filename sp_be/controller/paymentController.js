@@ -117,13 +117,25 @@ exports.handleNotify = async (req, res) => {
 
       let conflict = false;
       let booking;
+
+      // Auto-confirm (ADR-0040): with the switch off, an online-paid booking
+      // lands `pending` and the owner confirms it. With it on, the payment
+      // confirms it immediately.
+      const { rows: confirmRows } = await client.query(
+        `select b.auto_confirm from businesses b
+         join venues v on v.business_id = b.id
+         where v.id = (select venue_id from courts where id = $1)`,
+        [hold.court_id]
+      );
+      const bookingStatus = confirmRows.length && confirmRows[0].auto_confirm === false ? 'pending' : 'confirmed';
+
       try {
         await client.query('savepoint booking_insert');
         const inserted = await client.query(
-          `insert into bookings (court_id, user_id, start_at, end_at, price_per_slot, total_price, tax_rate, tax_amount, venue_tax_rate, venue_tax_amount, status, payment_method, player_name, player_phone, qr_token, idempotency_key, subtotal_amount, discount_amount)
-           values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'confirmed', 'online', $11, $12, $13, $14, $15, $16)
+          `insert into bookings (court_id, user_id, start_at, end_at, price_per_slot, total_price, tax_rate, tax_amount, venue_tax_rate, venue_tax_amount, status, payment_method, player_name, player_phone, qr_token, idempotency_key, subtotal_amount, discount_amount, confirmed_at)
+           values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'online', $12, $13, $14, $15, $16, $17, $18)
            returning *`,
-          [hold.court_id, hold.user_id, hold.start_at, hold.end_at, pricePerSlot, payment.amount, payment.tax_rate, payment.tax_amount, payment.venue_tax_rate, payment.venue_tax_amount, playerName, playerPhone, mintQrToken(), hold.idempotency_key, hold.subtotal_amount, hold.discount_amount]
+          [hold.court_id, hold.user_id, hold.start_at, hold.end_at, pricePerSlot, payment.amount, payment.tax_rate, payment.tax_amount, payment.venue_tax_rate, payment.venue_tax_amount, bookingStatus, playerName, playerPhone, mintQrToken(), hold.idempotency_key, hold.subtotal_amount, hold.discount_amount, bookingStatus === 'confirmed' ? new Date() : null]
         );
         booking = inserted.rows[0];
       } catch (error) {
@@ -165,8 +177,8 @@ exports.handleNotify = async (req, res) => {
       await client.query('commit');
 
       await publishBookingEvent('booking.created', booking.id);
-      await notificationCatalog.dispatchBooking('booking.confirmed', booking.id);
-      void billService.emailBillForBooking(booking.id);
+      const confirmKey = bookingStatus === 'confirmed' ? 'booking.confirmed' : 'booking.pending';
+      await notificationCatalog.dispatchBooking(confirmKey, booking.id);
 
       return ok(res, 200, { handled: true, booking_id: booking.id });
     }
@@ -241,7 +253,7 @@ exports.adminRefund = async (req, res) => {
 
     if (payment.booking_id) {
       await client.query(
-        `update bookings set status = 'cancelled', cancelled_at = now(), updated_at = now() where id = $1`,
+        `update bookings set status = 'cancelled_by_admin', cancelled_at = now(), updated_at = now() where id = $1`,
         [payment.booking_id]
       );
     }

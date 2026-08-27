@@ -354,6 +354,42 @@ function buildOwnerBookingHtml(booking, brand = DEFAULT_BRAND, opts = {}) {
   };
 }
 
+// Awaiting-confirmation copy (ADR-0040): sent to the player when their booking
+// lands `pending` (Business has auto-confirm off). No QR yet — the player
+// hasn't been confirmed, so nothing is checkable.
+function buildPendingBookingHtml(booking, brand = DEFAULT_BRAND, opts = {}) {
+  const th = themeFor(opts.tokens);
+  const preheader = `We've received your booking request at ${booking?.venue_name || 'the venue'} — awaiting confirmation.`;
+  const text = plainLines(
+    `Booking received — awaiting confirmation`,
+    `${booking?.venue_name || ''} — ${booking?.court_name || ''}`,
+    `When: ${fmtWhen(booking?.start_at)} — ${fmtWhen(booking?.end_at)}`,
+    booking?.total_price != null ? `Total: ${fmtLkr(booking.total_price)}` : '',
+    `Payment: ${booking?.payment_method === 'cash' ? 'Pay at venue' : 'Paid online'}`,
+    '',
+    'The venue will confirm shortly. You can cancel this request any time.',
+    '',
+    footerLine(brand)
+  );
+  return {
+    preheader,
+    text,
+    html: shell({
+      brand,
+      tokens: opts.tokens,
+      preheader,
+      content: `
+        <h1 class="ms-ink" style="margin:0 0 8px;color:${C.ink};font-size:22px;font-weight:800;line-height:1.25;">Booking received</h1>
+        <p class="ms-ink2" style="margin:0 0 20px;color:${C.ink2};font-size:15px;">The venue is confirming your slot — we'll email you the moment it's confirmed.</p>
+        ${badge('Awaiting confirmation', th.badgeBg, th.badgeFg)}
+        ${bookingCard(booking)}`,
+      ctaText: 'View booking',
+      ctaHref: `${appBase()}/bookings/${booking?.id || ''}`,
+      plainText: text
+    })
+  };
+}
+
 function buildReminderHtml(booking, brand = DEFAULT_BRAND, opts = {}) {
   const th = themeFor(opts.tokens);
   const preheader = `Reminder: your booking at ${booking?.venue_name || ''} is tomorrow — ${fmtWhen(booking?.start_at)}.`;
@@ -394,14 +430,16 @@ function buildBillHtml(booking, brand = DEFAULT_BRAND, opts = {}) {
   const th = themeFor(opts.tokens);
   const preheader = `Your bill for ${booking?.venue_name || 'your booking'} is ready.`;
   const base = Number(booking?.total_price || 0) - Number(booking?.tax_amount || 0) - Number(booking?.venue_tax_amount || 0);
+  const invoiceNo = booking?.invoice_number ? `INV-${String(booking.invoice_number).padStart(4, '0')}` : '';
   const text = plainLines(
     `Your bill — ${booking?.venue_name || ''}`,
     `${booking?.court_name || ''}`,
     `When: ${fmtWhen(booking?.start_at)} — ${fmtWhen(booking?.end_at)}`,
     `Base: ${fmtLkr(base)}`,
+    invoiceNo ? `Invoice No: ${invoiceNo}` : '',
     `Payment: ${booking?.payment_method === 'cash' ? 'Pay at venue' : 'Paid online'} — ${booking?.status || ''}`,
     '',
-    'Your bill PDF is attached — it also carries the QR code for check-in.',
+    'Your invoice PDF is attached.',
     '',
     footerLine(brand)
   );
@@ -416,16 +454,13 @@ function buildBillHtml(booking, brand = DEFAULT_BRAND, opts = {}) {
         <h1 class="ms-ink" style="margin:0 0 8px;color:${C.ink};font-size:22px;font-weight:800;line-height:1.25;">Your bill is ready</h1>
         <p class="ms-ink2" style="margin:0 0 20px;color:${C.ink2};font-size:15px;">Thanks for playing — details below.</p>
         ${badge('Bill', th.badgeBg, th.badgeFg)}
+        ${invoiceNo ? `<p class="ms-ink2" style="margin:0 0 6px;color:${C.ink2};font-size:13px;">Invoice No: <strong class="ms-ink" style="color:${C.ink};">${invoiceNo}</strong></p>` : ''}
         ${bookingCard(booking)}
-        ${qrBlock(opts.qr || null)}
-        <p class="ms-muted" style="margin:6px 0 0;color:${C.ink2};font-size:12px;">The PDF is attached; the QR inside is your check-in code.</p>`,
+        <p class="ms-muted" style="margin:6px 0 0;color:${C.ink2};font-size:12px;">Your invoice PDF is attached.</p>`,
       ctaText: 'View booking',
       ctaHref: `${appBase()}/bookings/${booking?.id || ''}`,
       plainText: text
-    }),
-    attachment: opts.qr
-      ? { filename: 'booking-qr.png', content: null, contentType: 'image/png', inline: true, qrOpts: opts.qr }
-      : null
+    })
   };
 }
 
@@ -914,6 +949,7 @@ module.exports = {
   bookingCard,
   buildBookingHtml,
   buildOwnerBookingHtml,
+  buildPendingBookingHtml,
   buildReminderHtml,
   buildWelcomeHtml,
   buildVerificationCodeHtml,

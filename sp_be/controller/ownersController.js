@@ -289,7 +289,7 @@ exports.listOwnerAllowance = async (req, res) => {
        where v.owner_id = $1
          and b.start_at >= $2::date
          and b.start_at < ($2::date + interval '1 month')
-         and b.status <> 'cancelled'`,
+         and b.status in ('confirmed', 'completed', 'no_show')`,
       [ownerId, `${month}-01`]
     );
     const { usage, revenue } = tallyRows[0];
@@ -308,7 +308,7 @@ exports.listOwnerAllowance = async (req, res) => {
            where v.owner_id = $1
              and b.start_at >= $2::date
              and b.start_at < ($2::date + interval '1 month')
-             and b.status <> 'cancelled'
+             and b.status in ('confirmed', 'completed', 'no_show')
          ) ranked
          where ranked.rn > $3`,
         [ownerId, `${month}-01`, allowance]

@@ -8,13 +8,24 @@ export type Role = z.infer<typeof ROLE>;
 export const BOOKING_STATUS = z.enum([
   "pending",
   "confirmed",
-  "checked_in",
   "completed",
   "cancelled",
-  "no_show",
-  "failed"
+  "cancelled_by_user",
+  "cancelled_by_owner",
+  "cancelled_by_admin",
+  "cancelled_auto",
+  "no_show"
 ]);
 export type BookingStatus = z.infer<typeof BOOKING_STATUS>;
+
+export const PAYMENT_STATUS = z.enum([
+  "due",
+  "pending",
+  "paid",
+  "failed",
+  "refunded"
+]);
+export type PaymentStatus = z.infer<typeof PAYMENT_STATUS>;
 
 export const SLOT_STATE = z.enum([
   "available",
@@ -465,21 +476,54 @@ export const BookingSchema = z.object({
   created_at: z.string().nullable().optional(),
   refund_amount: z.number().nullable().optional(),
   cash_payment_status: z.string().nullable().optional(),
+  payment_status: PAYMENT_STATUS.optional().nullable(),
   paid_at: z.string().nullable().optional()
 });
 export type Booking = z.infer<typeof BookingSchema>;
+
+// Owner Invoices tab (ADR-0041): a booking's bill row for the ledger — money
+// snapshot + latest payment state + the per-Business invoice number.
+export const InvoiceSchema = z.object({
+  id: z.string(),
+  invoice_number: z.number().nullable().optional(),
+  status: BOOKING_STATUS,
+  start_at: z.string(),
+  end_at: z.string(),
+  total_price: z.number(),
+  subtotal_amount: z.number().optional(),
+  discount_amount: z.number().optional(),
+  tax_amount: z.number().optional(),
+  venue_tax_amount: z.number().optional(),
+  tax_rate: z.number().optional(),
+  venue_tax_rate: z.number().optional(),
+  payment_method: z.string().nullable().optional(),
+  payment_status: PAYMENT_STATUS.optional().nullable(),
+  paid_at: z.string().nullable().optional(),
+  player_name: z.string().nullable().optional(),
+  player_phone: z.string().nullable().optional(),
+  court_name: z.string().optional(),
+  venue_name: z.string().optional(),
+  venue_city: z.string().nullable().optional()
+});
+export type Invoice = z.infer<typeof InvoiceSchema>;
 
 export const PaymentSchema = z.object({
   id: z.string(),
   booking_id: z.string().nullable(),
   amount: z.number(),
   currency: z.string(),
-  status: z.string(),
+  status: PAYMENT_STATUS,
   payment_method: z.string().nullable().optional(),
   paid_at: z.string().nullable().optional(),
   created_at: z.string().nullable().optional()
 });
 export type Payment = z.infer<typeof PaymentSchema>;
+
+export const BookingSettingsSchema = z.object({
+  auto_confirm: z.boolean(),
+  pending_auto_cancel_hours: z.number()
+});
+export type BookingSettings = z.infer<typeof BookingSettingsSchema>;
 
 export const CheckoutResultSchema = z.object({
   hold_id: z.string().optional(),

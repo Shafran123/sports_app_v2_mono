@@ -147,12 +147,12 @@ describe("bookings.checkout", () => {
 
   it("qrCheckin posts a token to the business endpoint", async () => {
     const post = vi.fn(async () => ({
-      data: { id: "b1", court_id: "c1", user_id: "u1", start_at: "x", end_at: "y", price_per_slot: 1500, total_price: 1500, status: "checked_in" }
+      data: { id: "b1", court_id: "c1", user_id: "u1", start_at: "x", end_at: "y", price_per_slot: 1500, total_price: 1500, status: "completed" }
     }));
     const client = { get: vi.fn(), post, patch: vi.fn() } as unknown as AxiosInstance;
     const booking = await business.qrCheckin("tok-9", client);
     expect(post).toHaveBeenCalledWith("/business/qr-checkin", { token: "tok-9" });
-    expect(booking.status).toBe("checked_in");
+    expect(booking.status).toBe("completed");
   });
 
   it("admin venue lifecycle calls hit the admin endpoints", async () => {

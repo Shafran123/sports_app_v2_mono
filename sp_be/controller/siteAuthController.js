@@ -43,7 +43,11 @@ exports.google = async (req, res) => {
     const { customer, session } = await siteCustomers.googleUpsert(req.body || {});
     ok(res, 201, { customer: ssoCustomer(customer), token: session.token, expires_at: session.expires_at });
   } catch (error) {
-    if (error.code) return fail(res, error.code === 'GOOGLE_PROFILE_INVALID' ? 400 : 403, error.code, error.message);
+    if (error.code === 'SITE_HOST_NOT_LIVE') return fail(res, 403, error.code, error.message);
+    if (error.code === 'GOOGLE_TOKEN_REQUIRED') return fail(res, 400, error.code, error.message);
+    if (error.code === 'GOOGLE_TOKEN_INVALID') return fail(res, 401, error.code, error.message);
+    if (error.code === 'GOOGLE_PROFILE_INVALID') return fail(res, 400, error.code, error.message);
+    if (error.code) return fail(res, 403, error.code, error.message);
     logger.error(`Error signing in with Google: ${error.message}`);
     fail(res, 500, 'INTERNAL_SERVER_ERROR', 'Something went wrong');
   }

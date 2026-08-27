@@ -94,7 +94,7 @@ describe('QR check-in', () => {
       .send({ token: booking.qr_token });
 
     expect(res.status).toBe(200);
-    expect(res.body.data.status).toBe('checked_in');
+    expect(res.body.data.status).toBe('completed');
     expect(res.body.data.checked_in_at).toBeTruthy();
   });
 
@@ -115,7 +115,7 @@ describe('QR check-in', () => {
       .set('Authorization', `Bearer ${OWNER_TOKEN}`)
       .send({ token: booking.qr_token });
     expect(checkin.status).toBe(200);
-    expect(checkin.body.data.status).toBe('checked_in');
+    expect(checkin.body.data.status).toBe('completed');
   });
 
   it('re-scanning a consumed token returns already used', async () => {

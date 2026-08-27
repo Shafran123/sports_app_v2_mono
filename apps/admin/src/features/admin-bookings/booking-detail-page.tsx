@@ -7,7 +7,7 @@ import { bookings, toApiFailure } from "@myslot/api";
 import { Button, Card, Dialog, DialogContent, ErrorState, Skeleton, StatusPill } from "@myslot/ui";
 import { formatDateLong, formatLkr, formatTime12 } from "@myslot/utils";
 import type { Booking } from "@myslot/types";
-import { SHEET_CLASS } from "@myslot/ui";
+import { SHEET_CLASS, statusLabel } from "@myslot/ui";
 import { useBookingActions } from "./use-booking-actions";
 import { BookingStatusSteps } from "./status-steps";
 
@@ -74,10 +74,10 @@ export function BookingDetailPage({ bookingId }: { bookingId: string }) {
   }
 
   const failureInfo =
-    actions.checkIn.error || actions.markNoShow.error || actions.cancel.error
-      ? toApiFailure(actions.checkIn.error ?? actions.markNoShow.error ?? actions.cancel.error)
+    actions.checkIn.error || actions.markNoShow.error || actions.cancel.error || actions.confirm.error
+      ? toApiFailure(actions.checkIn.error ?? actions.markNoShow.error ?? actions.cancel.error ?? actions.confirm.error)
       : null;
-  const busy = actions.checkIn.isPending || actions.markNoShow.isPending || actions.cancel.isPending;
+  const busy = actions.checkIn.isPending || actions.markNoShow.isPending || actions.cancel.isPending || actions.confirm.isPending;
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -148,7 +148,16 @@ export function BookingDetailPage({ bookingId }: { bookingId: string }) {
         {failureInfo && (
           <div className="mt-3 rounded-2xl bg-error-light px-4 py-3 text-sm text-error">{failureInfo.message}</div>
         )}
-        {booking.status === "confirmed" ? (
+        {booking.status === "pending" ? (
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button onClick={() => actions.confirm.mutate(booking.id)} loading={actions.confirm.isPending} disabled={busy}>
+              Confirm booking
+            </Button>
+            <Button variant="destructive" onClick={() => setCancelOpen(true)} disabled={busy}>
+              Cancel booking
+            </Button>
+          </div>
+        ) : booking.status === "confirmed" ? (
           <div className="mt-4 flex flex-wrap gap-2">
             <Button onClick={() => actions.checkIn.mutate(booking.id)} loading={actions.checkIn.isPending} disabled={busy}>
               Check in
@@ -165,13 +174,13 @@ export function BookingDetailPage({ bookingId }: { bookingId: string }) {
               Cancel booking
             </Button>
           </div>
-        ) : booking.status === "checked_in" ? (
+        ) : booking.status === "completed" ? (
           <p className="mt-3 rounded-2xl bg-success-light px-4 py-3 text-sm text-success">
-            Checked in — no further actions available.
+            Completed — no further actions available.
           </p>
         ) : (
           <p className="mt-3 rounded-2xl bg-surface-2 px-4 py-3 text-sm text-ink-2">
-            This booking is {booking.status.replace("_", " ")} and needs no action.
+            This booking is {statusLabel(booking.status)} and needs no action.
           </p>
         )}
       </div>

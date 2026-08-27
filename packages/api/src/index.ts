@@ -16,6 +16,7 @@ import {
   EventSchema,
   FeatureFlagsSchema,
   FlagAuditSchema,
+  InvoiceSchema,
   MyVenueSchema,
   NotificationSchema,
   NudgeResultSchema,
@@ -48,10 +49,11 @@ import {
   SiteConfigSchema,
   SiteSessionSchema,
   SiteCustomerSchema,
-  SiteCustomerSummarySchema
+  SiteCustomerSummarySchema,
+  BookingSettingsSchema
 } from "@myslot/types";
 import type { OwnerAgreement, OwnerPlan, VenueBrand, WidgetInstanceInput, SiteRequestInput } from "@myslot/types";
-export { TOKEN_KEY, SITE_CUSTOMER_TOKEN_KEY, persistSiteToken, isOwnerSurface } from "./client";
+export { TOKEN_KEY, SITE_CUSTOMER_TOKEN_KEY, SITE_GOOGLE_PENDING_KEY, persistSiteToken, isOwnerSurface } from "./client";
 export { toApiFailure, getClient, setClient, createClient, type ApiFailure } from "./client";
 export { parseData, parseList, parsePaginated } from "./parse";
 export { submitPayHere, PAYHERE_CHECKOUT_URL, type PayHereUserFields } from "./payhere";
@@ -324,7 +326,7 @@ export const siteCustomerAuth = {
     return parseData(SiteSessionSchema, res.data.data ?? res.data);
   },
   async google(
-    input: { site_hostname: string; name?: string; email: string; google_sub: string },
+    input: { site_hostname: string; id_token: string },
     client: AxiosInstance = getClient()
   ) {
     const res = await client.post("/site-auth/google", input);
@@ -416,6 +418,14 @@ export const business = {
     const res = await client.get("/business/bookings", { params });
     return parsePaginated(BookingSchema, res.data);
   },
+  async invoices(query: { from?: string; to?: string } = {}, client: AxiosInstance = getClient()) {
+    const res = await client.get("/business/invoices", { params: query });
+    return parseList(InvoiceSchema, res.data.data ?? res.data);
+  },
+  async bookingBillPdf(bookingId: string, client: AxiosInstance = getClient()) {
+    const res = await client.get(`/bookings/${bookingId}/bill`, { responseType: "blob" });
+    return res.data as Blob;
+  },
   async manualBooking(
     input: { court_id: string; start_at: string; end_at: string; player_name?: string; player_phone?: string; amount?: number },
     client: AxiosInstance = getClient()
@@ -439,9 +449,24 @@ export const business = {
     const res = await client.post(`/business/bookings/${bookingId}/no-show`);
     return res.data;
   },
+  async confirmBooking(bookingId: string, client: AxiosInstance = getClient()) {
+    const res = await client.post(`/business/bookings/${bookingId}/confirm`);
+    return parseData(BookingSchema, res.data.data ?? res.data);
+  },
   async cancelBooking(bookingId: string, client: AxiosInstance = getClient()) {
     const res = await client.post(`/business/bookings/${bookingId}/cancel`);
     return res.data;
+  },
+  async getBookingSettings(client: AxiosInstance = getClient()) {
+    const res = await client.get("/business/booking-settings");
+    return parseData(BookingSettingsSchema, res.data.data ?? res.data);
+  },
+  async updateBookingSettings(
+    patch: { auto_confirm?: boolean; pending_auto_cancel_hours?: number },
+    client: AxiosInstance = getClient()
+  ) {
+    const res = await client.put("/business/booking-settings", patch);
+    return parseData(BookingSettingsSchema, res.data.data ?? res.data);
   },
   async updateVenueHours(
     venueId: string,

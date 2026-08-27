@@ -10,7 +10,7 @@ async function getOverlaps(courtIds, dayStart, dayEnd) {
     pool.query(
       `select court_id, start_at, end_at from bookings
        where court_id = any($1)
-         and status in ('confirmed', 'checked_in', 'completed', 'no_show')
+         and status in ('pending', 'confirmed', 'completed', 'no_show')
          and tstzrange(start_at, end_at) && tstzrange($2, $3)`,
       [courtIds, dayStart, dayEnd]
     ),

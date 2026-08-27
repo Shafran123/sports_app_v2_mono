@@ -5,6 +5,7 @@ describe("eventToQueryKeys", () => {
   it("maps every booking event to the front desk + bookings + calendar queries", () => {
     for (const event of [
       "booking.created",
+      "booking.confirmed",
       "booking.checked_in",
       "booking.marked_paid",
       "booking.cancelled",

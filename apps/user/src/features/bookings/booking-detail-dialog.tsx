@@ -70,20 +70,33 @@ export function BookingDetailDialog({
               {formatTime12(booking.start_at)}–{formatTime12(booking.end_at)}
             </DetailRow>
             <DetailRow label="Payment">
-              {booking.payment_method === "cash" ? "Pay at venue" : "Paid online"}
+              {booking.payment_method === "cash"
+                ? booking.payment_status === "paid" || booking.paid_at
+                  ? "Cash — paid"
+                  : "Cash — due at venue"
+                : "Paid online"}
             </DetailRow>
             <DetailRow label="Booking ID">{booking.id}</DetailRow>
           </dl>
 
-          <div className="flex flex-col items-center rounded-3xl border border-border bg-white p-4">
-            <p className="text-xs font-semibold uppercase tracking-widest text-ink-3">Check-in QR</p>
-            {qrSrc ? (
-              <img src={qrSrc} alt="Booking check-in QR code" className="mt-3 h-48 w-48" />
-            ) : (
-              <Skeleton className="mt-3 h-48 w-48 rounded-3xl" />
-            )}
-            <p className="mt-3 text-sm text-ink-2">Show this QR code at the venue</p>
-          </div>
+          {booking.status === "pending" ? (
+            <div className="flex flex-col items-center rounded-3xl border border-dashed border-warning bg-warning-light/40 p-4 text-center">
+              <p className="text-sm font-semibold text-warning">Awaiting venue confirmation</p>
+              <p className="mt-1 text-xs text-ink-2">
+                The venue will confirm your booking shortly. You can cancel this request any time.
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center rounded-3xl border border-border bg-white p-4">
+              <p className="text-xs font-semibold uppercase tracking-widest text-ink-3">Check-in QR</p>
+              {qrSrc ? (
+                <img src={qrSrc} alt="Booking check-in QR code" className="mt-3 h-48 w-48" />
+              ) : (
+                <Skeleton className="mt-3 h-48 w-48 rounded-3xl" />
+              )}
+              <p className="mt-3 text-sm text-ink-2">Show this QR code at the venue</p>
+            </div>
+          )}
 
           <Link href={venueHref} className={buttonVariants({ variant: "secondary", size: "block" })}>
             <MapPin className="h-4 w-4" /> View venue

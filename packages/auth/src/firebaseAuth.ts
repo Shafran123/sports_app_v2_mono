@@ -40,9 +40,21 @@ export async function changePassword(newPassword: string): Promise<void> {
 }
 
 export async function loginWithGoogle(): Promise<void> {
+  const { idToken } = await loginWithGooglePopup();
+  if (typeof window !== "undefined") window.localStorage.setItem(TOKEN_KEY, idToken);
+}
+
+/**
+ * Google sign-in that returns the minted Firebase ID token WITHOUT persisting
+ * it as a platform session. Used on the Dedicated Site (first-party popups are
+ * allowed): the token is handed to `/site-auth/google` so the backend can
+ * resolve the Business's Site Customer — the Firebase identity is a throwaway
+ * credential there, never stored as a session.
+ */
+export async function loginWithGooglePopup(): Promise<{ idToken: string }> {
   const provider = new GoogleAuthProvider();
   const userCred = await signInWithPopup(getFirebaseAuth(), provider);
-  await persistToken(userCred.user);
+  return { idToken: await userCred.user.getIdToken() };
 }
 
 /**
@@ -58,21 +70,23 @@ export async function loginWithGoogleRedirect(): Promise<void> {
 
 /**
  * Complete a Google redirect sign-in that was started by
- * `loginWithGoogleRedirect`. Returns true when a redirect sign-in was settled
- * (the widget should then refresh / continue), false when there was none.
+ * `loginWithGoogleRedirect`. Returns the minted Firebase ID token (without
+ * persisting it) when a redirect sign-in was settled, or null when there was
+ * none. On an owner surface the caller hands the token to
+ * `siteCustomerAuth.google` to resolve the Business's Site Customer; on the
+ * marketplace path the caller persists it as the platform token.
  */
-export async function finishGoogleRedirect(): Promise<boolean> {
+export async function finishGoogleRedirect(): Promise<{ idToken: string } | null> {
   const auth = getFirebaseAuth();
   try {
     const result = await getRedirectResult(auth);
     if (result?.user) {
-      await persistToken(result.user);
-      return true;
+      return { idToken: await result.user.getIdToken() };
     }
   } catch {
     // Not a redirect result (or it failed) — treat as no redirect sign-in.
   }
-  return false;
+  return null;
 }
 
 export async function sendPasswordReset(email: string): Promise<void> {

@@ -23,7 +23,7 @@ router.get('/overview', async (req, res) => {
     const { rows } = await pool.query(
       `select
          coalesce(sum(p.amount), 0)::int as revenue_today,
-         (select count(*)::int from bookings b where b.status in ('confirmed', 'checked_in', 'completed')
+         (select count(*)::int from bookings b where b.status in ('pending', 'confirmed', 'completed')
             and b.start_at >= $1 and b.start_at < $2) as bookings_today,
          (select count(*)::int from venues) as total_venues,
          (select count(*)::int from venues where status = 'pending') as pending_approvals

@@ -11,13 +11,15 @@ import { useAuth } from "@/context/auth";
 
 const STATUS_OPTIONS = [
   { value: "all", label: "All statuses" },
-  { value: "confirmed", label: "Confirmed" },
-  { value: "checked_in", label: "Checked in" },
-  { value: "completed", label: "Completed" },
-  { value: "cancelled", label: "Cancelled" },
-  { value: "no_show", label: "No-show" },
   { value: "pending", label: "Pending" },
-  { value: "failed", label: "Failed" }
+  { value: "confirmed", label: "Confirmed" },
+  { value: "completed", label: "Completed" },
+  { value: "cancelled", label: "Cancelled (legacy)" },
+  { value: "cancelled_by_user", label: "Cancelled by user" },
+  { value: "cancelled_by_owner", label: "Cancelled by venue" },
+  { value: "cancelled_by_admin", label: "Cancelled by admin" },
+  { value: "cancelled_auto", label: "Auto-cancelled" },
+  { value: "no_show", label: "No-show" }
 ];
 
 export function BookingsPage() {

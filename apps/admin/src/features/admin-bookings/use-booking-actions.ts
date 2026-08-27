@@ -17,6 +17,7 @@ export function useBookingActions(extraKeys: string[][] = []) {
   const markNoShow = useMutation({ mutationFn: (id: string) => business.markNoShow(id), onSuccess: refresh });
   const cancel = useMutation({ mutationFn: (id: string) => business.cancelBooking(id), onSuccess: refresh });
   const markPaid = useMutation({ mutationFn: (id: string) => bookings.markPaid(id), onSuccess: refresh });
+  const confirm = useMutation({ mutationFn: (id: string) => business.confirmBooking(id), onSuccess: refresh });
 
-  return { checkIn, markNoShow, cancel, markPaid };
+  return { checkIn, markNoShow, cancel, markPaid, confirm };
 }

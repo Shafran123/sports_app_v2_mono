@@ -62,8 +62,8 @@ describe('email templates (prod-grade shell)', () => {
     expect(built.preheader).toContain('Smash Arena');
   });
 
-  it('confirmation/reminder/bill embed the inline QR when opts.qr is passed', () => {
-    for (const builder of [buildBookingHtml, buildReminderHtml, buildBillHtml]) {
+  it('confirmation/reminder embed the inline QR when opts.qr is passed; the bill never does (ADR-0041)', () => {
+    for (const builder of [buildBookingHtml, buildReminderHtml]) {
       const withQr = builder(booking, 'MySlot.LK', QR_OPTS);
       expect(withQr.html).toContain('cid:booking-qr.png');
       expect(withQr.html).toContain("don't forward this email");
@@ -74,6 +74,21 @@ describe('email templates (prod-grade shell)', () => {
       expect(withoutQr.html).not.toContain('cid:booking-qr.png');
       expect(withoutQr.attachment).toBeFalsy();
     }
+
+    const bill = buildBillHtml(booking, 'MySlot.LK', QR_OPTS);
+    expect(bill.html).not.toContain('cid:booking-qr.png');
+    expect(bill.html).not.toContain('carries the QR');
+    expect(bill.attachment).toBeFalsy();
+    expect(bill.html).toContain('invoice');
+  });
+
+  it('bill email shows the invoice number when present (ADR-0041)', () => {
+    const withNumber = buildBillHtml({ ...booking, invoice_number: 7 }, 'MySlot.LK');
+    expect(withNumber.html).toContain('INV-0007');
+    expect(withNumber.text).toContain('INV-0007');
+
+    const withoutNumber = buildBillHtml(booking, 'MySlot.LK');
+    expect(withoutNumber.html).not.toContain('INV-');
   });
 
   it('owner-facing booking email never contains the player QR', () => {

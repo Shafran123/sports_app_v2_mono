@@ -41,7 +41,7 @@ describe('check-in and manual bookings', () => {
       .set('Authorization', `Bearer ${ownerToken}`);
 
     expect(res.status).toBe(200);
-    expect(res.body.data.status).toBe('checked_in');
+    expect(res.body.data.status).toBe('completed');
     expect(res.body.data.checked_in_at).toBeTruthy();
   });
 
@@ -108,7 +108,10 @@ describe('check-in and manual bookings', () => {
       `select * from payments where booking_id = $1`,
       [res.body.data.id]
     );
-    expect(payments.length).toBe(0);
+    // A walk-in's cash payment is born `due` at creation (ADR-0037).
+    expect(payments).toHaveLength(1);
+    expect(payments[0].status).toBe('due');
+    expect(payments[0].payment_method).toBe('cash');
 
     const avail = await request(app).get(
       `/api/v1/venues/11111111-1111-1111-1111-111111111111/availability?date=${dateStr}`

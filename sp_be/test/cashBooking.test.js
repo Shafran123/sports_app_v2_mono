@@ -220,7 +220,7 @@ describe('cash bookings', () => {
       .post(`/api/v1/bookings/${bookingId}/cancel`)
       .set('Authorization', `Bearer ${PLAYER_TOKEN}`);
     expect(cancel.status).toBe(200);
-    expect(cancel.body.data.status).toBe('cancelled');
+    expect(cancel.body.data.status).toBe('cancelled_by_user');
 
     const rebuy = await request(app)
       .post('/api/v1/bookings/checkout')

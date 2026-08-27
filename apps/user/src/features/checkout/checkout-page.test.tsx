@@ -177,6 +177,37 @@ beforeEach(() => {
 });
 
 describe("CheckoutPage payment method", () => {
+  it("shows awaiting-confirmation (not confirmed) when the cash booking is pending (auto-confirm OFF)", async () => {
+    vi.mocked(venues.detail).mockResolvedValue(cashVenue as never);
+    vi.mocked(bookings.checkout).mockResolvedValue({
+      ...cashResult,
+      booking: { ...cashResult.booking!, status: "pending" }
+    } as never);
+
+    renderPage();
+    const cashOption = await screen.findByTestId("method-cash");
+    await userEvent.click(cashOption);
+    await userEvent.click(await screen.findByRole("button", { name: /Confirm booking/i }));
+
+    // A pending booking must never say "confirmed".
+    expect(await screen.findByText(/awaiting confirmation/i)).toBeInTheDocument();
+    expect(screen.queryByText("Booking confirmed")).toBeNull();
+    expect(screen.queryByText("Pay on arrival")).toBeNull();
+  });
+
+  it("still shows the confirmed pay-on-arrival screen for a confirmed cash booking", async () => {
+    vi.mocked(venues.detail).mockResolvedValue(cashVenue as never);
+    vi.mocked(bookings.checkout).mockResolvedValue(cashResult as never);
+
+    renderPage();
+    const cashOption = await screen.findByTestId("method-cash");
+    await userEvent.click(cashOption);
+    await userEvent.click(await screen.findByRole("button", { name: /Confirm booking/i }));
+
+    expect(await screen.findByText("Booking confirmed")).toBeInTheDocument();
+    expect(screen.getByText("Pay on arrival")).toBeInTheDocument();
+    expect(screen.getByText(/View booking & QR code/i)).toBeInTheDocument();
+  });
   it("auto-checkouts online when the venue does not accept cash", async () => {
     vi.mocked(venues.detail).mockResolvedValue(onlineVenue as never);
     vi.mocked(bookings.checkout).mockResolvedValue(onlineResult as never);

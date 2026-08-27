@@ -2,28 +2,27 @@
 
 import { cn } from "@myslot/utils";
 import type { BookingStatus } from "@myslot/types";
+import { statusLabel } from "@myslot/ui";
 
 const FLOW: { status: BookingStatus; label: string }[] = [
   { status: "pending", label: "Pending" },
   { status: "confirmed", label: "Confirmed" },
-  { status: "checked_in", label: "Checked in" },
   { status: "completed", label: "Completed" }
 ];
 
 const TERMINAL: Partial<Record<BookingStatus, { label: string; tone: string }>> = {
   cancelled: { label: "Cancelled", tone: "bg-error-light text-error" },
-  no_show: { label: "No-show", tone: "bg-surface-2 text-ink-2" },
-  failed: { label: "Failed", tone: "bg-error-light text-error" }
+  cancelled_by_user: { label: statusLabel("cancelled_by_user"), tone: "bg-error-light text-error" },
+  cancelled_by_owner: { label: statusLabel("cancelled_by_owner"), tone: "bg-error-light text-error" },
+  cancelled_by_admin: { label: statusLabel("cancelled_by_admin"), tone: "bg-error-light text-error" },
+  cancelled_auto: { label: statusLabel("cancelled_auto"), tone: "bg-error-light text-error" },
+  no_show: { label: "No-show", tone: "bg-surface-2 text-ink-2" }
 };
 
 export function BookingStatusSteps({ status, className }: { status: BookingStatus; className?: string }) {
   const terminal = TERMINAL[status];
   const currentIndex = FLOW.findIndex((s) => s.status === status);
-  const reachedIndex = terminal
-    ? status === "failed"
-      ? 0
-      : FLOW.findIndex((s) => s.status === "confirmed")
-    : currentIndex;
+  const reachedIndex = terminal ? FLOW.findIndex((s) => s.status === "confirmed") : currentIndex;
 
   return (
     <div className={cn("space-y-4", className)}>

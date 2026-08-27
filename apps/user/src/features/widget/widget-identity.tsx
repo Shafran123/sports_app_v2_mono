@@ -13,11 +13,12 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { auth as authApi, toApiFailure, featureFlags, siteCustomerAuth, persistSiteToken } from "@myslot/api";
+import { auth as authApi, toApiFailure, featureFlags, siteCustomerAuth, persistSiteToken, SITE_GOOGLE_PENDING_KEY } from "@myslot/api";
 import {
   loginWithEmail,
   registerWithEmail,
   loginWithGoogleRedirect,
+  loginWithGooglePopup,
   sendPasswordReset,
   logoutFirebase
 } from "@myslot/auth";
@@ -174,12 +175,33 @@ export function WidgetIdentity({
     setError("");
     setBusy(true);
     try {
-      // Redirect flow: the iframe leaves to Google and returns to the embed
-      // URL signed in (popup is blocked in cross-origin frames).
-      await loginWithGoogleRedirect();
+      if (siteMode) {
+        if (widgetKey) {
+          // Site-mode widget embed: the iframe blocks popups, so the redirect
+          // flow runs and the embed settles the sign-in on return (ADR-0030).
+          // Stash the hostname it needs to resolve the Site Customer.
+          if (typeof window !== "undefined") {
+            window.sessionStorage.setItem(SITE_GOOGLE_PENDING_KEY, siteHostname!);
+          }
+          await loginWithGoogleRedirect();
+        } else {
+          // Dedicated Site (first-party): popups are allowed, so resolve the
+          // Google identity as THIS Business's Site Customer inline — never a
+          // platform Player (ADR-0030).
+          const { idToken } = await loginWithGooglePopup();
+          const session = await siteCustomerAuth.google({ site_hostname: siteHostname!, id_token: idToken });
+          persistSiteToken(session.token);
+          setUser(toAppUser(session.customer));
+          setPhase("details");
+        }
+      } else {
+        // Marketplace / non-live-site widget: the platform (Firebase) flow.
+        await loginWithGoogleRedirect();
+      }
     } catch (err) {
-      setBusy(false);
       setError(toApiFailure(err).message);
+    } finally {
+      setBusy(false);
     }
   };
 

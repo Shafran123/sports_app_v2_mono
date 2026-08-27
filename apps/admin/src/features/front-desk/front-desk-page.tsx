@@ -10,6 +10,7 @@ import type { Booking } from "@myslot/types";
 import { BookingDetailDialog } from "@/features/admin-calendar/booking-detail-dialog";
 import { QrScanDialog } from "./qr-scan-dialog";
 import { QuickBookDialog } from "./quick-book-dialog";
+import { SocketStatusBadge } from "./socket-status";
 
 const WEEKDAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -69,8 +70,9 @@ export function FrontDeskPage() {
     [bookings, selectedId]
   );
 
-  const upcoming = bookings.filter((b) => b.status === "confirmed" || b.status === "checked_in");
-  const past = bookings.filter((b) => !["confirmed", "checked_in"].includes(b.status));
+  const pending = bookings.filter((b) => b.status === "pending");
+  const confirmed = bookings.filter((b) => b.status === "confirmed");
+  const past = bookings.filter((b) => b.status !== "pending" && b.status !== "confirmed");
 
   const selectToday = () => {
     setWeekOffset(0);
@@ -88,7 +90,8 @@ export function FrontDeskPage() {
           <h1 className="font-display text-2xl font-extrabold tracking-tight text-ink md:text-3xl">Front desk</h1>
           <p className="mt-1 text-sm text-ink-2">{rangeLabel}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <SocketStatusBadge />
           <Button variant="secondary" onClick={() => setScanOpen(true)}>
             <QrCode className="h-4 w-4" /> Scan QR
           </Button>
@@ -163,19 +166,42 @@ export function FrontDeskPage() {
           message="Use Quick book to add a walk-in, or pick another day or week."
         />
       ) : (
-        <div className="space-y-2">
-          {upcoming.map((b) => (
-            <BookingRow key={b.id} booking={b} onClick={() => setSelectedId(b.id)} />
-          ))}
+        <div className="space-y-6">
+          {pending.length > 0 && (
+            <section aria-label="Pending confirmation">
+              <p className="px-1 text-xs font-semibold uppercase tracking-wider text-warning">
+                Pending confirmation · {pending.length}
+              </p>
+              <div className="mt-2 space-y-2 rounded-3xl border border-warning/40 bg-warning-light/30 p-3">
+                {pending.map((b) => (
+                  <BookingRow key={b.id} booking={b} onClick={() => setSelectedId(b.id)} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {confirmed.length > 0 && (
+            <section aria-label="Confirmed bookings">
+              <p className="px-1 text-xs font-semibold uppercase tracking-wider text-ink-3">
+                Confirmed
+              </p>
+              <div className="mt-2 space-y-2">
+                {confirmed.map((b) => (
+                  <BookingRow key={b.id} booking={b} onClick={() => setSelectedId(b.id)} />
+                ))}
+              </div>
+            </section>
+          )}
+
           {past.length > 0 && (
-            <div className="pt-3">
+            <section aria-label="Earlier or finished bookings">
               <p className="px-1 text-xs font-semibold uppercase tracking-wider text-ink-3">Earlier / finished</p>
               <div className="mt-2 space-y-2 opacity-70">
                 {past.map((b) => (
                   <BookingRow key={b.id} booking={b} onClick={() => setSelectedId(b.id)} />
                 ))}
               </div>
-            </div>
+            </section>
           )}
         </div>
       )}

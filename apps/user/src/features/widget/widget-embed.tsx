@@ -9,10 +9,10 @@
 
 import { useMemo, useState, useEffect, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { widget, featureFlags, auth as authApi, toApiFailure } from "@myslot/api";
+import { widget, featureFlags, auth as authApi, toApiFailure, siteCustomerAuth, persistSiteToken, TOKEN_KEY, SITE_GOOGLE_PENDING_KEY } from "@myslot/api";
 import { ErrorState, Skeleton } from "@myslot/ui";
 import { DEFAULT_BRAND_NAME } from "@myslot/utils";
-import { finishGoogleRedirect } from "@myslot/auth";
+import { finishGoogleRedirect, toAppUser } from "@myslot/auth";
 import { ShieldX } from "lucide-react";
 import { BookPanel } from "./book-panel";
 import { VenueStep } from "./venue-step";
@@ -40,13 +40,33 @@ export function WidgetEmbed({ widgetKey }: { widgetKey: string }) {
 
   // Settle a Firebase Google redirect sign-in that this embed initiated
   // (the widget uses redirect, not popup — cross-origin iframes block
-  // popups). The browser returns to this same URL after Google auth.
+  // popups). The browser returns to this same URL after Google auth. The
+  // Firebase token is a throwaway identity: on a Business's live site it is
+  // exchanged for that Business's Site Customer (ADR-0030), on the marketplace
+  // path it becomes the platform token.
   useEffect(() => {
-    void finishGoogleRedirect().then((settled) => {
-      if (settled && typeof window !== "undefined") {
-        window.location.reload();
+    void (async () => {
+      const settled = await finishGoogleRedirect();
+      if (!settled) return;
+      const { idToken } = settled;
+      const pendingHost =
+        typeof window !== "undefined" ? window.sessionStorage.getItem(SITE_GOOGLE_PENDING_KEY) : null;
+      if (pendingHost) {
+        window.sessionStorage.removeItem(SITE_GOOGLE_PENDING_KEY);
+        try {
+          const session = await siteCustomerAuth.google({ site_hostname: pendingHost, id_token: idToken });
+          persistSiteToken(session.token);
+          setUser(toAppUser(session.customer));
+        } catch {
+          // The Site Customer could not be created — drop the identity and let
+          // the guest try again from the identity step.
+        }
+        return;
       }
-    });
+      if (typeof window !== "undefined") window.localStorage.setItem(TOKEN_KEY, idToken);
+      window.location.reload();
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const config = query.data;
@@ -150,6 +170,7 @@ export function WidgetEmbed({ widgetKey }: { widgetKey: string }) {
         <WidgetBookings
           widgetKey={widgetKey}
           venue={activeVenue}
+          siteHostname={config?.business.site_hostname ?? null}
           onBack={() => setShowBookings(false)}
         />
       ) : (

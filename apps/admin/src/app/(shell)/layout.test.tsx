@@ -13,7 +13,7 @@ vi.mock("@/context/auth", () => ({
 }));
 
 vi.mock("@/hooks/use-realtime", () => ({
-  RealtimeBridge: () => null
+  RealtimeBridge: ({ children }: { children: React.ReactNode }) => <>{children}</>
 }));
 
 vi.mock("next/navigation", () => ({

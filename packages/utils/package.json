@@ -15,7 +15,8 @@
   "dependencies": {
     "dayjs": "^1.11.13",
     "clsx": "^2.1.1",
-    "tailwind-merge": "^2.6.0"
+    "tailwind-merge": "^2.6.0",
+    "@myslot/types": "workspace:*"
   },
   "devDependencies": {
     "@myslot/config": "workspace:*",

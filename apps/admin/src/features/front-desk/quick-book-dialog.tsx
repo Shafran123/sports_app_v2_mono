@@ -4,11 +4,24 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { venues, business, toApiFailure } from "@myslot/api";
 import { Button, Dialog, DialogContent, Input, SelectSheet, Skeleton } from "@myslot/ui";
-import { formatLkr, formatTime12, toDateKey } from "@myslot/utils";
-import type { Venue } from "@myslot/types";
+import {
+  durationChoices,
+  formatDuration,
+  formatLkr,
+  formatTime12,
+  selectRun,
+  summarizeSelection,
+  toDateKey,
+  type SelectedSlots
+} from "@myslot/utils";
+import type { Slot, Venue } from "@myslot/types";
 import { SHEET_CLASS } from "@myslot/ui";
 import { useManualBooking } from "@/features/admin-calendar/use-manual-booking";
 
+// Front-desk quick book mirrors the player flow (ADR-0033): pick a duration
+// first, then tap the start time and a contiguous run of slots is selected.
+// A walk-in can then override the amount (offers / negotiated price) before
+// confirming.
 export function QuickBookDialog({
   open,
   onOpenChange,
@@ -22,20 +35,19 @@ export function QuickBookDialog({
   const [venueId, setVenueId] = useState("");
   const [courtId, setCourtId] = useState("");
   const [dateKey, setDateKey] = useState(todayKey);
-  const [startAt, setStartAt] = useState("");
-  const [endAt, setEndAt] = useState("");
+  const [durationMin, setDurationMin] = useState(0);
+  const [selected, setSelected] = useState<SelectedSlots>({});
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [amount, setAmount] = useState("");
-  const [pricePerSlot, setPricePerSlot] = useState(0);
 
   useEffect(() => {
     if (open) {
       setVenueId(myVenues[0]?.id ?? "");
       setCourtId("");
       setDateKey(todayKey);
-      setStartAt("");
-      setEndAt("");
+      setDurationMin(0);
+      setSelected({});
       setName("");
       setPhone("");
       setAmount("");
@@ -55,35 +67,52 @@ export function QuickBookDialog({
   );
 
   const selectedCourt = courtOptions.find((c) => c.court_id === courtId);
-  const availableSlots = selectedCourt?.slots.filter((s) => s.state === "available") ?? [];
+  const summary = summarizeSelection(selected, availabilityQuery.data);
+
+  // A slot is a valid start only when a full contiguous run of the chosen
+  // duration fits from it — mirroring the player picker (selection.ts).
+  const validStarts = useMemo(() => {
+    if (!selectedCourt || durationMin <= 0) return new Set<string>();
+    const runCount = durationMin / selectedCourt.slot_duration_min;
+    const set = new Set<string>();
+    for (const s of selectedCourt.slots) {
+      if (s.state !== "available") continue;
+      const run = selectRun({}, selectedCourt, s, durationMin);
+      if (Object.keys(run).length === runCount) set.add(s.start_at);
+    }
+    return set;
+  }, [selectedCourt, durationMin]);
+
+  const startSlots: Slot[] = useMemo(
+    () => (selectedCourt?.slots ?? []).filter((s) => validStarts.has(s.start_at)),
+    [selectedCourt, validStarts]
+  );
+
+  const pickDuration = (min: number) => {
+    setDurationMin(min);
+    setSelected({});
+    setAmount("");
+  };
+
+  const pickSlot = (slot: Slot) => {
+    if (!selectedCourt) return;
+    const next = selectRun(selected, selectedCourt, slot, durationMin);
+    setSelected(next);
+    const total = summarizeSelection(next, availabilityQuery.data).total;
+    setAmount(String(total));
+  };
 
   const manual = useManualBooking(venueId, dateKey);
 
-  useEffect(() => {
-    if (selectedCourt) {
-      setAmount(String(selectedCourt.price_per_slot));
-      setPricePerSlot(selectedCourt.price_per_slot);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [courtId, selectedCourt?.court_id]);
-
-  const pickSlot = (slot: { start_at: string; end_at: string; price?: number; offer_price?: number | null }) => {
-    setStartAt(slot.start_at);
-    setEndAt(slot.end_at);
-    const base = slot.price ?? selectedCourt?.price_per_slot ?? 0;
-    setPricePerSlot(base);
-    setAmount(String(slot.offer_price != null && slot.offer_price < base ? slot.offer_price : base));
-  };
-
-  const canSubmit = !!courtId && !!startAt && !!endAt && Number(amount) > 0;
+  const canSubmit = !!courtId && summary.count > 0 && Number(amount) > 0;
 
   const submit = () => {
     if (!canSubmit) return;
     manual.mutate(
       {
-        court_id: courtId,
-        start_at: startAt,
-        end_at: endAt,
+        court_id: summary.courtId!,
+        start_at: summary.startAt!,
+        end_at: summary.endAt!,
         player_name: name.trim() || undefined,
         player_phone: phone.trim() || undefined,
         amount: Number(amount)
@@ -111,7 +140,7 @@ export function QuickBookDialog({
             <label htmlFor="qb-venue" className="text-xs font-semibold uppercase tracking-wide text-ink-3">
               Venue
             </label>
-            <SelectSheet id="qb-venue" value={venueId} onChange={(e) => { setVenueId(e.target.value); setCourtId(""); setStartAt(""); }}>
+            <SelectSheet id="qb-venue" value={venueId} onChange={(e) => { setVenueId(e.target.value); setCourtId(""); setDurationMin(0); setSelected({}); }}>
               <option value="">Select a venue</option>
               {myVenues.map((v) => (
                 <option key={v.id} value={v.id}>
@@ -125,7 +154,7 @@ export function QuickBookDialog({
             <label htmlFor="qb-date" className="text-xs font-semibold uppercase tracking-wide text-ink-3">
               Date
             </label>
-            <Input id="qb-date" type="date" value={dateKey} onChange={(e) => { setDateKey(e.target.value); setCourtId(""); setStartAt(""); }} />
+            <Input id="qb-date" type="date" value={dateKey} onChange={(e) => { setDateKey(e.target.value); setCourtId(""); setDurationMin(0); setSelected({}); }} />
           </div>
 
           <div className="space-y-1.5">
@@ -138,7 +167,7 @@ export function QuickBookDialog({
               <SelectSheet
                 id="qb-court"
                 value={courtId}
-                onChange={(e) => { setCourtId(e.target.value); setStartAt(""); }}
+                onChange={(e) => { setCourtId(e.target.value); setDurationMin(0); setSelected({}); }}
               >
                 <option value="">Select a court</option>
                 {courtOptions.map((c) => (
@@ -150,31 +179,73 @@ export function QuickBookDialog({
             )}
           </div>
 
+          {courtId && selectedCourt && (
+            <div className="space-y-1.5">
+              <label htmlFor="qb-duration" className="text-xs font-semibold uppercase tracking-wide text-ink-3">
+                Duration
+              </label>
+              <SelectSheet
+                id="qb-duration"
+                value={durationMin ? String(durationMin) : ""}
+                onChange={(e) => pickDuration(e.target.value ? Number(e.target.value) : 0)}
+              >
+                <option value="">Select duration</option>
+                {durationChoices(selectedCourt, selectedCourt.slots).map((min) => (
+                  <option key={min} value={min}>
+                    {formatDuration(min)}
+                  </option>
+                ))}
+              </SelectSheet>
+            </div>
+          )}
+
           {courtId && (
             <div className="space-y-1.5">
               <span className="text-xs font-semibold uppercase tracking-wide text-ink-3">Start time</span>
-              {availableSlots.length === 0 ? (
+              {durationMin === 0 ? (
                 <p className="rounded-2xl bg-surface-2 px-4 py-3 text-sm text-ink-2">
-                  No available slots on this day.
+                  Pick a duration first to see available start times.
+                </p>
+              ) : startSlots.length === 0 ? (
+                <p className="rounded-2xl bg-surface-2 px-4 py-3 text-sm text-ink-2">
+                  No start times available for {formatDuration(durationMin)} on this day.
                 </p>
               ) : (
                 <div className="grid grid-cols-3 gap-2">
-                  {availableSlots.slice(0, 9).map((s) => (
-                    <button
-                      key={s.start_at}
-                      type="button"
-                      onClick={() => pickSlot(s)}
-                      className={`flex items-center justify-center rounded-2xl border px-3 py-2.5 text-sm font-semibold transition-colors ${
-                        startAt === s.start_at
-                          ? "border-primary bg-primary-light text-primary"
-                          : "border-border bg-surface text-ink hover:border-ink-3"
-                      }`}
-                    >
-                      {formatTime12(s.start_at)}
-                    </button>
-                  ))}
+                  {startSlots.map((s) => {
+                    const isSelected = summary.startAt === s.start_at;
+                    return (
+                      <button
+                        key={s.start_at}
+                        type="button"
+                        onClick={() => pickSlot(s)}
+                        className={`flex flex-col items-center justify-center rounded-2xl border px-3 py-2.5 text-sm font-semibold transition-colors ${
+                          isSelected
+                            ? "border-primary bg-primary-light text-primary"
+                            : "border-border bg-surface text-ink hover:border-ink-3"
+                        }`}
+                      >
+                        {formatTime12(s.start_at)}
+                        <span className="text-[10px] font-medium text-ink-3">
+                          – {formatTime12(s.end_at)}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               )}
+            </div>
+          )}
+
+          {summary.count > 0 && (
+            <div className="rounded-2xl border border-border bg-surface-2/60 px-4 py-3 text-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-ink-2">
+                  {summary.courtName} · {formatTime12(summary.startAt!)} – {formatTime12(summary.endAt!)} ·{" "}
+                  {formatDuration(summary.durationMin)}
+                </span>
+                <span className="font-display font-extrabold text-ink">{formatLkr(summary.total)}</span>
+              </div>
             </div>
           )}
 
@@ -190,6 +261,9 @@ export function QuickBookDialog({
                 Phone (optional)
               </label>
               <Input id="qb-phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="07X XXX XXXX" />
+              {phone.trim() && (
+                <p className="text-xs text-ink-3">Their bill link will be sent by SMS.</p>
+              )}
             </div>
           </div>
 
@@ -198,10 +272,10 @@ export function QuickBookDialog({
               Amount (LKR)
             </label>
             <Input id="qb-amount" type="number" min={0} value={amount} onChange={(e) => setAmount(e.target.value)} />
-            {pricePerSlot > 0 && (
+            {summary.total > 0 && Number(amount) !== summary.total && Number(amount) > 0 && (
               <p className="text-xs text-ink-3">
-                Slot price: {formatLkr(pricePerSlot)}
-                {Number(amount) < pricePerSlot && Number(amount) > 0 ? " (offer applied)" : ""}
+                Default slot price: {formatLkr(summary.total)}
+                {Number(amount) < summary.total ? " (offer applied)" : ""}
               </p>
             )}
           </div>

@@ -203,15 +203,41 @@ describe('site customer auth (ADR-0030, ticket 01)', () => {
     expect(rows[0].email_verified_at).toBeTruthy();
   });
 
-  it('maps Google sign-in to one per-business profile per google_sub', async () => {
-    const payload = { site_hostname: 'site-customer.test', email: `g-${rand}@gmail.test`, name: 'Google Pam', google_sub: `sub-${rand}` };
+  it('maps Google sign-in to one per-business profile per google_sub (verified server-side from the ID token)', async () => {
+    const gToken = await tokenFor(`g-${rand}`, { sub: `sub-${rand}`, name: 'Google Pam', email: `g-${rand}@gmail.test` });
+    const payload = { site_hostname: 'site-customer.test', id_token: gToken };
     const first = await request(app).post('/api/v1/site-auth/google').send(payload);
     expect(first.status).toBe(201);
+    expect(first.body.data.customer.email).toBe(`g-${rand}@gmail.test`);
     expect(first.body.data.customer.email_verified_at).toBeTruthy();
 
-    const second = await request(app).post('/api/v1/site-auth/google').send({ ...payload, name: 'Google Pam II' });
+    const secondToken = await tokenFor(`g-${rand}`, { sub: `sub-${rand}`, name: 'Google Pam II', email: `g-${rand}@gmail.test` });
+    const second = await request(app).post('/api/v1/site-auth/google').send({ site_hostname: 'site-customer.test', id_token: secondToken });
     expect(second.status).toBe(201);
     expect(second.body.data.customer.id).toBe(first.body.data.customer.id);
+  });
+
+  it('links a Google identity onto an existing email customer at the same Business instead of duplicating', async () => {
+    const email = `merge-${rand}@abc.test`;
+    const reg = await registerAt('site-customer.test', email, 'correct-horse-9');
+    const gToken = await tokenFor(`gmerge-${rand}`, { sub: `gsub-${rand}`, name: 'Merge Pam', email });
+    const google = await request(app).post('/api/v1/site-auth/google').send({ site_hostname: 'site-customer.test', id_token: gToken });
+    expect(google.status).toBe(201);
+    expect(google.body.data.customer.id).toBe(reg.body.data.customer.id);
+    // Google's verified claim satisfies the Verified Email on link.
+    expect(google.body.data.customer.email_verified_at).toBeTruthy();
+    const { rows } = await pool.query(`select google_sub from site_customers where id = $1`, [reg.body.data.customer.id]);
+    expect(rows[0].google_sub).toBe(`gsub-${rand}`);
+  });
+
+  it('rejects an unverifiable or missing Google ID token', async () => {
+    const missing = await request(app).post('/api/v1/site-auth/google').send({ site_hostname: 'site-customer.test' });
+    expect(missing.status).toBe(400);
+    expect(missing.body.error.code).toBe('GOOGLE_TOKEN_REQUIRED');
+
+    const garbage = await request(app).post('/api/v1/site-auth/google').send({ site_hostname: 'site-customer.test', id_token: 'not-a-real-token' });
+    expect(garbage.status).toBe(401);
+    expect(garbage.body.error.code).toBe('GOOGLE_TOKEN_INVALID');
   });
 
   it('books on its site as a Site Customer (cash-only, stores site_customer_id)', async () => {
@@ -306,7 +332,7 @@ describe('site customer auth (ADR-0030, ticket 01)', () => {
       .post(`/api/v1/bookings/${cash.body.data.booking.id}/cancel`)
       .set('Authorization', `Bearer ${token}`);
     expect(cancel.status).toBe(200);
-    expect(cancel.body.data.status).toBe('cancelled');
+    expect(cancel.body.data.status).toBe('cancelled_by_user');
 
     // The owner console sees the Site Customer's name on the booking (the
     // business bookings query coalesces the site_customer_id to the customer).
@@ -359,9 +385,9 @@ describe('site customer auth (ADR-0030, ticket 01)', () => {
   });
 });
 
-async function tokenFor(uid) {
+async function tokenFor(uid, extra = {}) {
   const { SignJWT } = require('jose');
-  return new SignJWT({ uid, email: `${uid}@myslot.test`, email_verified: true })
+  return new SignJWT({ uid, email: `${uid}@myslot.test`, email_verified: true, ...extra })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .sign(new TextEncoder().encode(process.env.JWT_SECRET || 'test-secret'));

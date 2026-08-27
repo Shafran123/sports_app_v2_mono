@@ -12,7 +12,9 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  Receipt,
   Settings,
+  Settings2,
   ShieldCheck,
   Ticket,
   Trophy,
@@ -35,10 +37,12 @@ const OWNER_NAV = [
       { href: "/", label: "Dashboard", icon: LayoutDashboard },
       { href: "/front-desk", label: "Front desk", icon: StoreIcon },
       { href: "/bookings", label: "Bookings", icon: CalendarDays },
+      { href: "/booking-settings", label: "Booking settings", icon: Settings2 },
       { href: "/venues", label: "Venues", icon: Building2 },
       { href: "/widget-and-site", label: "Widget & site", icon: Globe },
       { href: "/customers", label: "Customers", icon: Users },
       { href: "/calendar", label: "Calendar", icon: CalendarDays },
+      { href: "/invoices", label: "Invoices", icon: Receipt },
       { href: "/events", label: "Events", icon: Ticket },
       { href: "/plan", label: "Plan & agreement", icon: FileText }
     ]

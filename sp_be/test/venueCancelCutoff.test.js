@@ -71,7 +71,7 @@ describe('venue cancel cutoff (Cancel Cutoff setting)', () => {
 
     // 6h before start: beyond the 2h cutoff, inside the 12h zero-refund tier.
     expect(res.status).toBe(200);
-    expect(res.body.data.status).toBe('cancelled');
+    expect(res.body.data.status).toBe('cancelled_by_user');
     expect(res.body.data.refund_amount).toBe(0);
   });
 
@@ -83,7 +83,7 @@ describe('venue cancel cutoff (Cancel Cutoff setting)', () => {
       .set('Authorization', `Bearer ${OWNER_TOKEN}`);
 
     expect(res.status).toBe(200);
-    expect(res.body.data.status).toBe('cancelled');
+    expect(res.body.data.status).toBe('cancelled_by_owner');
   });
 
   it('a zero cutoff disables the self-cancel gate', async () => {

@@ -428,8 +428,13 @@ exports.qrCheckIn = async (req, res) => {
     const booking = result.booking;
 
     if (booking.status !== 'confirmed') {
-      const used = ['checked_in', 'completed', 'no_show'].includes(booking.status);
-      return fail(res, 409, used ? 'QR_ALREADY_USED' : 'CHECK_IN_INVALID_STATE', used ? 'This QR code has already been used' : 'This booking cannot be checked in');
+      if (booking.status === 'pending') {
+        return fail(res, 409, 'CHECK_IN_PENDING', 'This booking is awaiting confirmation — confirm it before check-in');
+      }
+      if (['completed', 'no_show'].includes(booking.status)) {
+        return fail(res, 409, 'QR_ALREADY_USED', 'This QR code has already been used');
+      }
+      return fail(res, 409, 'CHECK_IN_INVALID_STATE', 'This booking cannot be checked in');
     }
 
     if (!checkInWindow(booking)) {
@@ -437,13 +442,18 @@ exports.qrCheckIn = async (req, res) => {
     }
 
     const { rows } = await pool.query(
-      `update bookings set status = 'checked_in', checked_in_at = now(), updated_at = now()
+      `update bookings set status = 'completed', checked_in_at = now(), updated_at = now()
        where id = $1 and status = 'confirmed'
        returning *`,
       [booking.id]
     );
 
     await publishBookingEvent('booking.checked_in', booking.id);
+    // Online bookings bill at check-in (payment landed at booking); cash
+    // bookings bill on mark-paid instead (ADR-0041) — so no bill here for cash.
+    if (booking.payment_method !== 'cash') {
+      void billService.emailBillForBooking(booking.id);
+    }
 
     ok(res, 200, rows[0]);
   } catch (error) {
@@ -468,20 +478,40 @@ exports.markPaid = async (req, res) => {
     if (booking.payment_method !== 'cash') {
       return fail(res, 400, 'NOT_CASH_BOOKING', 'Only cash bookings can be marked paid');
     }
+    if (['cancelled', 'cancelled_by_user', 'cancelled_by_owner', 'cancelled_by_admin', 'cancelled_auto', 'no_show'].includes(booking.status)) {
+      return fail(res, 409, 'BOOKING_NOT_PAYABLE', 'This booking is no longer payable');
+    }
 
+    // A cash payment row was created `due` at booking creation (ADR-0037);
+    // marking paid is a status flip. Robustness: an old booking with no cash
+    // payment row gets one created paid here (legacy path).
     const { rows: existing } = await pool.query(
-      `select * from payments where booking_id = $1 and payment_method = 'cash' and status = 'paid' limit 1`,
+      `select * from payments where booking_id = $1 and payment_method = 'cash' order by created_at desc limit 1`,
       [id]
     );
     if (existing.length > 0) {
+      if (existing[0].status === 'paid') {
+        return ok(res, 200, existing[0]);
+      }
+      const { rows: paid } = await pool.query(
+        `update payments set status = 'paid', paid_at = now() where id = $1 and status <> 'paid' returning *`,
+        [existing[0].id]
+      );
+      if (paid.length > 0) {
+        await publishBookingEvent('booking.marked_paid', booking.id);
+        // Cash bill (ADR-0041): a cash booking bills once the owner records
+        // payment — not at check-in. Fire-and-forget.
+        void billService.emailBillForBooking(booking.id);
+        return ok(res, 200, paid[0]);
+      }
       return ok(res, 200, existing[0]);
     }
 
     const { rows: inserted } = await pool.query(
-      `insert into payments (user_id, booking_id, amount, tax_rate, tax_amount, venue_tax_rate, venue_tax_amount, currency, status, payment_method, paid_at)
-       values ($1, $2, $3, $4, $5, $6, $7, 'LKR', 'paid', 'cash', now())
+      `insert into payments (user_id, site_customer_id, booking_id, amount, tax_rate, tax_amount, venue_tax_rate, venue_tax_amount, currency, status, payment_method, paid_at)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, 'LKR', 'paid', 'cash', now())
        returning *`,
-      [booking.user_id, booking.id, booking.total_price, booking.tax_rate, booking.tax_amount, booking.venue_tax_rate, booking.venue_tax_amount]
+      [booking.user_id, booking.site_customer_id, booking.id, booking.total_price, booking.tax_rate, booking.tax_amount, booking.venue_tax_rate, booking.venue_tax_amount]
     );
 
     await publishBookingEvent('booking.marked_paid', booking.id);
@@ -495,6 +525,50 @@ exports.markPaid = async (req, res) => {
 };
 
 const OWNER_RANGES = { 7: 7, 30: 30, 90: 90 };
+
+// Invoices tab (ADR-0041): every booking on the owner's venues with its money
+// snapshot + latest payment state, so the owner sees all bills — paid and
+// still-due — with their invoice number. Default window: last 30 days.
+exports.listInvoices = async (req, res) => {
+  try {
+    const { from, to } = req.query;
+    const end = to ? new Date(to) : new Date();
+    const start = from ? new Date(from) : new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      return fail(res, 400, 'INVALID_RANGE', 'from/to must be valid dates');
+    }
+    const params = [start.toISOString(), end.toISOString()];
+    let scope = '';
+    if (req.user.role === 'venue_owner') {
+      scope = `and v.owner_id = $3`;
+      params.push(req.user.id);
+    } else if (req.user.role !== 'admin') {
+      return fail(res, 403, 'FORBIDDEN', 'Access denied');
+    }
+    const { rows } = await pool.query(
+      `select b.id, b.invoice_number, b.status, b.start_at, b.end_at, b.total_price,
+              b.subtotal_amount, b.discount_amount, b.tax_amount, b.venue_tax_amount,
+              b.tax_rate, b.venue_tax_rate, b.payment_method, b.player_name, b.player_phone,
+              c.name as court_name, v.name as venue_name, v.city as venue_city,
+              p.status as payment_status, p.paid_at
+       from bookings b
+       join courts c on c.id = b.court_id
+       join venues v on v.id = c.venue_id
+       left join lateral (
+         select status, paid_at from payments
+         where booking_id = b.id
+         order by created_at desc limit 1
+       ) p on true
+       where b.created_at >= $1 and b.created_at < $2 ${scope}
+       order by (b.invoice_number is null), b.invoice_number desc, b.created_at desc`,
+      params
+    );
+    ok(res, 200, rows);
+  } catch (error) {
+    logger.error(`Error listing invoices: ${error.message}`);
+    fail(res, 500, 'INTERNAL_SERVER_ERROR', 'Something went wrong');
+  }
+};
 
 // Same window definition as the admin reports: paid payments from `days`
 // days ago (Asia/Colombo boundaries, no DST) forward.
@@ -616,7 +690,7 @@ exports.overview = async (req, res) => {
          (select count(*)::int from bookings b
             join courts c on c.id = b.court_id
             join venues v on v.id = c.venue_id
-            where v.owner_id = $1 and b.status in ('confirmed', 'checked_in', 'completed') ${dayCondition}) as bookings_count,
+            where v.owner_id = $1 and b.status in ('pending', 'confirmed', 'completed') ${dayCondition}) as bookings_count,
          coalesce(sum(p.amount), 0)::int as revenue,
          coalesce(sum(p.amount) filter (where p.payment_method = 'online'), 0)::int as online_revenue,
          coalesce(sum(p.amount) filter (where p.payment_method = 'cash'), 0)::int as cash_revenue
@@ -660,14 +734,15 @@ exports.cancelBooking = async (req, res) => {
     }
 
     await client.query('begin');
-    const result = await cancellationService.cancelBooking(client, req.params.id, req.user.id, 'venue_owner');
+    const actor = req.user.role === 'admin' ? 'admin' : 'owner';
+    const result = await cancellationService.cancelBooking(client, req.params.id, req.user.id, 'venue_owner', null, actor);
     if (result.error) {
       await client.query('rollback');
       return fail(res, result.error.status, result.error.code, result.error.message);
     }
     await client.query('commit');
     await publishBookingEvent('booking.cancelled', req.params.id);
-    const cancelKey = req.user.role === 'admin' ? 'booking.cancelled.admin' : 'booking.cancelled.owner';
+    const cancelKey = actor === 'admin' ? 'booking.cancelled.admin' : 'booking.cancelled.owner';
     await notificationCatalog.dispatchBooking(cancelKey, req.params.id, {
       refund: { refund_amount: result.refund_amount, refund_pct: result.refund_pct }
     });
@@ -706,6 +781,45 @@ exports.markNoShow = async (req, res) => {
   }
 };
 
+// Owner confirms a pending booking (ADR-0040): pending -> confirmed, marking
+// confirmed_at and sending the confirmation + QR to the player. Only the
+// owner (or admin) of the venue may confirm; a confirmed booking is a no-op.
+exports.confirmBooking = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await findOwnedBooking(req, 'b.id = $1', [id]);
+    if (result.notFound) {
+      return fail(res, 404, 'BOOKING_NOT_FOUND', 'Booking not found');
+    }
+    if (result.forbidden) {
+      return fail(res, 403, 'FORBIDDEN', 'You do not manage this venue');
+    }
+    const booking = result.booking;
+
+    const { rows } = await pool.query(
+      `update bookings set status = 'confirmed', confirmed_at = coalesce(confirmed_at, now()), updated_at = now()
+       where id = $1 and status = 'pending'
+       returning *`,
+      [id]
+    );
+    if (rows.length === 0) {
+      if (booking.status === 'confirmed') {
+        return ok(res, 200, booking);
+      }
+      return fail(res, 409, 'BOOKING_NOT_CONFIRMABLE', 'Only pending bookings can be confirmed');
+    }
+
+    await publishBookingEvent('booking.confirmed', booking.id);
+    await notificationCatalog.dispatchBooking('booking.confirmed', booking.id);
+
+    ok(res, 200, stripBookingSecrets(rows[0]));
+  } catch (error) {
+    logger.error(`Error confirming booking: ${error.message}`);
+    fail(res, 500, 'INTERNAL_SERVER_ERROR', 'Something went wrong');
+  }
+};
+
 exports.checkIn = async (req, res) => {
   try {
     const { rows: bookingRows } = await pool.query(
@@ -729,6 +843,9 @@ exports.checkIn = async (req, res) => {
     }
 
     if (booking.status !== 'confirmed') {
+      if (booking.status === 'pending') {
+        return fail(res, 409, 'CHECK_IN_PENDING', 'This booking is awaiting confirmation — confirm it before check-in');
+      }
       return fail(res, 409, 'CHECK_IN_INVALID_STATE', 'Only confirmed bookings can be checked in');
     }
 
@@ -737,13 +854,17 @@ exports.checkIn = async (req, res) => {
     }
 
     const { rows } = await pool.query(
-      `update bookings set status = 'checked_in', checked_in_at = now(), updated_at = now()
+      `update bookings set status = 'completed', checked_in_at = now(), updated_at = now()
        where id = $1 and status = 'confirmed'
        returning *`,
       [req.params.id]
     );
 
     await publishBookingEvent('booking.checked_in', req.params.id);
+    // Cash bookings bill on mark-paid (ADR-0041); online bookings bill here.
+    if (booking.payment_method !== 'cash') {
+      void billService.emailBillForBooking(req.params.id);
+    }
 
     ok(res, 200, stripBookingSecrets(rows[0]));
   } catch (error) {
@@ -807,8 +928,8 @@ exports.createManualBooking = async (req, res) => {
       const platformRate = await getTaxRate();
       const split = applyInclusiveTax(total, platformRate, court.venue_tax_rate || 0);
       const { rows } = await client.query(
-        `insert into bookings (court_id, user_id, start_at, end_at, price_per_slot, total_price, tax_rate, tax_amount, venue_tax_rate, venue_tax_amount, status, payment_method, player_name, player_phone, qr_token, idempotency_key, subtotal_amount, discount_amount)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'confirmed', 'cash', $11, $12, $13, $14, $15, $16)
+        `insert into bookings (court_id, user_id, start_at, end_at, price_per_slot, total_price, tax_rate, tax_amount, venue_tax_rate, venue_tax_amount, status, payment_method, player_name, player_phone, qr_token, idempotency_key, subtotal_amount, discount_amount, confirmed_at)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'confirmed', 'cash', $11, $12, $13, $14, $15, $16, now())
          returning *`,
         [
           court_id, req.user.id, start_at, end_at,
@@ -817,6 +938,14 @@ exports.createManualBooking = async (req, res) => {
           `manual-${Math.random().toString(36).slice(2)}`,
           pricing.subtotal, pricing.discount
         ]
+      );
+      // Walk-ins are confirmed on the spot and their cash payment is born
+      // `due` (the owner takes the money when the player arrives).
+      const manualBookingId = rows[0].id;
+      await client.query(
+        `insert into payments (user_id, booking_id, amount, tax_rate, tax_amount, venue_tax_rate, venue_tax_amount, currency, status, payment_method)
+         values ($1, $2, $3, $4, $5, $6, $7, 'LKR', 'due', 'cash')`,
+        [req.user.id, manualBookingId, total, split.platformRate, split.platformTax, split.venueRate, split.venueTax]
       );
       await client.query('commit');
       const created = rows[0];

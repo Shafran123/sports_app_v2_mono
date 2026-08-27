@@ -213,27 +213,74 @@ async function login({ site_hostname, email, password }) {
   return { customer, session };
 }
 
-// Google sign-in: map a Google identity to a per-Business Site Customer,
-// creating one on first sign-in at this Business. (Token verification is
-// provider-side; this endpoint accepts a verified profile per ADR-0030 note.)
-async function googleUpsert({ site_hostname, name, email, google_sub }) {
+// Google sign-in: map a verified Google identity to a per-Business Site
+// Customer. The client hands us the Firebase ID token; we verify it with the
+// Admin SDK (never trust client-supplied identity), then resolve the Business
+// from the live site hostname. Merge order per Business: existing
+// (business_id, google_sub) row, else existing (business_id, email) row
+// (link the Google identity onto it — one human, one customer), else create.
+async function googleUpsert({ site_hostname, id_token }) {
   const { businessId } = await liveBusinessForHostname(site_hostname);
-  const cleanEmail = String(email || '').trim().toLowerCase();
-  const sub = String(google_sub || '').trim();
-  if (!EMAIL_RE.test(cleanEmail) || !sub) {
-    throw Object.assign(new Error('A Google profile with email is required.'), { code: 'GOOGLE_PROFILE_INVALID' });
+  if (!id_token || typeof id_token !== 'string') {
+    throw Object.assign(new Error('A Google ID token is required.'), { code: 'GOOGLE_TOKEN_REQUIRED' });
   }
-  const { rows } = await pool.query(
-    `insert into site_customers (business_id, email, name, google_sub, email_verified_at)
-     values ($1, $2, $3, $4, now())
-     on conflict (business_id, google_sub) where google_sub is not null
-     do update set name = coalesce(excluded.name, site_customers.name),
-                   email = excluded.email, updated_at = now()
-     returning *`,
-    [businessId, cleanEmail, String(name || '').trim().slice(0, 80), sub]
+  const { verifyIdToken } = require('../middleware/authenticate');
+  let decoded;
+  try {
+    decoded = await verifyIdToken(id_token);
+  } catch (error) {
+    throw Object.assign(new Error('That Google sign-in could not be verified.'), { code: 'GOOGLE_TOKEN_INVALID' });
+  }
+  const sub = String(decoded.sub || decoded.uid || '').trim();
+  const email = String(decoded.email || '').trim().toLowerCase();
+  const name = String(decoded.name || '').trim().slice(0, 80);
+  const emailVerified = decoded.email_verified === true;
+  if (!sub || !EMAIL_RE.test(email)) {
+    throw Object.assign(new Error('A Google profile with a verified email is required.'), { code: 'GOOGLE_PROFILE_INVALID' });
+  }
+
+  const bySub = await pool.query(
+    `select * from site_customers where business_id = $1 and google_sub = $2`,
+    [businessId, sub]
   );
-  const session = await createSession(rows[0].id);
-  return { customer: rows[0], session };
+
+  let customer = bySub.rows[0] || null;
+  if (customer) {
+    const updated = await pool.query(
+      `update site_customers
+       set name = coalesce($2, name), email = $3,
+           email_verified_at = coalesce(email_verified_at, $4), updated_at = now()
+       where id = $1 returning *`,
+      [customer.id, name || null, email, emailVerified ? new Date() : null]
+    );
+    customer = updated.rows[0];
+  } else {
+    const byEmail = await pool.query(
+      `select * from site_customers where business_id = $1 and lower(email) = $2`,
+      [businessId, email]
+    );
+    if (byEmail.rows[0]) {
+      const linked = await pool.query(
+        `update site_customers
+         set google_sub = $2, name = coalesce($3, name),
+             email_verified_at = coalesce(email_verified_at, $4), updated_at = now()
+         where id = $1 returning *`,
+        [byEmail.rows[0].id, sub, name || null, emailVerified ? new Date() : null]
+      );
+      customer = linked.rows[0];
+    } else {
+      const created = await pool.query(
+        `insert into site_customers (business_id, email, name, google_sub, email_verified_at)
+         values ($1, $2, $3, $4, $5)
+         returning *`,
+        [businessId, email, name, sub, emailVerified ? new Date() : null]
+      );
+      customer = created.rows[0];
+    }
+  }
+
+  const session = await createSession(customer.id);
+  return { customer, session };
 }
 
 async function sendPhoneCode(customerId, rawPhone) {

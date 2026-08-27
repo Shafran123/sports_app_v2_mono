@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import jsQR from "jsqr";
-import { Button, Dialog, DialogContent, ErrorState, Input, StatusPill } from "@myslot/ui";
+import { Button, Dialog, DialogContent, ErrorState, Input, StatusPill, statusLabel } from "@myslot/ui";
 import { toApiFailure, business } from "@myslot/api";
 import { SHEET_CLASS } from "@myslot/ui";
 import { formatDateLong, formatLkr, formatTime12 } from "@myslot/utils";
@@ -114,7 +114,8 @@ export function QrScanDialog({
   };
 
   const failure = lookup.error ? toApiFailure(lookup.error) : null;
-  const alreadyUsed = !!scanned && scanned.status !== "confirmed";
+  const alreadyUsed = !!scanned && ["completed", "no_show", "cancelled", "cancelled_by_user", "cancelled_by_owner", "cancelled_by_admin", "cancelled_auto"].includes(scanned.status);
+  const awaitingConfirmation = !!scanned && scanned.status === "pending";
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onOpenChange(false)}>
@@ -181,7 +182,11 @@ export function QrScanDialog({
 
               {alreadyUsed ? (
                 <div className="rounded-2xl bg-warning-light px-4 py-3 text-sm text-warning">
-                  This QR code has already been used (status: {scanned.status.replace("_", " ")}).
+                  This QR code has already been used (status: {statusLabel(scanned.status)}).
+                </div>
+              ) : awaitingConfirmation ? (
+                <div className="rounded-2xl bg-warning-light px-4 py-3 text-sm text-warning">
+                  This booking is awaiting confirmation — confirm it before check-in.
                 </div>
               ) : (
                 <Button
@@ -193,9 +198,9 @@ export function QrScanDialog({
                 </Button>
               )}
 
-              {checkin.data?.status === "checked_in" && (
+              {checkin.data?.status === "completed" && (
                 <p className="rounded-2xl bg-success-light px-4 py-3 text-sm font-semibold text-success">
-                  Checked in successfully at {formatTime12(checkin.data.checked_in_at ?? new Date().toISOString())}.
+                  Completed at {formatTime12(checkin.data.checked_in_at ?? new Date().toISOString())}.
                 </p>
               )}
               {checkin.error && (

@@ -61,8 +61,8 @@ export function StyleGuide() {
           <Badge variant="error">Error</Badge>
           <StatusPill status="confirmed" />
           <StatusPill status="pending" />
-          <StatusPill status="checked_in" />
-          <StatusPill status="cancelled" />
+          <StatusPill status="completed" />
+          <StatusPill status="cancelled_by_owner" />
           <StatusPill status="no_show" />
         </div>
       </section>

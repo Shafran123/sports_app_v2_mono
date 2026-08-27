@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Banknote, ShieldCheck, Wallet } from "lucide-react";
+import { ArrowLeft, Banknote, Clock, ShieldCheck, Wallet } from "lucide-react";
 import { bookings, featureFlags, toApiFailure, venues } from "@myslot/api";
 import { Badge, Button, Card, CardContent, CountdownPill, ErrorState, Skeleton } from "@myslot/ui";
 import { formatDateLong, formatDuration, formatLkr, formatTime12, uuidV4 } from "@myslot/utils";
@@ -260,21 +260,35 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
   }
 
   if (isCash && result?.booking) {
+    const bookingStatus = result.booking.status;
+    const confirmed = bookingStatus === "confirmed";
     return (
       <main className="mx-auto max-w-3xl px-4 pb-32 pt-8 md:pb-14">
         <h1 className="font-display text-2xl font-extrabold tracking-tight text-ink md:text-3xl">
-          Booking confirmed
+          {confirmed ? "Booking confirmed" : "Booking pending"}
         </h1>
         <Card className="mt-6 overflow-hidden">
           <CardContent className="px-6 py-8 text-center">
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary-light text-primary">
-              <Banknote className="h-7 w-7" />
+              {confirmed ? <Banknote className="h-7 w-7" /> : <Clock className="h-7 w-7" />}
             </div>
-            <h2 className="mt-4 font-display text-xl font-extrabold text-ink">Pay on arrival</h2>
+            <h2 className="mt-4 font-display text-xl font-extrabold text-ink">
+              {confirmed ? "Pay on arrival" : "Awaiting confirmation"}
+            </h2>
             <p className="mt-1 text-sm text-ink-2">
-              Your slot is locked in. Pay{" "}
-              <span className="font-semibold text-ink">{formatLkr(result.amount)}</span> at the
-              venue.
+              {confirmed ? (
+                <>
+                  Your slot is locked in. Pay{" "}
+                  <span className="font-semibold text-ink">{formatLkr(result.amount)}</span> at the
+                  venue.
+                </>
+              ) : (
+                <>
+                  The venue is confirming your slot — pay{" "}
+                  <span className="font-semibold text-ink">{formatLkr(result.amount)}</span> at the
+                  venue when you arrive. We&apos;ll email you the moment it&apos;s confirmed.
+                </>
+              )}
             </p>
             <dl className="mx-auto mt-5 max-w-sm space-y-2 text-left text-sm">
               <DetailRow label="Venue" value={venueName || "—"} />
@@ -286,7 +300,7 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
               />
             </dl>
             <Button size="lg" className="mt-6 w-full" onClick={() => router.push(`/bookings/${result.booking!.id}`)}>
-              View booking & QR code
+              {confirmed ? "View booking & QR code" : "View booking & confirmation"}
             </Button>
           </CardContent>
         </Card>

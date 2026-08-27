@@ -5,6 +5,10 @@ export const TOKEN_KEY = "spots_token";
 // iframe and the site host share it), sent as a bearer when the current
 // surface is an owner-hosted one.
 export const SITE_CUSTOMER_TOKEN_KEY = "site_customer_token";
+// Where the Google redirect flow stashes the site hostname it must resolve
+// to a Site Customer on return to the embed (ADR-0030): the embed settles the
+// redirect on mount, before its async config has loaded.
+export const SITE_GOOGLE_PENDING_KEY = "site_google_pending";
 
 /** True when the current surface is a Dedicated Site host or a widget embed. */
 export function isOwnerSurface(): boolean {

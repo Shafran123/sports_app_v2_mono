@@ -84,8 +84,8 @@ A per-venue, Owner-controlled state deciding whether an approved Venue appears a
 _Avoid_: marketplace sell-on, web listing
 
 **Site Customer**:
-A person with an account inside exactly one Business's tenant — the audience of that Business's **Dedicated Site** and **Booking Widgets**. Accounts are created and verified per Business: the same person who is a Site Customer at one Business holds a separate, independent account (own verification, own history) at another, with no data shared across Businesses. Distinct from the **Player**, whose account is platform-wide.
-_Avoid_: member, tenant user, business user
+A person with an account inside exactly one Business's tenant — the audience of that Business's **Dedicated Site** and **Booking Widgets**. Accounts are created and verified per Business: the same person who is a Site Customer at one Business holds a separate, independent account (own verification, own history) at another, with no data shared across Businesses. Distinct from the **Player**, whose account is platform-wide. Signs in with email+password or Google; on Google sign-in the backend verifies the Firebase ID token itself, resolves the Business from the site hostname (never from the client), and merges by `google_sub` then by email before creating — so one human holds one Site Customer row per Business. Distinct from the **Venue Owner**, whose Google-facing identity is a platform account that owners never sign in with on customer surfaces.
+_Avoid_: account, tenant user, business user
 
 **Site Domain Request**:
 The owner-initiated, admin-workflow request that provisions a Business's **Site Hostname**. States: requested → approved → dns-pending → verifying → live, or rejected. The owner submits the hostname they want (a `myslot.lk` subdomain or their own host); staff approve, hand over the DNS record to add, and the system verifies it — automated polling plus an owner "I've added it" re-check. Staff-only manual steps (auth-provider authorized domain, hosting-domain configuration) are a checklist inside the request. Rejection carries a reason and the owner may edit and re-request. The owner watches live status in their console; every state change also goes out as an **Email Notification**.
@@ -128,32 +128,40 @@ A temporary claim on a Slot while a player is in checkout. Expires after a fixed
 _Avoid_: pending booking, reservation
 
 **Booking**:
-A paid reservation of one or more consecutive Slots on a Court. Carries an ID and QR code.
+A reservation of one or more consecutive Slots on a Court. Carries an ID and QR code. Lifecycle: **pending** (awaiting the owner's confirmation — only used when the Business has **Auto-confirm** off) → **confirmed** → **completed** (set on **Check-in**) — plus terminal states **cancelled_by_user**, **cancelled_by_owner**, **cancelled_by_admin**, **cancelled_auto** and **no_show**. A pending booking still holds its Slots; it can be self-cancelled without cutoff, and may be auto-cancelled by the Business's **Pending Auto-cancel** timer.
 _Avoid_: order, purchase
-_Note_: A booking has a payment method (online via PayHere, or cash collected at the venue). See **Payment** below.
+_Note_: A booking has a payment method (online via PayHere, or cash collected at the venue) and a **Payment** status tracked independently of the booking status. See **Payment** below.
+
+**Auto-confirm**:
+A per-Business setting governing how new Bookings are confirmed. When on, a cash booking is **confirmed** at creation and an online booking the moment its payment lands; when off, every booking lands **pending** and the Venue Owner confirms it — cancelling a pending online-paid booking refunds it.
+_Avoid_: auto-accept (bare), auto-approve, auto-book
+
+**Pending Auto-cancel**:
+The Business-level setting — N hours before a pending Booking's start — after which a still-**pending** Booking is automatically cancelled (`cancelled_auto`), freeing its Slots. Distinct from the Player-facing **Cancel Cutoff** (the window in which the Player may self-cancel a confirmed booking); a pending Booking self-cancels freely. When the auto-cancel fires on an online-paid booking, the payment is refunded.
+_Avoid_: auto-expire, pending timeout, pending TTL
 
 **QR Token**:
-A random, secret, single-use string minted when a Booking is created. Encoded in the player's check-in QR code; the venue consumes it by scanning and checking in. Re-scanning a consumed token returns "already used." Disclosed to the Booking's Player in their own app and in transactional emails sent to that player's inbox (booking confirmation, reminder, and bill); never surfaced to Venue Owners or in venue-facing read APIs. Disclosed only to the Booking's Player (in their own app) and consumed only by the Venue Owner of the Venue the Booking was made on — the check-in validates ownership of the Venue as well as the identity of the Token.
+A random, secret, single-use string minted when a Booking is created. Encoded in the player's check-in QR code; the venue consumes it by scanning and checking in. Re-scanning a consumed token returns "already used." Disclosed to the Booking's Player in their own app and in transactional emails sent to that player's inbox (booking confirmation and reminder; never in bills); never surfaced to Venue Owners or in venue-facing read APIs. Disclosed only to the Booking's Player (in their own app) and consumed only by the Venue Owner of the Venue the Booking was made on — the check-in validates ownership of the Venue as well as the identity of the Token.
 _Avoid_: ticket number, booking ID (the Booking UUID is NOT the QR token)
 _Note_: For widget bookings the QR is also shown on the widget's success screen and sent by SMS/email to the verified phone/**Verified Email** inbox — a fresh widget Player may never open their own app, but must be able to check in. Phone-only bookings receive only a QR link by SMS, not a rendered QR, which is why the widget requires a Verified Email.
 
 **Payment**:
-A recorded transfer of money for a Booking or Event Registration. Online payments come from PayHere; cash payments are recorded by the Venue Owner when collected. Status: pending / paid / failed / refunded. Cash payments never sit in pending — the owner records them as paid on collection.
+A recorded transfer of money for a Booking or Event Registration. Online payments come from PayHere and begin **pending**; cash payments are created **due** when the Booking is created and the Venue Owner flips them to **paid** on collection. Statuses: **due** / **pending** / **paid** / **failed** / **refunded**.
 _Avoid_: payment intent (don't reuse for unpaid holds)
 
 **Cash Payment**:
-A Payment with method cash, recorded by the Venue Owner when the player pays at the venue. Distinct from an online Payment; it is the source of truth for "was this booking actually paid."
+A Payment with method cash, created **due** at Booking creation and recorded **paid** by the Venue Owner when the player pays at the venue. It is the source of truth for "was this booking actually paid". Distinct from an online Payment; may be independent of the booking's **Auto-confirm** state — a cash booking can be confirmed before it is paid, and paid before it is confirmed.
 _Avoid_: COD (wrong shipping framing), walk-in payment (the walk-in may still book online)
 
 **Check-in**:
-The act of a venue confirming a Booking on arrival by scanning its QR code and consuming the QR Token. Only the Venue Owner of the Venue the Booking was made on may check it in; the scan validates owner-side ownership as well as the Token. Possible from booking creation until shortly after the slot ends; can happen early (walk-ins arrive before their slot).
+The act of a venue confirming a Booking on arrival by scanning its QR code and consuming the QR Token. Only the Venue Owner of the Venue the Booking was made on may check it in; the scan validates owner-side ownership as well as the Token. Sets the Booking to **completed**. Possible from booking creation until shortly after the slot ends; can happen early (walk-ins arrive before their slot).
 _Avoid_: attendance
 
 **No-show**:
 A confirmed Booking whose slot passed without check-in or cancellation.
 
 **Cancellation**:
-Player-initiated termination of a Booking before its slot, allowed only up to the Venue's **Cancel Cutoff**. Online-paid bookings refund per the platform cancellation tiers; cash bookings have nothing to refund.
+Termination of a Booking before its slot. Recorded with the canceller so reporting can tell the actors apart: **cancelled_by_user** (Player-initiated, allowed only up to the Venue's **Cancel Cutoff**), **cancelled_by_owner**, **cancelled_by_admin**, or **cancelled_auto** (the **Pending Auto-cancel** timer). Online-paid bookings refund per the platform cancellation tiers — including when a pending online-paid booking is cancelled or auto-cancelled (full refund, no tier); cash bookings have nothing to refund. Rows cancelled before this status split were migrated to the legacy value **cancelled**, which nothing new writes.
 _Avoid_: refund (cancellation is the act; a refund is a separate consequence)
 
 **Cancel Cutoff**:
@@ -161,7 +169,7 @@ The Venue-level setting, in hours before a Booking's start, by which a Player ma
 _Avoid_: cancel window, cancel-block, cancel deadline
 
 **Verified Email**:
-An email address on a Player account proven to belong to that Player by passing an email OTP challenge sent by the backend (or attested by an email provider on Google sign-in). Both the Booking Widget and the app require a Verified Email to create Bookings — the QR must reach an inbox, since a phone-only Player receives only a QR *link* by SMS — and it unlocks email confirmations and reminders. A Google-verified email needs no OTP. Changing the email clears verified status until the new address is re-verified.
+An email address on a **Player** or **Site Customer** account proven to belong to that person by passing an email OTP challenge sent by the backend (or attested by an email provider on Google sign-in). Both the Booking Widget and the app require a Verified Email to create Bookings — the QR must reach an inbox, since a phone-only Player receives only a QR *link* by SMS — and it unlocks email confirmations and reminders. A Google-verified email needs no OTP. Changing the email clears verified status until the new address is re-verified.
 _Avoid_: confirmed email, validated email, trusted inbox
 
 **Event**:
@@ -199,7 +207,7 @@ The commercial term attached to a Venue Owner, drawn from an Admin-maintained ca
 _Avoid_: subscription, contract, pricing tier
 
 **Booking Allowance**:
-The number of Bookings a Venue Owner's plan entitles them to per period (default per month) at no platform fee, counted across all of that Owner's Venues. One Booking counts once regardless of slot count; every recorded Booking counts (including Walk-in Guest bookings), except cancelled and refunded ones. Part of the Owner Plan template, alongside price and term.
+The number of Bookings a Venue Owner's plan entitles them to per period (default per month) at no platform fee, counted across all of that Owner's Venues. A Booking is counted once it is **confirmed** (a **pending** booking does not count) regardless of slot count; every recorded Booking counts (including Walk-in Guest bookings), except cancelled and refunded ones. Part of the Owner Plan template, alongside price and term.
 _Avoid_: free bookings, quota, allotment
 
 **Overflow Platform Fee**:
@@ -218,7 +226,7 @@ _Avoid_: anonymous booking, off-book
 Platform staff with full oversight over users, venues, bookings, payments, events, and configuration.
 
 **Booking Reminder**:
-An Email Notification sent ahead of a Booking's slot (one day before) to prompt the Player. Distinct from the Booking Confirmation sent at creation.
+An Email Notification sent ahead of a Booking's slot (one day before) to prompt the Player. Sent only for **confirmed** Bookings — a pending Booking is reminded by the owner's confirmation, not by the reminder job. Distinct from the Booking Confirmation, sent when a Booking becomes confirmed.
 _Avoid_: reminder booking
 
 **Booking Alert**:
@@ -254,8 +262,12 @@ A percentage rate set by a Venue Owner for a specific Venue. Like Platform Tax, 
 _Avoid_: owner tax, venue tax rate
 
 **Booking Bill**:
-A PDF invoice for a Booking or Event Registration, itemizing base price, Platform Tax, Venue Tax, and total. Emailed on payment and printable on demand. Walk-in Guest bills are printed at the venue, never emailed.
-_Avoid_: receipt, invoice slip, statement
+A computer-generated invoice PDF for a Booking, rendered with the **Business Brand** (logo, name, colors) and business contact details, itemized in a bordered table — per-slot lines when the court's price is uniform across the booking, else a single item line — with Subtotal, Offer discount, Platform Tax and Venue Tax (each with its rate %), and Total, stamped with a per-Business sequential **Invoice Number** when first emitted. Never carries the check-in QR (confirmation and reminder emails do that). Emailed exactly once to the Player when payment is confirmed — cash Bookings when the owner marks them paid, online Bookings at Check-in — and cancelled bookings never carry a bill. Walk-in Guest bills skip email; the customer's phone gets an SMS with a tokenized bill link to download it instead.
+_Avoid_: receipt (a receipt has no tax breakdown or invoice number), invoice slip, statement
+
+**Invoice Number**:
+The per-Business sequential reference stamped on a **Booking Bill** at first emission (e.g. INV-0001) and persisted on the Booking so the PDF and the owner's Invoices tab show one stable number for the life of the document.
+_Avoid_: bill id, reference (bare), receipt number
 
 **Venue Photo**:
 An image of a Venue stored in the public Supabase Storage bucket `venue_images` as an absolute URL in `venues.photos[]`. Uploaded via the backend (authenticated, base64, magic-byte validated) — never written directly by the browser. Removed from the bucket when removed from the venue. A Venue Photo is not sensitive; it is rendered by any client as a plain `<img>`.

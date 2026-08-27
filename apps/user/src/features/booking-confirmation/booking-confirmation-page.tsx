@@ -4,13 +4,14 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import * as QRCode from "qrcode";
-import { CircleCheckBig, Copy, MapPin, RefreshCw } from "lucide-react";
+import { CircleCheckBig, Clock, Copy, MapPin, RefreshCw } from "lucide-react";
 import { bookings, toApiFailure } from "@myslot/api";
 import { Button, Card, CardContent, CardFooter, ErrorState, Skeleton, SkeletonRow } from "@myslot/ui";
 import { formatDateLong, formatLkr, formatTime12 } from "@myslot/utils";
 
-const SUCCESS_STATUSES = new Set(["confirmed", "checked_in", "completed"]);
-const FAILED_STATUSES = new Set(["cancelled", "failed"]);
+const SUCCESS_STATUSES = new Set(["confirmed", "completed"]);
+const FAILED_STATUSES = new Set(["cancelled", "cancelled_by_user", "cancelled_by_owner", "cancelled_by_admin", "cancelled_auto"]);
+const PENDING_STATUSES = new Set(["pending"]);
 const POLL_INTERVAL_MS = 2500;
 const POLL_TIMEOUT_MS = 60_000;
 
@@ -29,7 +30,7 @@ export function BookingConfirmationPage({ bookingId }: { bookingId: string }) {
     refetchInterval: (q) => {
       if (timedOut) return false;
       const s = q.state.data?.status;
-      if (s && (SUCCESS_STATUSES.has(s) || FAILED_STATUSES.has(s))) return false;
+      if (s && (SUCCESS_STATUSES.has(s) || FAILED_STATUSES.has(s) || PENDING_STATUSES.has(s))) return false;
       return POLL_INTERVAL_MS;
     }
   });
@@ -38,7 +39,8 @@ export function BookingConfirmationPage({ bookingId }: { bookingId: string }) {
   const status = booking?.status;
   const isSuccess = !!status && SUCCESS_STATUSES.has(status);
   const isFailed = !!status && FAILED_STATUSES.has(status);
-  const shouldPoll = !!bookingId && !isSuccess && !isFailed && !timedOut;
+  const isPending = !!status && PENDING_STATUSES.has(status);
+  const shouldPoll = !!bookingId && !isSuccess && !isFailed && !isPending && !timedOut;
 
   React.useEffect(() => {
     if (!shouldPoll) return;
@@ -118,8 +120,38 @@ export function BookingConfirmationPage({ bookingId }: { bookingId: string }) {
     );
   }
 
+  if (isPending) {
+    return (
+      <main className="mx-auto max-w-2xl px-4 pb-24 pt-8">
+        <Card className="animate-pop-in overflow-hidden">
+          <CardContent className="px-6 pt-8">
+            <div className="flex flex-col items-center text-center">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-warning-light text-warning">
+                <Clock className="h-8 w-8" />
+              </div>
+              <h1 className="mt-3 font-display text-2xl font-extrabold tracking-tight text-ink">
+                Booking received
+              </h1>
+              <p className="mt-1 text-sm text-ink-2">
+                Your payment went through. The venue is confirming your slot — we&apos;ll email you the moment it&apos;s confirmed. You can cancel this request any time.
+              </p>
+            </div>
+          </CardContent>
+          <CardFooter className="flex flex-col gap-2 px-5 pt-0 sm:flex-row">
+            <Button className="flex-1" onClick={() => router.push("/bookings")}>
+              Go to my bookings
+            </Button>
+            <Button variant="secondary" className="flex-1" onClick={() => router.push("/explore")}>
+              Explore venues
+            </Button>
+          </CardFooter>
+        </Card>
+      </main>
+    );
+  }
+
   if (isFailed) {
-    const cancelled = status === "cancelled";
+    const cancelled = status && ["cancelled", "cancelled_by_user", "cancelled_by_owner", "cancelled_by_admin", "cancelled_auto"].includes(status);
     return (
       <main className="mx-auto max-w-2xl px-4 pb-24 pt-8">
         <ErrorState

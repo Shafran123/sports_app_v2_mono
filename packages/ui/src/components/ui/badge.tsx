@@ -31,20 +31,59 @@ export function Badge({ className, variant, ...props }: BadgeProps) {
 const STATUS_TONE: Record<string, VariantProps<typeof badgeVariants>["variant"]> = {
   pending: "warning",
   confirmed: "primary",
-  checked_in: "accent",
-  completed: "neutral",
+  completed: "accent",
   cancelled: "error",
+  cancelled_by_user: "error",
+  cancelled_by_owner: "error",
+  cancelled_by_admin: "error",
+  cancelled_auto: "error",
   no_show: "neutral",
+  due: "warning",
+  paid: "success",
+  refunded: "neutral",
   failed: "error",
   active: "success",
   approved: "success",
-  rejected: "error",
-  paid: "success",
-  refunded: "neutral"
+  rejected: "error"
 };
 
+// Human title-case label for a status code, shared across every surface so
+// the console, the app and the widget never disagree on wording. Unknown
+// statuses humanize into title case ("some_unknown" -> "Some Unknown").
+const STATUS_LABEL: Record<string, string> = {
+  pending: "Pending",
+  confirmed: "Confirmed",
+  completed: "Completed",
+  cancelled: "Cancelled",
+  cancelled_by_user: "Cancelled by user",
+  cancelled_by_owner: "Cancelled by venue",
+  cancelled_by_admin: "Cancelled by admin",
+  cancelled_auto: "Auto-cancelled",
+  no_show: "No-show",
+  due: "Due",
+  paid: "Paid",
+  refunded: "Refunded",
+  failed: "Failed",
+  active: "Active",
+  approved: "Approved",
+  rejected: "Rejected",
+  online: "Online",
+  cash: "Cash"
+};
+
+function humanizeTitle(value: string) {
+  return value
+    .split("_")
+    .map((part) => (part ? part.charAt(0).toUpperCase() + part.slice(1) : part))
+    .join(" ");
+}
+
+export function statusLabel(status: string) {
+  return STATUS_LABEL[status] ?? humanizeTitle(status);
+}
+
 export function StatusPill({ status, children, className }: { status: string; children?: React.ReactNode; className?: string }) {
-  const label = children ?? status.replaceAll("_", " ");
+  const label = children ?? statusLabel(status);
   return (
     <Badge variant={STATUS_TONE[status] ?? "neutral"} className={className}>
       {label}

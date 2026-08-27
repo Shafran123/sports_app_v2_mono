@@ -22,3 +22,13 @@ export {
 export { cn } from "./cn";
 export { uuidV4 } from "./uuid";
 export { DEFAULT_BRAND_NAME } from "./brand";
+export {
+  MAX_SLOTS,
+  durationChoices,
+  longestAvailableRun,
+  selectRun,
+  selectionKey,
+  summarizeSelection,
+  type SelectedSlots,
+  type SelectionSummary
+} from "./slots";

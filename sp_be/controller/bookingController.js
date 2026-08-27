@@ -15,7 +15,22 @@ const pricingEngine = require('../services/pricingEngine');
 const { validateWidgetScope } = require('../services/widgetInstances');
 const siteDomains = require('../services/siteDomains');
 
-const ACTIVE_BOOKING_STATES = ['confirmed', 'checked_in', 'completed', 'no_show'];
+// Pending bookings hold their slot (ADR-0040): a booking awaiting the owner's
+// confirmation blocks double-booking just like a confirmed one.
+const ACTIVE_BOOKING_STATES = ['pending', 'confirmed', 'completed', 'no_show'];
+
+// The Business's auto-confirm switch (ADR-0040): when on (default) a new
+// booking is created confirmed; when off it lands `pending` until the owner
+// confirms it. Resolved from the venue's Business.
+async function autoConfirmForVenue(client, venueId) {
+  const { rows } = await client.query(
+    `select b.auto_confirm from businesses b
+     join venues v on v.business_id = b.id
+     where v.id = $1`,
+    [venueId]
+  );
+  return rows.length ? Boolean(rows[0].auto_confirm) : true;
+}
 
 // How many concurrent holds a player may hold before checkout is rejected.
 // Production default 3 (spec/security hardening); tests may raise it.
@@ -259,17 +274,30 @@ exports.checkout = async (req, res) => {
         return fail(res, 400, 'CASH_NOT_ACCEPTED', 'This venue does not accept pay-at-venue');
       }
 
+      const autoConfirm = await autoConfirmForVenue(client, court.venue_id);
+      const bookingStatus = autoConfirm ? 'confirmed' : 'pending';
+
       await client.query('begin');
       try {
         const { rows: bookingRows } = await client.query(
-          `insert into bookings (court_id, user_id, site_customer_id, start_at, end_at, price_per_slot, total_price, tax_rate, tax_amount, venue_tax_rate, venue_tax_amount, status, payment_method, player_name, player_phone, qr_token, idempotency_key, subtotal_amount, discount_amount, site_hostname)
-           values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'confirmed', 'cash', $12, $13, $14, $15, $16, $17, $18)
+          `insert into bookings (court_id, user_id, site_customer_id, start_at, end_at, price_per_slot, total_price, tax_rate, tax_amount, venue_tax_rate, venue_tax_amount, status, payment_method, player_name, player_phone, qr_token, idempotency_key, subtotal_amount, discount_amount, site_hostname, confirmed_at)
+           values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'cash', $13, $14, $15, $16, $17, $18, $19, $20)
            returning *`,
-          [court_id, siteCustomer ? null : req.user.id, siteCustomer ? siteCustomer.id : null, start, end, pricing.slots[0]?.base_price ?? court.price_per_slot, amount, split.platformRate, split.platformTax, split.venueRate, split.venueTax, siteCustomer ? (siteCustomer.name || req.user.name) : req.user.name, siteCustomer ? (siteCustomer.phone || req.user.phone) : req.user.phone, mintQrToken(), idempotency_key, pricing.subtotal, pricing.discount, siteHostname || null]
+          [court_id, siteCustomer ? null : req.user.id, siteCustomer ? siteCustomer.id : null, start, end, pricing.slots[0]?.base_price ?? court.price_per_slot, amount, split.platformRate, split.platformTax, split.venueRate, split.venueTax, bookingStatus, siteCustomer ? (siteCustomer.name || req.user.name) : req.user.name, siteCustomer ? (siteCustomer.phone || req.user.phone) : req.user.phone, mintQrToken(), idempotency_key, pricing.subtotal, pricing.discount, siteHostname || null, bookingStatus === 'confirmed' ? new Date() : null]
+        );
+        // A cash payment is born `due` at booking creation (ADR-0037): the
+        // payer is known now, so mark-paid later is a status flip, not an
+        // insert — this also fixes the site-customer crash (payments.user_id
+        // is nullable; the site_customer_id mirrors the booking).
+        await client.query(
+          `insert into payments (user_id, site_customer_id, booking_id, amount, tax_rate, tax_amount, venue_tax_rate, venue_tax_amount, currency, status, payment_method)
+           values ($1, $2, $3, $4, $5, $6, $7, $8, 'LKR', 'due', 'cash')`,
+          [siteCustomer ? null : req.user.id, siteCustomer ? siteCustomer.id : null, bookingRows[0].id, amount, split.platformRate, split.platformTax, split.venueRate, split.venueTax]
         );
         await client.query('commit');
         await publishBookingEvent('booking.created', bookingRows[0].id);
-        await notificationCatalog.dispatchBooking('booking.confirmed', bookingRows[0].id);
+        const confirmKey = bookingStatus === 'confirmed' ? 'booking.confirmed' : 'booking.pending';
+        await notificationCatalog.dispatchBooking(confirmKey, bookingRows[0].id);
         return ok(res, 201, { booking: bookingRows[0], amount, currency: 'LKR' });
       } catch (error) {
         await client.query('rollback').catch(() => {});
@@ -384,7 +412,9 @@ exports.getBooking = async (req, res) => {
     const { id } = req.params;
     const { rows } = await pool.query(
       `select b.*, c.name as court_name, v.name as venue_name, v.address as venue_address,
-              v.owner_id as venue_owner_id, s.name as sport
+              v.owner_id as venue_owner_id, s.name as sport,
+              (select p.status from payments p where p.booking_id = b.id order by p.created_at desc limit 1) as payment_status,
+              (select p.paid_at from payments p where p.booking_id = b.id and p.status = 'paid' order by p.paid_at desc nulls last limit 1) as paid_at
        from bookings b
        join courts c on c.id = b.court_id
        join venues v on v.id = c.venue_id
@@ -435,11 +465,11 @@ exports.listMyBookings = async (req, res) => {
     let index = 2;
 
     if (status === 'upcoming') {
-      conditions.push(`b.start_at > now() and b.status = 'confirmed'`);
+      conditions.push(`b.start_at > now() and b.status in ('pending', 'confirmed')`);
     } else if (status === 'past') {
-      conditions.push(`(b.start_at <= now() or b.status in ('completed', 'checked_in', 'no_show'))`);
+      conditions.push(`(b.start_at <= now() or b.status in ('completed', 'no_show'))`);
     } else if (status === 'cancelled') {
-      conditions.push(`b.status = 'cancelled'`);
+      conditions.push(`b.status in ('cancelled', 'cancelled_by_user', 'cancelled_by_owner', 'cancelled_by_admin', 'cancelled_auto')`);
     }
 
     // Venue-scoped list (widget "Your bookings"): the widget passes its
@@ -451,7 +481,9 @@ exports.listMyBookings = async (req, res) => {
     }
 
     const { rows } = await pool.query(
-      `select b.*, c.name as court_name, v.name as venue_name, v.city as venue_city, v.id as venue_id, s.name as sport
+      `select b.*, c.name as court_name, v.name as venue_name, v.city as venue_city, v.id as venue_id, s.name as sport,
+              (select p.status from payments p where p.booking_id = b.id order by p.created_at desc limit 1) as payment_status,
+              (select p.paid_at from payments p where p.booking_id = b.id and p.status = 'paid' order by p.paid_at desc nulls last limit 1) as paid_at
        from bookings b
        join courts c on c.id = b.court_id
        join venues v on v.id = c.venue_id

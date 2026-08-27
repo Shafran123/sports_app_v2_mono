@@ -1,13 +1,38 @@
 const request = require('supertest');
 const { SignJWT } = require('jose');
+const crypto = require('crypto');
 const app = require('../app');
 const pool = require('../db');
-const { bookingBillPdf, registrationBillPdf, emailBillForBooking } = require('../utils/billService');
+const { bookingBillPdf, registrationBillPdf, emailBillForBooking, ensureInvoiceNumber } = require('../utils/billService');
+const smsService = require('../utils/smsService');
 const { resetFlagsToDefaults } = require('./helpers/flags');
 
 const secret = new TextEncoder().encode('test-secret');
 const tokenFor = (uid) =>
   new SignJWT({ uid, email: `${uid}@myslot.test`, email_verified: true }).setProtectedHeader({ alg: 'HS256' }).setIssuedAt().sign(secret);
+
+function payhereSig({ orderId, amount, statusCode }) {
+  const secretMd5 = crypto.createHash('md5').update('test-merchant-secret').digest('hex').toUpperCase();
+  return crypto
+    .createHash('md5')
+    .update(`TEST_MERCHANT_ID${orderId}${amount}LKR${statusCode}${secretMd5}`)
+    .digest('hex')
+    .toUpperCase();
+}
+
+function webhookBody(orderId, amount, statusCode = '2') {
+  return {
+    merchant_id: 'TEST_MERCHANT_ID',
+    order_id: orderId,
+    payment_id: 'pay_bill',
+    payhere_amount: String(amount),
+    payhere_currency: 'LKR',
+    status_code: statusCode,
+    method: 'TEST',
+    status_message: 'ok',
+    md5sig: payhereSig({ orderId, amount, statusCode })
+  };
+}
 
 let PLAYER_TOKEN;
 let ADMIN_TOKEN;
@@ -78,11 +103,22 @@ describe('booking bills', () => {
     await resetFlagsToDefaults();
   });
 
-  it('renders a PDF for a booking with tax line and QR content', async () => {
+  it('renders a PDF for a booking with tax line and invoice header', async () => {
     const pdf = await bookingBillPdf(BOOKING_ID);
     expect(pdf).toBeInstanceOf(Buffer);
     expect(pdf.length).toBeGreaterThan(1000);
     expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
+    // No check-in QR on the bill (ADR-0041).
+    expect(pdf.includes(Buffer.from('Show the QR code at the venue'))).toBe(false);
+  });
+
+  it('allocates a stable per-business invoice number on first render (ADR-0041)', async () => {
+    const first = await ensureInvoiceNumber(BOOKING_ID);
+    expect(first).toBeGreaterThan(0);
+    const again = await ensureInvoiceNumber(BOOKING_ID);
+    expect(again).toBe(first);
+    const { rows } = await pool.query(`select invoice_number from bookings where id = $1`, [BOOKING_ID]);
+    expect(rows[0].invoice_number).toBe(first);
   });
 
   it('exposes a download endpoint for the owning player', async () => {
@@ -128,14 +164,14 @@ describe('booking bills', () => {
     expect(pdf).toBeInstanceOf(Buffer);
   });
 
-  it('never emails a walk-in booking (player row IS the venue owner)', async () => {
+  it('emails a walk-in bill link by SMS instead of emailing (ADR-0041)', async () => {
     const manual = await request(app)
       .post('/api/v1/business/bookings/manual')
       .set('Authorization', `Bearer ${OWNER_TOKEN}`)
       .send({
         court_id: CASH_COURT_ID,
-        start_at: isoColombo(colomboDate(4), '11:00'),
-        end_at: isoColombo(colomboDate(4), '12:00'),
+        start_at: isoColombo(colomboDate(4), '13:00'),
+        end_at: isoColombo(colomboDate(4), '14:00'),
         player_name: 'Walk-In Guest',
         player_phone: '0771234567',
         amount: 1500
@@ -146,20 +182,80 @@ describe('booking bills', () => {
     await emailBillForBooking(manual.body.data.id);
     expect(spy).not.toHaveBeenCalled();
     spy.mockRestore();
+
+    const sms = smsService.buildWalkinSms(
+      { venue_name: 'Bill Venue', court_name: 'Bill Court', start_at: new Date().toISOString() },
+      'MySlot.LK',
+      { billUrl: 'http://localhost:3000/api/v1/public/bill/abc-123?t=token' }
+    );
+    expect(sms).toContain('/api/v1/public/bill/');
+    expect(sms).not.toContain('Show the QR');
   });
 
-  it('emails a bill to the player after the cash booking is marked paid', async () => {
+  it('a cash booking bills on mark-paid, not at check-in (ADR-0041)', async () => {
     const spy = vi.spyOn(require('../utils/emailService'), 'sendEmail').mockResolvedValue({ success: true });
-    await request(app)
+
+    const checkin = await request(app)
+      .post(`/api/v1/business/bookings/${BOOKING_ID}/check-in`)
+      .set('Authorization', `Bearer ${OWNER_TOKEN}`);
+    expect(checkin.status).toBe(200);
+    expect(checkin.body.data.status).toBe('completed');
+    // emailBillForBooking is fire-and-forget; give it a beat to run.
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(spy).not.toHaveBeenCalled();
+
+    const paid = await request(app)
       .post(`/api/v1/business/bookings/${BOOKING_ID}/mark-paid`)
       .set('Authorization', `Bearer ${OWNER_TOKEN}`);
-    // emailBillForBooking is fire-and-forget; give it a beat to run.
+    expect(paid.status).toBe(200);
     await new Promise((resolve) => setTimeout(resolve, 300));
     expect(spy).toHaveBeenCalled();
     const arg = spy.mock.calls[0][0];
     expect(arg.subject).toContain('Your bill');
     const files = arg.attachments || (arg.attachment ? [arg.attachment] : []);
     expect(files[0].filename).toMatch(/\.pdf$/);
+    expect(files.some((f) => f.filename === 'booking-qr.png')).toBe(false);
+    spy.mockRestore();
+  });
+
+  it('an online booking emails its bill at check-in (ADR-0041)', async () => {
+    await pool.query(
+      `insert into platform_config (key, value, updated_at) values ('payhere_enabled', 'true'::jsonb, now())
+       on conflict (key) do update set value = excluded.value, updated_at = now()`
+    );
+    const idem = `online-bill-${Date.now()}`;
+    const res = await request(app)
+      .post('/api/v1/bookings/checkout')
+      .set('Authorization', `Bearer ${PLAYER_TOKEN}`)
+      .send({
+        court_id: CASH_COURT_ID,
+        start_at: isoColombo(colomboDate(5), '16:00'),
+        end_at: isoColombo(colomboDate(5), '17:00'),
+        idempotency_key: idem
+      });
+    expect(res.status).toBe(201);
+    const holdId = res.body.data.hold_id;
+    expect(holdId).toBeTruthy();
+
+    const notify = await request(app)
+      .post('/api/v1/payments/payhere/notify')
+      .type('form')
+      .send(webhookBody(holdId, 1500));
+    expect(notify.status).toBe(200);
+
+    const { rows } = await pool.query(`select id, payment_method, status from bookings where idempotency_key = $1`, [idem]);
+    expect(rows[0].payment_method).toBe('online');
+    expect(rows[0].status).toBe('confirmed');
+
+    const spy = vi.spyOn(require('../utils/emailService'), 'sendEmail').mockResolvedValue({ success: true });
+    const checkin = await request(app)
+      .post(`/api/v1/business/bookings/${rows[0].id}/check-in`)
+      .set('Authorization', `Bearer ${OWNER_TOKEN}`);
+    expect(checkin.status).toBe(200);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(spy).toHaveBeenCalled();
+    const arg = spy.mock.calls[0][0];
+    expect(arg.subject).toContain('Your bill');
     spy.mockRestore();
   });
 });

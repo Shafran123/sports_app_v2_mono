@@ -28,6 +28,16 @@ function bookingQrUrl(bookingId, qrToken) {
   return `${base}/api/v1/public/qr/${bookingId}?t=${qrToken}`;
 }
 
+// The tokenized bill download link (ADR-0041) sent to a walk-in's phone at
+// quick-book — the walk-in has no inbox and no app, so this is how their bill
+// reaches them. Same bearer model as the QR link: the secret token is the
+// disclosure.
+function bookingBillUrl(bookingId, qrToken) {
+  const base = process.env.FRONTEND_URL;
+  if (!base || !bookingId || !qrToken) return '';
+  return `${base}/api/v1/public/bill/${bookingId}?t=${qrToken}`;
+}
+
 function buildBookingSms(booking, brand = DEFAULT_BRAND, opts = {}) {
   const method = booking.payment_method === 'cash' ? 'Pay at venue' : 'Paid online';
   const qr = opts?.qrUrl ? ` Show your QR to check in: ${opts.qrUrl}` : ` Show the QR at check-in.`;
@@ -37,6 +47,17 @@ function buildBookingSms(booking, brand = DEFAULT_BRAND, opts = {}) {
 function buildOwnerBookingSms(booking, brand = DEFAULT_BRAND) {
   const method = booking.payment_method === 'cash' ? 'Pay at venue' : 'Paid online';
   return `${brand}: New booking at your venue ${booking.venue_name || ''} (${booking.court_name || ''}) on ${fmtWhen(booking.start_at)}. ${method}.`;
+}
+
+// Awaiting-confirmation SMS (ADR-0040): no QR — the booking isn't confirmed yet.
+function buildPendingBookingSms(booking, brand = DEFAULT_BRAND) {
+  const method = booking.payment_method === 'cash' ? 'Pay at venue' : 'Paid online';
+  return `${brand}: Booking request received at ${booking.venue_name || ''} (${booking.court_name || ''}) on ${fmtWhen(booking.start_at)} — awaiting the venue's confirmation. ${method}.`;
+}
+
+function buildOwnerPendingBookingSms(booking, brand = DEFAULT_BRAND) {
+  const method = booking.payment_method === 'cash' ? 'Pay at venue' : 'Paid online';
+  return `${brand}: Booking request at your venue ${booking.venue_name || ''} (${booking.court_name || ''}) on ${fmtWhen(booking.start_at)} — confirm it in your console. ${method}.`;
 }
 
 function buildReminderSms(booking, brand = DEFAULT_BRAND, opts = {}) {
@@ -56,8 +77,9 @@ function buildVenueCancelledSms(booking, brand = DEFAULT_BRAND) {
   return `${brand}: Your booking at ${booking.venue_name || ''} (${booking.court_name || ''}) on ${fmtWhen(booking.start_at)} was cancelled by the venue.`;
 }
 
-function buildWalkinSms(booking, brand = DEFAULT_BRAND) {
-  return `${brand}: Booking confirmed at ${booking.venue_name || ''} (${booking.court_name || ''}) on ${fmtWhen(booking.start_at)}. Show the QR at check-in.`;
+function buildWalkinSms(booking, brand = DEFAULT_BRAND, opts = {}) {
+  const bill = opts?.billUrl ? ` View or download your bill: ${opts.billUrl}` : '';
+  return `${brand}: Booking confirmed at ${booking.venue_name || ''} (${booking.court_name || ''}) on ${fmtWhen(booking.start_at)}. Pay at the venue.${bill}`;
 }
 
 function buildEventRegisteredSms(reg, brand = DEFAULT_BRAND) {
@@ -121,8 +143,11 @@ module.exports = {
   sendSms,
   formatSriLankanPhone,
   bookingQrUrl,
+  bookingBillUrl,
   buildBookingSms,
   buildOwnerBookingSms,
+  buildPendingBookingSms,
+  buildOwnerPendingBookingSms,
   buildReminderSms,
   buildPlayerCancelledSms,
   buildOwnerBookingCancelledSms,

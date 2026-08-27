@@ -19,10 +19,12 @@ import { WidgetIdentity } from "./widget-identity";
 export function WidgetBookings({
   widgetKey,
   venue,
+  siteHostname,
   onBack
 }: {
   widgetKey?: string;
   venue: { id: string; name: string; cancel_cutoff_hours?: number };
+  siteHostname?: string | null;
   onBack: () => void;
 }) {
   const { user } = useAuth();
@@ -38,7 +40,7 @@ export function WidgetBookings({
         >
           <ArrowLeft className="h-3.5 w-3.5" /> Back to booking
         </button>
-        <WidgetIdentity widgetKey={widgetKey} onDone={onBack} />
+        <WidgetIdentity widgetKey={widgetKey} siteHostname={siteHostname ?? null} onDone={onBack} />
       </div>
     );
   }
@@ -135,7 +137,9 @@ function BookingCard({
 }) {
   const [showQr, setShowQr] = useState(false);
   const hoursToStart = dayjs(booking.start_at).diff(dayjs(), "hour", true);
-  const pastCutoff = hoursToStart <= cancelCutoffHours;
+  // A pending booking self-cancels freely (ADR-0040); the Cancel Cutoff binds
+  // only confirmed bookings.
+  const pastCutoff = booking.status !== "pending" && hoursToStart <= cancelCutoffHours;
 
   return (
     <Card className="p-5">

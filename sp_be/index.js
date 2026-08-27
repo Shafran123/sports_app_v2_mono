@@ -18,6 +18,7 @@ const { ensureBucket } = require('./utils/storage');
 const { realtime } = require('./realtime');
 const { startReminderJob } = require('./jobs/reminders');
 const { startDigestJob } = require('./jobs/dailyDigest');
+const { startAutoCancelJob } = require('./jobs/autoCancelPending');
 
 const http = require('http');
 
@@ -27,6 +28,7 @@ const server = http.createServer(app);
 realtime.attach(server);
 startReminderJob();
 startDigestJob();
+startAutoCancelJob();
 
 function warnMissingConfig() {
   if (!process.env.MAILGUN_API_KEY || !process.env.MAILGUN_DOMAIN) {
