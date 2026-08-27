@@ -83,6 +83,7 @@ describe("WidgetSitePage (ticket 08)", () => {
     createMock.mockResolvedValue({ ...instance });
     updateMock.mockResolvedValue({ ...instance, enabled: false });
     deleteMock.mockResolvedValue({ deleted: true });
+    setListingMock.mockResolvedValue({});
   });
 
   it("renders the business brand editor and the instance list with embed keys", async () => {
@@ -113,73 +114,66 @@ describe("WidgetSitePage (ticket 08)", () => {
     });
   });
 
-  it("renders the dedicated Site brand card (ADR-0031) alongside the business brand", async () => {
+  it("renders one Business brand editor with every section (brand-consolidation 03)", async () => {
     meMock.mockResolvedValue({
       ...profile,
       brand: {
         colors: { primary: "#16a34a" },
         tagline: "Book direct",
-        hero_image: "https://cdn.test/hero.jpg",
-        contact: { phone: "+94 77 000 0000", email: "hello@courtgroup.lk" }
+        about: "We run courts since 1998.",
+        banner_image: "https://cdn.test/banner.jpg",
+        contact: { phone: "+94 77 000 0000", email: "hello@courtgroup.lk" },
+        social_links: { facebook: "https://facebook.com/courtgroup" }
       }
     });
     wrap(<WidgetSitePage />);
     await waitFor(() => {
-      expect(screen.getByText("Site brand")).toBeInTheDocument();
+      expect(screen.getByText("Business brand")).toBeInTheDocument();
     });
-    // The legacy hero image seeds the first gallery slide (ADR-0032).
-    expect(screen.getByLabelText("Gallery slide 1 image URL")).toHaveValue("https://cdn.test/hero.jpg");
+    // All sections render in the one card — no duplicate editors.
+    expect(screen.getByLabelText("Business name")).toHaveValue("Court Group");
+    expect(screen.getByLabelText("Site banner")).toHaveValue("https://cdn.test/banner.jpg");
     expect(screen.getByLabelText("Contact phone")).toHaveValue("+94 77 000 0000");
-    // The Preview button is gone — the site is previewed at its own hostname.
+    expect(screen.getByLabelText("Facebook URL")).toHaveValue("https://facebook.com/courtgroup");
+    expect(screen.getByLabelText("Privacy policy")).toBeInTheDocument();
+    expect(screen.getByLabelText("Terms & conditions")).toBeInTheDocument();
+    // The separate "Site brand" / "Site policies" cards and their buttons are gone.
+    expect(screen.queryByText("Site brand")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Save site brand" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Save policies" })).toBeNull();
+    // The retired headline field is gone; the Preview button is gone too.
+    expect(screen.queryByLabelText("Headline")).toBeNull();
     expect(screen.queryByRole("button", { name: /preview/i })).toBeNull();
   });
 
-  it("saves site-brand fields (gallery, headline, contact) via the profile endpoint", async () => {
+  it("saves every brand field through the single Save brand button (brand-consolidation 03)", async () => {
     wrap(<WidgetSitePage />);
     await waitFor(() => {
-      expect(screen.getByText("Site brand")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Save brand" })).toBeInTheDocument();
     });
-    await userEvent.click(screen.getByRole("button", { name: /add slide/i }));
-    await userEvent.type(screen.getByLabelText("Gallery slide 1 image URL"), "https://cdn.test/hero-new.jpg");
-    await userEvent.type(screen.getByLabelText("Gallery slide 1 caption"), "Dawn at the main hall");
-    await userEvent.type(screen.getByLabelText("Headline"), "The home of badminton in Colombo");
+    await userEvent.type(screen.getByLabelText("Site banner"), "https://cdn.test/banner.jpg");
     await userEvent.type(screen.getByLabelText("Contact email"), "hello@courtgroup.lk");
-    await userEvent.click(screen.getByRole("button", { name: "Save site brand" }));
-
-    await waitFor(() => {
-      expect(updateMeMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          brand: expect.objectContaining({
-            gallery: [
-              { image_url: "https://cdn.test/hero-new.jpg", caption: "Dawn at the main hall" }
-            ],
-            headline: "The home of badminton in Colombo",
-            contact: expect.objectContaining({ email: "hello@courtgroup.lk" })
-          })
-        })
-      );
-    });
-  });
-
-  it("saves Site Policies and shows up to six gallery slides (ADR-0032)", async () => {
-    wrap(<WidgetSitePage />);
-    await waitFor(() => {
-      expect(screen.getByText("Site policies")).toBeInTheDocument();
-    });
+    await userEvent.type(screen.getByLabelText("Instagram URL"), "https://instagram.com/courtgroup");
     await userEvent.type(screen.getByLabelText("Privacy policy"), "We keep your data private.");
     await userEvent.type(screen.getByLabelText("Terms & conditions"), "Bookings follow venue rules.");
-    await userEvent.click(screen.getByRole("button", { name: "Save policies" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save brand" }));
 
     await waitFor(() => {
       expect(updateMeMock).toHaveBeenCalledWith(
         expect.objectContaining({
+          name: "Court Group",
           brand: expect.objectContaining({
+            banner_image: "https://cdn.test/banner.jpg",
+            contact: expect.objectContaining({ email: "hello@courtgroup.lk" }),
+            social_links: expect.objectContaining({ instagram: "https://instagram.com/courtgroup" }),
             privacy_policy: "We keep your data private.",
             terms_conditions: "Bookings follow venue rules."
           })
         })
       );
     });
+    // Exactly one save path — the same endpoint every section goes through.
+    expect(updateMeMock).toHaveBeenCalledTimes(1);
   });
 
   it("creates an instance from the dialog with a locked default", async () => {

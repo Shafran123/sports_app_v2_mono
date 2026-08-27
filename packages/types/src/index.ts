@@ -71,11 +71,14 @@ export const BrandContactSchema = z.object({
 });
 export type BrandContact = z.infer<typeof BrandContactSchema>;
 
-export const BrandGallerySlideSchema = z.object({
-  image_url: z.string(),
-  caption: z.string().max(300).optional()
+export const SocialLinksSchema = z.object({
+  facebook: z.string().optional(),
+  instagram: z.string().optional(),
+  tiktok: z.string().optional(),
+  whatsapp: z.string().optional(),
+  youtube: z.string().optional()
 });
-export type BrandGallerySlide = z.infer<typeof BrandGallerySlideSchema>;
+export type SocialLinks = z.infer<typeof SocialLinksSchema>;
 
 export const BrandSchema = z.object({
   colors: z
@@ -87,16 +90,17 @@ export const BrandSchema = z.object({
   logo_url: z.string().optional(),
   tagline: z.string().optional(),
   about: z.string().optional(),
-  // Site-brand tokens (ADR-0031): hero + headline for the portfolio root,
-  // and the contact block mirrored in the footer/footer strip.
-  hero_image: z.string().optional(),
-  headline: z.string().optional(),
+  // Site-brand tokens (ADR-0031): the contact block mirrored in the footer's
+  // "Find us" dialog.
   contact: BrandContactSchema.optional(),
-  // Site Gallery + Site Policies (ADR-0032): the hero slide set with optional
-  // captions, and the business's own legal copy. All owned by the site host.
-  gallery: z.array(BrandGallerySlideSchema).max(6).optional(),
+  // Site Banner (ADR-0034 rev.): the owner-chosen image shown at the top of
+  // the site home, replacing the deleted hero/gallery fields.
+  banner_image: z.string().optional(),
+  // Site Policies (ADR-0032): the business's own legal copy; Social Links
+  // (ADR-0034) are the optional per-platform URLs shown in the site footer.
   privacy_policy: z.string().optional(),
-  terms_conditions: z.string().optional()
+  terms_conditions: z.string().optional(),
+  social_links: SocialLinksSchema.optional()
 });
 export type VenueBrand = z.infer<typeof BrandSchema>;
 
@@ -261,14 +265,23 @@ export const SiteVenueSchema = z.object({
   city: z.string().nullable(),
   address: z.string().nullable(),
   photos: z.array(z.string()),
-  sports: z.array(z.string()),
+  sports: z.array(
+    z.object({
+      name: z.string(),
+      icon: z.string().nullable().optional()
+    })
+  ),
   visibility: z.enum(["public", "private"]).optional(),
   // Coordinates fuel the auto Google-Maps link on the site's venue cards
   // (ADR-0031): hidden when unset, never re-entered by the owner.
   lat: z.number().nullable().optional(),
   lng: z.number().nullable().optional(),
   // Cheapest active court price, for the "from" caption on the cards.
-  min_price: z.number().nullable().optional()
+  min_price: z.number().nullable().optional(),
+  // Opening Windows fuel the cards' Open Status ("Open now" / "Closed now"
+  // dot + today's hours line, ADR-0034). Optional so stale payloads from a
+  // not-yet-updated backend degrade to "Closed today" instead of crashing.
+  hours: z.array(VenueHoursSchema).optional()
 });
 export type SiteVenue = z.infer<typeof SiteVenueSchema>;
 
@@ -423,7 +436,9 @@ export type Offer = z.infer<typeof OfferSchema>;
 export const BookingSchema = z.object({
   id: z.string(),
   court_id: z.string(),
-  user_id: z.string(),
+  // Site-customer (ADR-0030) and walk-in cash bookings carry no platform
+  // user_id — the server stores `user_id: null` and a site_customer_id instead.
+  user_id: z.string().nullable(),
   venue_id: z.string().optional(),
   start_at: z.string(),
   end_at: z.string(),

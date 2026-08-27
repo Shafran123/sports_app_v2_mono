@@ -20,7 +20,7 @@ function computeRefundPct(tiers, hoursBefore) {
   return 0;
 }
 
-async function cancelBooking(client, bookingId, actorUserId, actorRole) {
+async function cancelBooking(client, bookingId, actorUserId, actorRole, siteCustomerId) {
   const { rows } = await client.query(
     `select * from bookings where id = $1 for update`,
     [bookingId]
@@ -33,7 +33,9 @@ async function cancelBooking(client, bookingId, actorUserId, actorRole) {
   const isOwnerActor =
     actorRole === 'venue_owner' || actorRole === 'admin';
 
-  if (!isOwnerActor && booking.user_id !== actorUserId) {
+  // A Site Customer may cancel the bookings under their own per-Business
+  // account (site_customer_id), just like a Player cancels their own.
+  if (!isOwnerActor && booking.user_id !== actorUserId && booking.site_customer_id !== siteCustomerId) {
     return { error: { status: 403, code: 'FORBIDDEN', message: 'You cannot cancel this booking' } };
   }
 

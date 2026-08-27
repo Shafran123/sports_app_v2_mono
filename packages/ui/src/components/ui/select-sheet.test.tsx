@@ -57,6 +57,18 @@ describe("SelectSheet", () => {
     expect(option.className).toContain("bg-primary-light");
   });
 
+  it("shows the selected value on the mobile sheet when option values are numbers (duration selector)", async () => {
+    render(
+      <SelectSheet value="60" onChange={() => {}} placeholder="Select">
+        <option value={60}>1h</option>
+        <option value={120}>2h</option>
+      </SelectSheet>
+    );
+    const sheetButton = screen.getByRole("button", { name: /1h|2h|select/i });
+    expect(sheetButton).toHaveTextContent("1h");
+    expect(sheetButton.textContent).not.toContain("Select");
+  });
+
   it("scrolls long option lists inside the sheet instead of overlapping the page", async () => {
     const options = Array.from({ length: 40 }, (_, i) => (
       <option key={i} value={`v${i}`}>

@@ -1,6 +1,6 @@
 # 0031 — Site branding, contact, and the marketplace-opt-in model
 
-- **Status:** accepted
+- **Status:** accepted (dashboard-restructure section superseded by ADR-0035)
 - **Date:** 2026-08-26
 - **Supersedes in part:** ADR-0029 (site-level presentation listed hero/intro/contact/footer; this ADR defines the fields, the venue-card maps link, and the marketplace cutover rule)
 

@@ -288,4 +288,109 @@ describe('notification catalog', () => {
     );
     expect(out.rows.filter((r) => r.recipient === 'owner@myslot.lk').length).toBe(2);
   });
+
+  it('brands booking messages with the Business name, logo and colors (brand-consolidation 02/04)', async () => {
+    const sendEmailSpy = vi.spyOn(require('../utils/emailService'), 'sendEmail').mockResolvedValue({ success: false, error: 'Email not configured' });
+    const sendSmsSpy = vi.spyOn(require('../utils/smsService'), 'sendSms').mockResolvedValue({ success: false, error: 'SMS not configured' });
+    const booking = {
+      id: 'catalog-branded-1',
+      user_id: PLAYER_ID,
+      user_email: 'player@myslot.lk',
+      player_phone: '+94771234567',
+      user_phone: '+94771234567',
+      venue_owner_id: OWNER_ID,
+      owner_email: 'owner@myslot.lk',
+      owner_phone: '0700000002',
+      venue_name: 'Catalog Venue',
+      court_name: 'Catalog Court',
+      start_at: '2026-09-01T04:30:00.000Z',
+      end_at: '2026-09-01T05:30:00.000Z',
+      total_price: 1500,
+      payment_method: 'cash',
+      status: 'confirmed',
+      business_name: 'Smash Arena Sports',
+      business_brand: { colors: { primary: '#0f766e', accent: '#b45309' }, logo_url: 'https://cdn.test/smash-logo.png' }
+    };
+
+    await dispatch('booking.confirmed', { booking }, { awaitTransports: true });
+
+    // SMS prefix is the Business name (the sender mask is untouched — env-only).
+    const smsCalls = sendSmsSpy.mock.calls.map(([arg]) => arg.message);
+    expect(smsCalls.some((m) => m.startsWith('Smash Arena Sports:'))).toBe(true);
+
+    // Email carries the Business logo + primary CTA, and the platform footer.
+    const emailCalls = sendEmailSpy.mock.calls.map(([arg]) => arg.html || '');
+    expect(emailCalls.some((h) => h.includes('https://cdn.test/smash-logo.png'))).toBe(true);
+    expect(emailCalls.some((h) => h.includes('background:#0f766e'))).toBe(true);
+    expect(emailCalls.some((h) => h.includes('MySlot.LK — book courts, join games, find players.'))).toBe(true);
+
+    sendEmailSpy.mockRestore();
+    sendSmsSpy.mockRestore();
+  });
+
+  it('keeps platform branding when the booking has no Business context (brand-consolidation 02/04)', async () => {
+    const sendEmailSpy = vi.spyOn(require('../utils/emailService'), 'sendEmail').mockResolvedValue({ success: false, error: 'Email not configured' });
+    const sendSmsSpy = vi.spyOn(require('../utils/smsService'), 'sendSms').mockResolvedValue({ success: false, error: 'SMS not configured' });
+    const booking = {
+      id: 'catalog-plain-1',
+      user_id: PLAYER_ID,
+      user_email: 'player@myslot.lk',
+      player_phone: '+94771234567',
+      venue_owner_id: OWNER_ID,
+      owner_email: 'owner@myslot.lk',
+      owner_phone: '0700000002',
+      venue_name: 'Catalog Venue',
+      court_name: 'Catalog Court',
+      start_at: '2026-09-01T04:30:00.000Z',
+      end_at: '2026-09-01T05:30:00.000Z',
+      total_price: 1500,
+      payment_method: 'cash',
+      status: 'confirmed'
+    };
+
+    await dispatch('booking.confirmed', { booking }, { awaitTransports: true });
+
+    const smsCalls = sendSmsSpy.mock.calls.map(([arg]) => arg.message);
+    expect(smsCalls.some((m) => m.startsWith('MySlot.LK:'))).toBe(true);
+    const emailCalls = sendEmailSpy.mock.calls.map(([arg]) => arg.html || '');
+    // No Business logo/colors — the platform green CTA and wordmark remain.
+    expect(emailCalls.some((h) => h.includes('#16a34a'))).toBe(true);
+
+    sendEmailSpy.mockRestore();
+    sendSmsSpy.mockRestore();
+  });
+
+  it('attributs the platform footer when a Business has a name but no brand (brand-consolidation 02/04)', async () => {
+    const sendEmailSpy = vi.spyOn(require('../utils/emailService'), 'sendEmail').mockResolvedValue({ success: false, error: 'Email not configured' });
+    const sendSmsSpy = vi.spyOn(require('../utils/smsService'), 'sendSms').mockResolvedValue({ success: false, error: 'SMS not configured' });
+    const booking = {
+      id: 'catalog-nameonly-1',
+      user_id: PLAYER_ID,
+      user_email: 'player@myslot.lk',
+      player_phone: '+94771234567',
+      venue_owner_id: OWNER_ID,
+      owner_email: 'owner@myslot.lk',
+      owner_phone: '0700000002',
+      venue_name: 'Catalog Venue',
+      court_name: 'Catalog Court',
+      start_at: '2026-09-01T04:30:00.000Z',
+      end_at: '2026-09-01T05:30:00.000Z',
+      total_price: 1500,
+      payment_method: 'cash',
+      status: 'confirmed',
+      business_name: 'Smash Arena Sports',
+      business_brand: null
+    };
+
+    await dispatch('booking.confirmed', { booking }, { awaitTransports: true });
+
+    const smsCalls = sendSmsSpy.mock.calls.map(([arg]) => arg.message);
+    expect(smsCalls.some((m) => m.startsWith('Smash Arena Sports:'))).toBe(true);
+    const emailCalls = sendEmailSpy.mock.calls.map(([arg]) => arg.html || '');
+    expect(emailCalls.some((h) => h.includes('MySlot.LK — book courts, join games, find players.'))).toBe(true);
+    expect(emailCalls.some((h) => h.includes('Smash Arena Sports — book courts, join games, find players.'))).toBe(false);
+
+    sendEmailSpy.mockRestore();
+    sendSmsSpy.mockRestore();
+  });
 });

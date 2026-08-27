@@ -5,7 +5,30 @@ import { Button, buttonVariants } from "@myslot/ui";
 import { cn, formatDuration, formatLkr, formatTime12 } from "@myslot/utils";
 import type { SelectionSummary } from "./selection";
 
-function ContinueButton({ count, total, href, className }: { count: number; total: number; href: string; className?: string }) {
+function ContinueButton({
+  count,
+  total,
+  href,
+  className,
+  identityRequired,
+  identityLabel,
+  onIdentityClick
+}: {
+  count: number;
+  total: number;
+  href: string;
+  className?: string;
+  identityRequired?: boolean;
+  identityLabel?: string;
+  onIdentityClick?: () => void;
+}) {
+  if (identityRequired && onIdentityClick) {
+    return (
+      <Button variant="primary" size="lg" className={className} onClick={onIdentityClick}>
+        {identityLabel ?? "Sign in to book"}
+      </Button>
+    );
+  }
   if (count > 0 && href) {
     return (
       <Link href={href} className={cn(buttonVariants({ variant: "primary", size: "lg" }), className)}>
@@ -25,13 +48,19 @@ export function BookingCta({
   href,
   dateLabel,
   stacked,
-  className
+  className,
+  identityRequired,
+  identityLabel,
+  onIdentityClick
 }: {
   summary: SelectionSummary;
   href: string;
   dateLabel: string;
   stacked?: boolean;
   className?: string;
+  identityRequired?: boolean;
+  identityLabel?: string;
+  onIdentityClick?: () => void;
 }) {
   const { count, durationMin, total, courtName, startAt, endAt } = summary;
   const timeRange = startAt && endAt ? `${formatTime12(startAt)} – ${formatTime12(endAt)}` : null;
@@ -58,6 +87,9 @@ export function BookingCta({
         total={total}
         href={href}
         className={stacked ? "w-full" : "shrink-0"}
+        identityRequired={identityRequired}
+        identityLabel={identityLabel}
+        onIdentityClick={onIdentityClick}
       />
     </div>
   );

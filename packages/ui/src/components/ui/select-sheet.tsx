@@ -41,8 +41,11 @@ export function SelectSheet({
 }) {
   const [open, setOpen] = React.useState(false);
   const options = React.Children.toArray(children).filter(isOption);
+  // Compare stringified values: option props may be numbers (e.g. a duration
+  // in minutes) while `value` arrives as a string — strict equality would
+  // silently drop the selection on the mobile sheet.
   const selected =
-    value && value !== "" ? options.find((o) => o.props.value === value) : undefined;
+    value && value !== "" ? options.find((o) => String(o.props.value) === String(value)) : undefined;
 
   const fireChange = (next: string) => {
     onChange?.({ target: { value: next } } as React.ChangeEvent<HTMLSelectElement>);
@@ -105,13 +108,13 @@ export function SelectSheet({
                 }}
                 className={cn(
                   "flex w-full items-center justify-between gap-2 rounded-2xl px-4 py-3 text-left text-sm font-medium transition-colors",
-                  opt.props.value === value
+                  String(opt.props.value) === String(value)
                     ? "bg-primary-light text-primary"
                     : "text-ink hover:bg-surface-2"
                 )}
               >
                 <span>{opt.props.children}</span>
-                {opt.props.value === value && <Check className="h-4 w-4 shrink-0" />}
+                {String(opt.props.value) === String(value) && <Check className="h-4 w-4 shrink-0" />}
               </button>
             ))}
           </div>

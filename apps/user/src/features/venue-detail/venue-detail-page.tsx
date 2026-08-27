@@ -1,15 +1,17 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { venues, featureFlags, toApiFailure } from "@myslot/api";
-import { Card, ErrorState, SelectSheet, Skeleton, SkeletonCard } from "@myslot/ui";
+import { Card, Dialog, DialogContent, ErrorState, SelectSheet, Skeleton, SkeletonCard } from "@myslot/ui";
 import { cn, dayjs, firstSportSlug, formatDuration, formatLkr, toDateKey } from "@myslot/utils";
 import type { CourtAvailability, Slot } from "@myslot/types";
 import { useAuth } from "@/context/auth";
 import { currentHostname, isSiteHost } from "@/lib/site-host";
 import { VerifiedPhonePrompt } from "@/features/verify-phone/verified-phone-prompt";
 import { VerifyPhoneModal } from "@/features/verify-phone/verify-phone-modal";
+import { WidgetIdentity } from "@/features/widget/widget-identity";
 import { Gallery } from "./gallery";
 import { VenueInfo } from "./venue-info";
 import { DatePicker } from "./date-picker";
@@ -43,18 +45,32 @@ function VenueDetailSkeleton() {
 }
 
 export function VenueDetailPage({ venueId }: { venueId: string }) {
+  const router = useRouter();
   const { user } = useAuth();
   const [date, setDate] = useState(() => toDateKey(new Date()));
   const [heroIndex, setHeroIndex] = useState(0);
   const [selected, setSelected] = useState<SelectedSlots>({});
   const [durationMin, setDurationMin] = useState<number>(0);
   const [verifyOpen, setVerifyOpen] = useState(false);
+  // The confirm-step identity gate (ADR-0033): a guest — or a site customer
+  // still missing a verified phone/email — signs in / signs up in a modal
+  // before continuing to checkout. The picker itself is never gated.
+  const [identityOpen, setIdentityOpen] = useState(false);
 
   const flagsQuery = useQuery({
     queryKey: ["feature-flags"],
     queryFn: () => featureFlags.get()
   });
   const flags = flagsQuery.data;
+
+  // Mirrors the checkout gate (checkout-page.tsx): the venue page's Continue
+  // is identity-gated for guests, and on a live site host for customers who
+  // have not yet verified both phone and email.
+  const requiresVerification = flags?.phone_verification_required ?? false;
+  const siteHostActive = isSiteHost(flags?.app_url);
+  const verifiedPhone = !!user?.phone_verified_at;
+  const verifiedEmail = !!user?.email_verified_at;
+  const identityRequired = !user || (siteHostActive && requiresVerification && (!verifiedPhone || !verifiedEmail));
 
   const venueQuery = useQuery({
     queryKey: ["venue-detail", venueId],
@@ -199,7 +215,15 @@ export function VenueDetailPage({ venueId }: { venueId: string }) {
           <Card className="sticky top-24 p-5">
             <h3 className="font-display text-lg font-extrabold tracking-tight text-ink">Booking summary</h3>
             <div className="mt-4">
-              <BookingCta summary={displaySummary} href={href} dateLabel={dateLabel} stacked />
+              <BookingCta
+                summary={displaySummary}
+                href={href}
+                dateLabel={dateLabel}
+                stacked
+                identityRequired={identityRequired}
+                identityLabel={user ? "Verify to confirm" : "Sign in / Sign up to book"}
+                onIdentityClick={() => setIdentityOpen(true)}
+              />
             </div>
           </Card>
         </aside>
@@ -207,9 +231,35 @@ export function VenueDetailPage({ venueId }: { venueId: string }) {
 
       <div className="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-40 px-4 md:hidden">
         <div className="rounded-3xl border border-border bg-surface/95 p-3 shadow-lift backdrop-blur">
-          <BookingCta summary={displaySummary} href={href} dateLabel={dateLabel} />
+          <BookingCta
+            summary={displaySummary}
+            href={href}
+            dateLabel={dateLabel}
+            stacked
+            identityRequired={identityRequired}
+            identityLabel={user ? "Verify to confirm" : "Sign in / Sign up to book"}
+            onIdentityClick={() => setIdentityOpen(true)}
+          />
         </div>
       </div>
+
+      <Dialog open={identityOpen} onOpenChange={setIdentityOpen}>
+        <DialogContent
+          title={user ? "Complete your booking details" : "Sign in to book"}
+          description={user ? "We need these before you can book." : "Your slot stays selected — sign in or create an account to confirm it."}
+          titleClassName="font-display font-extrabold"
+        >
+          <WidgetIdentity
+            siteHostname={siteHostActive ? currentHostname() ?? null : null}
+            siteName={venue.business_name ?? null}
+            hideIntro
+            onDone={() => {
+              setIdentityOpen(false);
+              if (href) router.push(href);
+            }}
+          />
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }

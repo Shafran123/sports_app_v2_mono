@@ -6,6 +6,13 @@ import { VenueDetailPage } from "./venue-detail-page";
 
 const { useSearchParams } = vi.hoisted(() => ({ useSearchParams: vi.fn() }));
 
+let ctxUser: Record<string, unknown> | null = {
+  id: "u1",
+  role: "player",
+  phone: "+94771234567",
+  phone_verified_at: "2026-08-22T10:00:00.000Z"
+};
+
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
   useSearchParams: () => useSearchParams()
@@ -13,11 +20,19 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("@/context/auth", () => ({
   useAuth: () => ({
-    user: { id: "u1", role: "player", phone: "+94771234567", phone_verified_at: "2026-08-22T10:00:00.000Z" },
+    user: ctxUser,
     loading: false,
     logout: vi.fn(),
     setUser: vi.fn()
   })
+}));
+
+vi.mock("@/features/widget/widget-identity", () => ({
+  WidgetIdentity: ({ onDone }: { onDone: () => void }) => (
+    <button type="button" onClick={onDone}>
+      Mock identity onDone
+    </button>
+  )
 }));
 
 vi.mock("@myslot/api", () => ({
@@ -99,6 +114,12 @@ function renderPage() {
 
 beforeEach(() => {
   vi.resetAllMocks();
+  ctxUser = {
+    id: "u1",
+    role: "player",
+    phone: "+94771234567",
+    phone_verified_at: "2026-08-22T10:00:00.000Z"
+  };
   vi.mocked(venues.detail).mockResolvedValue(venue as never);
   vi.mocked(venues.availability).mockResolvedValue(availability as never);
   useSearchParams.mockReturnValue(new URLSearchParams());
@@ -128,5 +149,35 @@ describe("venue-wide offer is applied once", () => {
     expect(params.get("base_price_per_slot")).toBe("4500");
     expect(params.get("venue_offer_value")).toBe("20");
     expect(link.textContent).toContain("Rs 3,600");
+  });
+});
+
+describe("guest sign-in at the confirm step (ADR-0033)", () => {
+  it("shows Sign in / Sign up to book for a guest, opening the identity modal", async () => {
+    ctxUser = null;
+    renderPage();
+
+    const durationSelect = await screen.findByLabelText("Duration");
+    await userEvent.selectOptions(durationSelect, "60");
+    const slotButton = await screen.findByRole("button", { name: /Turf A, / });
+    await userEvent.click(slotButton);
+
+    const buttons = await screen.findAllByRole("button", { name: /sign in \/ sign up to book/i });
+    expect(buttons.length).toBeGreaterThan(0);
+    await userEvent.click(buttons[0]!);
+    expect(screen.getByText(/mock identity ondone/i)).toBeInTheDocument();
+  });
+
+  it("an already-verified user keeps the Continue link (no identity gate)", async () => {
+    renderPage();
+
+    const durationSelect = await screen.findByLabelText("Duration");
+    await userEvent.selectOptions(durationSelect, "60");
+    const slotButton = await screen.findByRole("button", { name: /Turf A, / });
+    await userEvent.click(slotButton);
+
+    const links = await screen.findAllByRole("link", { name: /Continue/ });
+    expect(links.length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: /sign in \/ sign up to book/i })).not.toBeInTheDocument();
   });
 });

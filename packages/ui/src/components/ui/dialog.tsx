@@ -22,12 +22,14 @@ export function DialogContent({
   className,
   title,
   description,
+  titleClassName,
   onClose
 }: {
   children: React.ReactNode;
   className?: string;
   title?: string;
   description?: string;
+  titleClassName?: string;
   onClose?: () => void;
 }) {
   return (
@@ -43,7 +45,7 @@ export function DialogContent({
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
             {title && (
-              <DialogPrimitive.Title className="text-lg font-semibold tracking-tight text-ink">
+              <DialogPrimitive.Title className={cn("text-lg font-semibold tracking-tight text-ink", titleClassName)}>
                 {title}
               </DialogPrimitive.Title>
             )}

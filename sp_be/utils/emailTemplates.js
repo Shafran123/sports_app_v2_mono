@@ -52,16 +52,67 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
+// ---- Business-brand theming (brand-consolidation ticket 04) ----
+// Booking/event/site emails can carry the Business's own colors + logo via a
+// `tokens` object ({ logo_url, primary, accent, platform }). Surfaces and ink
+// stay neutral regardless — only accents, the CTA, badges and the header
+// brand get the Business colors.
+
+function hexRgb(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ''));
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+// Mix hex toward another hex by t (0..1). Used to derive readable badge tints
+// from an arbitrary Business primary color.
+function mixHex(a, b, t) {
+  const ra = hexRgb(a);
+  const rb = hexRgb(b);
+  if (!ra || !rb) return C.primary;
+  return `#${ra
+    .map((v, i) => Math.round(v + (rb[i] - v) * t).toString(16).padStart(2, '0'))
+    .join('')}`;
+}
+
+// The accent palette derived from the Business brand tokens, falling back to
+// the platform defaults when tokens are absent.
+function themeFor(tokens) {
+  const t = tokens || null;
+  const primary = t?.primary || C.primary;
+  return {
+    primary,
+    accent: t?.accent || C.accent,
+    badgeBg: mixHex(primary, '#ffffff', 0.86),
+    badgeFg: mixHex(primary, '#000000', 0.32),
+    logoUrl: t?.logo_url || '',
+    platform: t?.platform || ''
+  };
+}
+
 const DEFAULT_BRAND = 'MySlot.LK';
 
-// Two-tone wordmark from the brand config ("MySlot.LK" -> ink "MySlot" + green ".LK").
-function brandWordmark(brand = DEFAULT_BRAND) {
+// Two-tone wordmark from the brand config ("MySlot.LK" -> ink "MySlot" + the
+// brand's primary ".LK"). Used as the header when the Business has no logo.
+function brandWordmark(brand = DEFAULT_BRAND, primary = C.primary) {
   const name = String(brand || DEFAULT_BRAND);
   const dot = name.lastIndexOf('.');
   if (dot > 0 && dot < name.length - 1) {
-    return `<span style="color:${C.ink};font-weight:800;">${escapeHtml(name.slice(0, dot))}</span><span style="color:${C.primary};font-weight:800;">${escapeHtml(name.slice(dot))}</span>`;
+    return `<span style="color:${C.ink};font-weight:800;">${escapeHtml(name.slice(0, dot))}</span><span style="color:${primary};font-weight:800;">${escapeHtml(name.slice(dot))}</span>`;
   }
-  return `<span style="color:${C.primary};font-weight:800;">${escapeHtml(name)}</span>`;
+  return `<span style="color:${primary};font-weight:800;">${escapeHtml(name)}</span>`;
+}
+
+// The header brand block: the Business's logo image when set, else the
+// wordmark recolored to the Business primary.
+function brandHeader(brand, theme) {
+  if (theme.logoUrl) {
+    const alt = escapeHtml(brand);
+    const src = escapeHtml(theme.logoUrl);
+    return `<img src="${src}" alt="${alt}" width="160" style="max-width:160px;max-height:44px;display:block;object-fit:contain;border:0;">`;
+  }
+  return brandWordmark(brand, theme.primary);
 }
 
 function preheaderBlock(preheader) {
@@ -70,16 +121,17 @@ function preheaderBlock(preheader) {
 }
 
 // Bulletproof CTA: VML rounded rect for Outlook, normal anchor for everyone else.
-function ctaButton(text, href) {
+// Filled with the Business primary when business-branded.
+function ctaButton(text, href, primary = C.primary) {
   const safeHref = escapeHtml(href);
   const safeText = escapeHtml(text);
   return `<!--[if mso]>
-  <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${safeHref}" style="height:44px;v-text-anchor:middle;width:240px;" arcsize="50%" strokecolor="${C.primary}" fillcolor="${C.primary}">
+  <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${safeHref}" style="height:44px;v-text-anchor:middle;width:240px;" arcsize="50%" strokecolor="${primary}" fillcolor="${primary}">
     <w:anchorlock/>
     <center style="color:#ffffff;font-family:Arial,sans-serif;font-size:15px;font-weight:700;">${safeText}</center>
   </v:roundrect>
   <![endif]-->
-  <a href="${safeHref}" style="display:inline-block;background:${C.primary};color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:12px 28px;border-radius:999px;mso-hide:all;">${safeText}</a>`;
+  <a href="${safeHref}" style="display:inline-block;background:${primary};color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:12px 28px;border-radius:999px;mso-hide:all;">${safeText}</a>`;
 }
 
 function appBase() {
@@ -165,12 +217,18 @@ function badge(text, bg = C.primaryLight, fg = C.primaryDark) {
 /**
  * The shared prod-grade shell (ADR-0005). Table-based for Outlook, inline
  * styled, forced-dark styles, preheader, optional CTA and venue contact.
+ * `tokens` ({ logo_url, primary, accent, platform }) themes the header brand,
+ * CTA and badges to the Business; the footer always attributes the platform.
  */
-function shell({ brand = DEFAULT_BRAND, preheader, content, ctaText, ctaHref, plainText, dark = true } = {}) {
+function shell({ brand = DEFAULT_BRAND, tokens, preheader, content, ctaText, ctaHref, plainText, dark = true } = {}) {
+  const theme = themeFor(tokens);
   const safeBrand = escapeHtml(brand);
+  // The footer always attributes the platform when business-branded (tokens
+  // carry the platform name); otherwise it attributes the brand itself.
+  const footerBrand = theme.platform || brand;
   const cta = ctaText && ctaHref ? `
       <table role="presentation" cellpadding="0" cellspacing="0" align="center" style="border-collapse:collapse;margin:24px auto 0;">
-        <tr><td align="center">${ctaButton(ctaText, ctaHref)}</td></tr>
+        <tr><td align="center">${ctaButton(ctaText, ctaHref, theme.primary)}</td></tr>
       </table>` : '';
   const plain = plainText ? `<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:${C.paper};">${escapeHtml(plainText).slice(0, 200)}</div>` : '';
   return `<!DOCTYPE html>
@@ -192,7 +250,7 @@ ${plain}
       <table role="presentation" width="600" cellpadding="0" cellspacing="0" class="ms-shell" style="border-collapse:collapse;width:600px;max-width:600px;background:${C.surface};border-radius:24px;border:1px solid ${C.border};">
         <tr>
           <td style="padding:28px 32px 8px;">
-            <p style="margin:0;font-size:24px;letter-spacing:-0.5px;">${brandWordmark(brand)}</p>
+            <p style="margin:0;font-size:24px;letter-spacing:-0.5px;">${brandHeader(brand, theme)}</p>
           </td>
         </tr>
         <tr>
@@ -203,7 +261,7 @@ ${plain}
         </tr>
         <tr>
           <td class="ms-footer" style="padding:16px 32px 28px;border-top:1px solid ${C.border};">
-            <p class="ms-muted" style="margin:0;color:${C.ink2};font-size:12px;line-height:1.6;text-align:center;">${safeBrand} — book courts, join games, find players.<br>This is a transactional message about your account.</p>
+            <p class="ms-muted" style="margin:0;color:${C.ink2};font-size:12px;line-height:1.6;text-align:center;">${escapeHtml(footerBrand)} — book courts, join games, find players.<br>This is a transactional message about your account.</p>
           </td>
         </tr>
       </table>
@@ -223,6 +281,7 @@ async function qrPng(token, width = 160) {
 // ---- Builders ----
 
 function buildBookingHtml(booking, brand = DEFAULT_BRAND, opts = {}) {
+  const th = themeFor(opts.tokens);
   const venue = booking?.venue_name || '';
   const what = venue ? `at ${venue}` : 'is booked';
   const preheader = `Your slot ${what} — ${fmtWhen(booking?.start_at)}. Show this QR at check-in.`;
@@ -242,11 +301,12 @@ function buildBookingHtml(booking, brand = DEFAULT_BRAND, opts = {}) {
     text,
     html: shell({
       brand,
+      tokens: opts.tokens,
       preheader,
       content: `
         <h1 class="ms-ink" style="margin:0 0 8px;color:${C.ink};font-size:22px;font-weight:800;line-height:1.25;">Your slot is booked</h1>
         <p class="ms-ink2" style="margin:0 0 20px;color:${C.ink2};font-size:15px;">Show the QR code at the venue to check in.</p>
-        ${badge('Confirmed')}
+        ${badge('Confirmed', th.badgeBg, th.badgeFg)}
         ${bookingCard(booking)}
         ${qrBlock(opts.qr || null)}
         <p class="ms-muted" style="margin:6px 0 0;color:${C.ink2};font-size:12px;">Also in the app under Bookings.</p>`,
@@ -261,6 +321,7 @@ function buildBookingHtml(booking, brand = DEFAULT_BRAND, opts = {}) {
 }
 
 function buildOwnerBookingHtml(booking, brand = DEFAULT_BRAND, opts = {}) {
+  const th = themeFor(opts.tokens);
   const preheader = `A new booking at ${booking?.venue_name || 'your venue'} — ${fmtWhen(booking?.start_at)}.`;
   const text = plainLines(
     `New booking — ${booking?.venue_name || ''}`,
@@ -279,11 +340,12 @@ function buildOwnerBookingHtml(booking, brand = DEFAULT_BRAND, opts = {}) {
     text,
     html: shell({
       brand,
+      tokens: opts.tokens,
       preheader,
       content: `
         <h1 class="ms-ink" style="margin:0 0 8px;color:${C.ink};font-size:22px;font-weight:800;line-height:1.25;">New booking at your venue</h1>
         <p class="ms-ink2" style="margin:0 0 20px;color:${C.ink2};font-size:15px;">Ready for the next player.</p>
-        ${badge('New booking')}
+        ${badge('New booking', th.badgeBg, th.badgeFg)}
         ${bookingCard(booking)}`,
       ctaText: 'Open console',
       ctaHref: `${consoleBase()}`,
@@ -293,6 +355,7 @@ function buildOwnerBookingHtml(booking, brand = DEFAULT_BRAND, opts = {}) {
 }
 
 function buildReminderHtml(booking, brand = DEFAULT_BRAND, opts = {}) {
+  const th = themeFor(opts.tokens);
   const preheader = `Reminder: your booking at ${booking?.venue_name || ''} is tomorrow — ${fmtWhen(booking?.start_at)}.`;
   const text = plainLines(
     `Reminder — your booking is coming up`,
@@ -308,11 +371,12 @@ function buildReminderHtml(booking, brand = DEFAULT_BRAND, opts = {}) {
     text,
     html: shell({
       brand,
+      tokens: opts.tokens,
       preheader,
       content: `
         <h1 class="ms-ink" style="margin:0 0 8px;color:${C.ink};font-size:22px;font-weight:800;line-height:1.25;">See you tomorrow!</h1>
         <p class="ms-ink2" style="margin:0 0 20px;color:${C.ink2};font-size:15px;">Your booking is coming up — arrive a few minutes early.</p>
-        ${badge('Reminder')}
+        ${badge('Reminder', th.badgeBg, th.badgeFg)}
         ${bookingCard(booking)}
         ${qrBlock(opts.qr || null)}
         <p class="ms-muted" style="margin:6px 0 0;color:${C.ink2};font-size:12px;">Your QR code stays valid; don't forward this email.</p>`,
@@ -327,6 +391,7 @@ function buildReminderHtml(booking, brand = DEFAULT_BRAND, opts = {}) {
 }
 
 function buildBillHtml(booking, brand = DEFAULT_BRAND, opts = {}) {
+  const th = themeFor(opts.tokens);
   const preheader = `Your bill for ${booking?.venue_name || 'your booking'} is ready.`;
   const base = Number(booking?.total_price || 0) - Number(booking?.tax_amount || 0) - Number(booking?.venue_tax_amount || 0);
   const text = plainLines(
@@ -345,11 +410,12 @@ function buildBillHtml(booking, brand = DEFAULT_BRAND, opts = {}) {
     text,
     html: shell({
       brand,
+      tokens: opts.tokens,
       preheader,
       content: `
         <h1 class="ms-ink" style="margin:0 0 8px;color:${C.ink};font-size:22px;font-weight:800;line-height:1.25;">Your bill is ready</h1>
         <p class="ms-ink2" style="margin:0 0 20px;color:${C.ink2};font-size:15px;">Thanks for playing — details below.</p>
-        ${badge('Bill')}
+        ${badge('Bill', th.badgeBg, th.badgeFg)}
         ${bookingCard(booking)}
         ${qrBlock(opts.qr || null)}
         <p class="ms-muted" style="margin:6px 0 0;color:${C.ink2};font-size:12px;">The PDF is attached; the QR inside is your check-in code.</p>`,
@@ -364,6 +430,7 @@ function buildBillHtml(booking, brand = DEFAULT_BRAND, opts = {}) {
 }
 
 function buildRegistrationBillHtml(reg, brand = DEFAULT_BRAND, opts = {}) {
+  const th = themeFor(opts.tokens);
   const amount = Number(reg?.amount || 0);
   const preheader = `Your bill for ${reg?.event_name || 'your event'} is ready.`;
   const text = plainLines(
@@ -381,11 +448,12 @@ function buildRegistrationBillHtml(reg, brand = DEFAULT_BRAND, opts = {}) {
     text,
     html: shell({
       brand,
+      tokens: opts.tokens,
       preheader,
       content: `
         <h1 class="ms-ink" style="margin:0 0 8px;color:${C.ink};font-size:22px;font-weight:800;line-height:1.25;">Your bill is ready</h1>
         <p class="ms-ink2" style="margin:0 0 20px;color:${C.ink2};font-size:15px;">Your event registration — summary below.</p>
-        ${badge('Bill')}
+        ${badge('Bill', th.badgeBg, th.badgeFg)}
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="ms-card" style="border-collapse:collapse;background:${C.surface};border:1px solid ${C.border};border-radius:16px;">
           <tr><td style="padding:20px 24px;">
             <p class="ms-ink" style="margin:0 0 4px;color:${C.ink};font-size:17px;font-weight:800;">${escapeHtml(reg?.event_name || '')}</p>
@@ -526,6 +594,7 @@ function taxLine(rate, tax, venueRate, venueTax) {
 }
 
 function buildPlayerCancelledHtml(booking, refund, brand = DEFAULT_BRAND, opts = {}) {
+  const th = themeFor(opts.tokens);
   const refundAmount = Number(refund?.refund_amount || 0);
   const refundLine = refundAmount > 0
     ? `<p class="ms-ink" style="margin:14px 0 0;color:${C.ink};font-size:14px;"><strong>Refund:</strong> ${fmtLkr(refundAmount)} will be returned to your payment method.</p>`
@@ -545,6 +614,7 @@ function buildPlayerCancelledHtml(booking, refund, brand = DEFAULT_BRAND, opts =
     text,
     html: shell({
       brand,
+      tokens: opts.tokens,
       preheader,
       content: `
         <h1 class="ms-ink" style="margin:0 0 8px;color:${C.ink};font-size:22px;font-weight:800;line-height:1.25;">Booking cancelled</h1>
@@ -560,6 +630,7 @@ function buildPlayerCancelledHtml(booking, refund, brand = DEFAULT_BRAND, opts =
 }
 
 function buildOwnerBookingCancelledHtml(booking, brand = DEFAULT_BRAND, opts = {}) {
+  const th = themeFor(opts.tokens);
   const preheader = `A player cancelled a booking at ${booking?.venue_name || 'your venue'}.`;
   const text = plainLines(
     'Booking cancelled at your venue',
@@ -575,6 +646,7 @@ function buildOwnerBookingCancelledHtml(booking, brand = DEFAULT_BRAND, opts = {
     text,
     html: shell({
       brand,
+      tokens: opts.tokens,
       preheader,
       content: `
         <h1 class="ms-ink" style="margin:0 0 8px;color:${C.warning};font-size:22px;font-weight:800;line-height:1.25;">A booking was cancelled</h1>
@@ -589,6 +661,7 @@ function buildOwnerBookingCancelledHtml(booking, brand = DEFAULT_BRAND, opts = {
 }
 
 function buildVenueCancelledHtml(booking, brand = DEFAULT_BRAND, opts = {}) {
+  const th = themeFor(opts.tokens);
   const preheader = `Your booking at ${booking?.venue_name || ''} was cancelled by the venue.`;
   const text = plainLines(
     'Booking cancelled by the venue',
@@ -603,6 +676,7 @@ function buildVenueCancelledHtml(booking, brand = DEFAULT_BRAND, opts = {}) {
     text,
     html: shell({
       brand,
+      tokens: opts.tokens,
       preheader,
       content: `
         <h1 class="ms-ink" style="margin:0 0 8px;color:${C.error};font-size:22px;font-weight:800;line-height:1.25;">Booking cancelled by the venue</h1>
@@ -617,6 +691,7 @@ function buildVenueCancelledHtml(booking, brand = DEFAULT_BRAND, opts = {}) {
 }
 
 function buildEventRegisteredHtml(reg, brand = DEFAULT_BRAND, opts = {}) {
+  const th = themeFor(opts.tokens);
   const preheader = `You're in for ${reg?.event_name || 'the event'} — see you there.`;
   const text = plainLines(
     `You're in — ${reg?.event_name || ''}`,
@@ -630,11 +705,12 @@ function buildEventRegisteredHtml(reg, brand = DEFAULT_BRAND, opts = {}) {
     text,
     html: shell({
       brand,
+      tokens: opts.tokens,
       preheader,
       content: `
         <h1 class="ms-ink" style="margin:0 0 8px;color:${C.ink};font-size:22px;font-weight:800;line-height:1.25;">You're in!</h1>
         <p class="ms-ink2" style="margin:0 0 20px;color:${C.ink2};font-size:15px;">Your registration is confirmed.</p>
-        ${badge('Registered')}
+        ${badge('Registered', th.badgeBg, th.badgeFg)}
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="ms-card" style="border-collapse:collapse;background:${C.surface};border:1px solid ${C.border};border-radius:16px;">
           <tr><td style="padding:20px 24px;">
             <p class="ms-ink" style="margin:0 0 4px;color:${C.ink};font-size:17px;font-weight:800;">${escapeHtml(reg?.event_name || '')}</p>
@@ -650,6 +726,7 @@ function buildEventRegisteredHtml(reg, brand = DEFAULT_BRAND, opts = {}) {
 }
 
 function buildEventCancelledHtml(reg, brand = DEFAULT_BRAND, opts = {}) {
+  const th = themeFor(opts.tokens);
   const preheader = `${reg?.event_name || 'The event'} has been cancelled.`;
   const text = plainLines(
     'Event cancelled',
@@ -664,6 +741,7 @@ function buildEventCancelledHtml(reg, brand = DEFAULT_BRAND, opts = {}) {
     text,
     html: shell({
       brand,
+      tokens: opts.tokens,
       preheader,
       content: `
         <h1 class="ms-ink" style="margin:0 0 8px;color:${C.error};font-size:22px;font-weight:800;line-height:1.25;">Event cancelled</h1>
@@ -680,6 +758,7 @@ function buildEventCancelledHtml(reg, brand = DEFAULT_BRAND, opts = {}) {
 }
 
 function buildEventCancelledOwnerHtml(event, brand = DEFAULT_BRAND, opts = {}) {
+  const th = themeFor(opts.tokens);
   const preheader = `${event?.name || 'Your event'} has been cancelled.`;
   const text = plainLines(
     'Event cancelled',
@@ -693,6 +772,7 @@ function buildEventCancelledOwnerHtml(event, brand = DEFAULT_BRAND, opts = {}) {
     text,
     html: shell({
       brand,
+      tokens: opts.tokens,
       preheader,
       content: `
         <h1 class="ms-ink" style="margin:0 0 8px;color:${C.error};font-size:22px;font-weight:800;line-height:1.25;">Event cancelled</h1>
@@ -824,6 +904,8 @@ module.exports = {
   DEFAULT_BRAND,
   escapeHtml,
   brandWordmark,
+  brandHeader,
+  themeFor,
   shell,
   qrPng,
   badge,

@@ -140,28 +140,43 @@ describe("BookPanel", () => {
     });
   });
 
-  it("shows a skeleton while auth is loading instead of flashing the login form", () => {
+  it("shows the picker immediately while auth is loading — never the sign-in UI", () => {
     ctxLoading = true;
     renderPanel();
-    // The misleading "Sign in to book" login UI must NOT appear during auth
-    // resolution — a placeholder skeleton is shown until the session settles.
+    expect(screen.getByRole("heading", { name: /book a slot/i })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: /sign in to book/i })).not.toBeInTheDocument();
-    expect(screen.getByTestId("identity-skeleton")).toBeInTheDocument();
   });
 
-  it("keeps the skeleton during loading even when the session is already verified", () => {
+  it("a verified session changes nothing about the picker while loading", () => {
     ctxLoading = true;
     ctxUser = verifiedUser;
     renderPanel();
-    expect(screen.queryByRole("heading", { name: /book a slot/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /book a slot/i })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: /complete your booking details/i })).not.toBeInTheDocument();
-    expect(screen.getByTestId("identity-skeleton")).toBeInTheDocument();
   });
 
-  it("shows the sign-in step for an anonymous visitor", () => {
+  it("lets a guest pick slots freely, then signs in at the confirm step (ADR-0033)", async () => {
+    const { venues } = await import("@myslot/api");
+    (venues.availability as typeof vi.fn).mockResolvedValue(availability);
     renderPanel();
-    expect(screen.getByRole("heading", { name: /sign in to book/i })).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("you@example.com")).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(screen.getByText(/book a slot/i)).toBeInTheDocument();
+    });
+    await userEvent.selectOptions(screen.getByLabelText(/duration/i), "60");
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /2026|10:00/i })).toBeDefined();
+    });
+    await userEvent.click(screen.getByRole("button", { name: /2026|10:00/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /sign in \/ sign up to book/i })).toBeInTheDocument();
+    });
+    await userEvent.click(screen.getByRole("button", { name: /sign in \/ sign up to book/i }));
+    await waitFor(() => {
+      expect(screen.getAllByRole("heading", { name: /sign in to book/i }).length).toBeGreaterThan(0);
+      expect(screen.getByPlaceholderText("you@example.com")).toBeInTheDocument();
+    });
   });
 
   it("a fully-verified player skips straight to the picker", async () => {

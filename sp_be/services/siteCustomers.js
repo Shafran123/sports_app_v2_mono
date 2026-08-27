@@ -9,7 +9,7 @@ const pool = require('../db');
 const siteDomains = require('./siteDomains');
 const { formatSriLankanPhone } = require('../utils/smsService');
 const { sendSms } = require('../utils/smsService');
-const { sendEmail } = require('../utils/emailService');
+const { sendEmail, buildVerificationCodeHtml } = require('../utils/emailService');
 const { getBrandName } = require('../utils/featureFlags');
 const { recordOutbound } = require('../utils/notificationCatalog');
 
@@ -294,10 +294,12 @@ async function sendEmailCode(customerId, rawEmail) {
   const code = generateCode();
   const salt = crypto.randomBytes(16).toString('hex');
   const brand = await getBrandName();
+  const { text, html } = buildVerificationCodeHtml(code, brand, CODE_TTL_MINUTES);
   await sendEmail({
     to: email,
     subject: `${brand} — verify your email`,
-    text: `Your ${brand} verification code is ${code}. It expires in ${CODE_TTL_MINUTES} minutes.`
+    html,
+    text
   });
   await pool.query(
     `insert into site_customer_otps (site_customer_id, channel, target, code_hash, salt, expires_at)

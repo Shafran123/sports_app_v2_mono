@@ -23,9 +23,10 @@ import { SiteAccountPanel } from "./site-account-panel";
 // the Business's look with no per-page edits. The marketplace host keeps the
 // platform defaults.
 //
-// ADR-0032: the page background is always neutral (no brand tint), the header
-// stays slim (logo + name + account), and venue switching lives in a dialog
-// reachable only from venue pages — never the home page.
+// ADR-0034 rev.: the home page drops the header entirely — its banner carries
+// the logo, name and account control (SiteHome). The header (logo + account +
+// venue chooser) is only for the venue/booking pages. The footer is pure legal
+// + attribution: Social Links and the "Find us" dialog moved up to the home.
 
 const BRAND_TOKEN_FALLBACKS = {
   "--color-primary": "#16a34a",
@@ -64,14 +65,11 @@ export function SiteChrome({ config, children }: { config: SiteConfig; children:
     };
   }, [style]);
 
-  // Venue switching is a detail-page affordance (ADR-0032): the portfolio
-  // root has its own grid and the legal pages have none, so the header
-  // chooser only appears on actual venue pages.
+  // The home page has no header (ADR-0034 rev.): its banner carries the logo,
+  // the account control and the "Find us" bar. The venue chooser stays a
+  // detail-page affordance (ADR-0032) — the header only renders off-home.
   const isVenuePage =
     venues.some((v) => v.slug && `/${v.slug}` === pathname) || /^\/venues\/[^/]+$/.test(pathname);
-  // On the home page the hero image reaches the very top of the viewport and
-  // the nav stacks over it, transparent over a dark shade — a classic
-  // full-bleed hero. Everywhere else the header is the solid sticky bar.
   const isHome = pathname === "/";
   const openVenue = (id: string) => {
     setPickerOpen(false);
@@ -80,54 +78,52 @@ export function SiteChrome({ config, children }: { config: SiteConfig; children:
   };
 
   return (
-    <div style={style} className="flex min-h-screen flex-col bg-paper text-ink">
-      <header
-        className={
-          isHome
-            ? "absolute inset-x-0 top-0 z-40 border-b border-white/10 bg-gradient-to-b from-ink/55 to-transparent"
-            : "sticky top-0 z-40 border-b border-border bg-surface/90 backdrop-blur"
-        }
-      >
-        <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-2.5 md:px-6 md:py-3">
-          <Link href="/" className="flex min-w-0 items-center gap-2.5" aria-label={business.name}>
-            {business.brand?.logo_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={business.brand.logo_url} alt="" className="h-10 w-auto shrink-0 object-contain md:h-11" />
-            ) : null}
-            {!isHome && (
-              <p className="truncate font-display text-lg font-extrabold tracking-tight text-ink md:text-xl">
-                {business.name}
-              </p>
-            )}
-          </Link>
-          <div className="ml-auto flex items-center gap-2">
-            {multi && isVenuePage ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setPickerOpen(true)}
-                  className="hidden rounded-full border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink-2 transition-colors hover:text-ink sm:inline-flex"
-                >
-                  Switch venue
-                </button>
-                <button
-                  type="button"
-                  aria-label="Choose a venue"
-                  onClick={() => setPickerOpen(true)}
-                  className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-surface text-ink-2 transition-colors hover:text-ink sm:hidden"
-                >
-                  <Map className="h-4 w-4" />
-                </button>
-              </>
-            ) : null}
-            <SiteAccountPanel business={business} onDark={isHome} />
+    <div
+      style={style}
+      className={
+        isHome
+          ? "flex min-h-screen flex-col bg-paper text-ink lg:h-screen lg:overflow-hidden"
+          : "flex min-h-screen flex-col bg-paper text-ink"
+      }
+    >
+      {!isHome && (
+        <header className="sticky top-0 z-40 border-b border-border bg-surface/90 backdrop-blur">
+          <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-2.5 md:px-6 md:py-3">
+            <Link href="/" className="flex min-w-0 items-center gap-2.5" aria-label={business.name}>
+              {business.brand?.logo_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={business.brand.logo_url} alt="" className="h-10 w-auto shrink-0 object-contain md:h-11" />
+              ) : null}
+            </Link>
+            <div className="ml-auto flex items-center gap-2">
+              {multi && isVenuePage ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setPickerOpen(true)}
+                    className="hidden rounded-full border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink-2 transition-colors hover:text-ink sm:inline-flex"
+                  >
+                    Switch venue
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Choose a venue"
+                    onClick={() => setPickerOpen(true)}
+                    className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-surface text-ink-2 transition-colors hover:text-ink sm:hidden"
+                  >
+                    <Map className="h-4 w-4" />
+                  </button>
+                </>
+              ) : null}
+              <SiteAccountPanel business={business} />
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
+      )}
 
-      <div className="flex-1">{children}</div>
+      <div className={isHome ? "flex min-h-0 flex-1 flex-col" : "flex-1"}>{children}</div>
 
-      <footer className="border-t border-border bg-surface/60 py-8">
+      <footer className="shrink-0 border-t border-border bg-surface/60 py-6">
         <div className="mx-auto max-w-6xl px-4 text-center text-xs text-ink-3 md:px-6">
           <p className="font-semibold text-ink-2">{business.name}</p>
           {business.brand?.tagline ? <p className="mt-0.5">{business.brand.tagline}</p> : null}
@@ -151,7 +147,18 @@ export function SiteChrome({ config, children }: { config: SiteConfig; children:
       <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
         <DialogContent title="Choose a venue" className="max-w-md">
           <p className="mb-3 text-sm text-ink-2">Pick a venue to book. You can switch anytime.</p>
-          <VenueStep venues={venues} selectedId={null} onSelect={openVenue} />
+          <VenueStep
+                venues={venues.map((v) => ({
+                  id: v.id,
+                  name: v.name,
+                  photos: v.photos,
+                  sports: v.sports?.map((s) => s.name),
+                  city: v.city
+                }))}
+                selectedId={null}
+                onSelect={openVenue}
+                flat
+              />
         </DialogContent>
       </Dialog>
     </div>

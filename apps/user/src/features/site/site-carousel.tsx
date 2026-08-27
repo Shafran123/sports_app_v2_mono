@@ -1,12 +1,12 @@
 "use client";
 
-// The site hero gallery (ADR-0032 + revamp): auto-rotating slide set that
-// accepts an optional persistent overlay (the Business name / headline / CTA
-// on the site home). Autoplay pauses on hover and focus, stops while the tab
-// is hidden, and never runs for users who prefer reduced motion. Slides keep
-// their caption as a compact pill (top-right) so it never collides with the
-// brand overlay. Render all slides in a translated track so swiping is cheap
-// and images preload.
+// The photo carousel (ADR-0032 + revamp): auto-rotating slide set used for a
+// venue's photo set on its detail page and the Branded Venue Page (ADR-0034:
+// the home hero/gallery is gone, but the component survives for venue photos).
+// Autoplay pauses on hover and focus, stops while the tab is hidden, and never
+// runs for users who prefer reduced motion. Slides keep their caption as a
+// compact pill (top-right) so it never collides with the brand overlay. Render
+// all slides in a translated track so swiping is cheap and images preload.
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -137,7 +137,7 @@ export function SiteCarousel({
                 and dead-center it — this must match the nav bar's own
                 centered max-w-6xl block instead. */}
             <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/80 via-ink/30 to-transparent">
-              <div className="mx-auto max-w-6xl px-4 pb-10 md:px-6 md:pb-14">{overlay}</div>
+              <div className="mx-auto max-w-6xl px-4 pb-4 md:px-6 md:pb-6">{overlay}</div>
             </div>
           </div>
         ) : null}

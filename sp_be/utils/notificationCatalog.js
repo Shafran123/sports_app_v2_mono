@@ -5,6 +5,7 @@ const emailTemplates = require('./emailTemplates');
 const smsService = require('./smsService');
 const { getBrandName, getSmsEvents } = require('./featureFlags');
 const { loadBookingForEvents, loadQrToken } = require('./bookingLoader');
+const { brandTokens } = require('./brandContext');
 
 // Booking-key emails that carry the player's inline check-in QR. QR is never
 // rendered on owner/admin roles (guarded in the email loop + confirmed here).
@@ -17,22 +18,29 @@ function firstNameOf(booking) {
 
 // ---- Event / registration loaders (notification-specific shapes) ----
 
+// Business context rides along (brand-consolidation ticket 02): events belong
+// to a venue which belongs to a Business, so event messages can carry the
+// Business's own branding too.
 const EVENT_REGISTRATION_SELECT = `
   select r.id, r.user_id, r.status, e.id as event_id, e.name as event_name,
          e.start_at as event_start, e.end_at as event_end, e.city as event_city,
          v.name as venue_name,
+         biz.id as business_id, biz.name as business_name, biz.brand as business_brand,
          u.email as player_email, u.phone as player_phone, u.name as player_name
   from event_registrations r
   join events e on e.id = r.event_id
   left join venues v on v.id = e.venue_id
+  left join businesses biz on biz.id = v.business_id
   join users u on u.id = r.user_id
   where r.id = $1`;
 
 const EVENT_SELECT = `
   select e.*, v.name as venue_name,
+         biz.id as business_id, biz.name as business_name, biz.brand as business_brand,
          u.id as organizer_id, u.email as organizer_email, u.phone as organizer_phone
   from events e
   left join venues v on v.id = e.venue_id
+  left join businesses biz on biz.id = v.business_id
   join users u on u.id = e.organizer_id
   where e.id = $1`;
 
@@ -82,6 +90,19 @@ async function recordOutbound({ channel, to, key, status, error, providerRef }) 
 }
 
 // ---- Recipient resolution ----
+
+// The Business context for a dispatch (brand-consolidation ticket 02):
+// booking/event rows carry `business_id`/`business_name`/`business_brand`
+// from the loader; the site-request flow passes a full `payload.business`.
+// Returns null when the message has no Business (platform-branded by default).
+function businessFromPayload(payload) {
+  if (payload?.business && (payload.business.name || payload.business.brand)) {
+    return { id: payload.business.id || null, name: payload.business.name || null, brand: payload.business.brand || null };
+  }
+  const source = payload?.booking || payload?.registration || payload?.event || null;
+  if (!source || (!source.business_name && !source.business_brand)) return null;
+  return { id: source.business_id || null, name: source.business_name || null, brand: source.business_brand || null };
+}
 
 function recipientsForBooking(payload, role) {
   const b = payload.booking;
@@ -137,11 +158,11 @@ const MESSAGES = {
     buildInApp: () => ({ type: 'booking_confirmed', title: 'Booking confirmed', body: 'Your booking has been confirmed.' }),
     buildEmail: (ctx, role) => {
       if (role === 'owner') {
-        const built = emailService.buildOwnerBookingHtml(ctx.payload.booking, ctx.brand);
+        const built = emailService.buildOwnerBookingHtml(ctx.payload.booking, ctx.brand, { tokens: ctx.tokens });
         return { subject: `New booking — ${ctx.payload.booking.venue_name || 'your venue'}`, html: built.html, text: built.text };
       }
       const first = firstNameOf(ctx.payload.booking);
-      const built = emailService.buildBookingHtml(ctx.payload.booking, ctx.brand, ctx.qr ? { qr: { cid: ctx.qr.cid } } : {});
+      const built = emailService.buildBookingHtml(ctx.payload.booking, ctx.brand, { ...(ctx.qr ? { qr: { cid: ctx.qr.cid } } : {}), tokens: ctx.tokens });
       return {
         subject: first
           ? `${first}, your court at ${ctx.payload.booking.venue_name || 'the venue'} is booked`
@@ -162,7 +183,7 @@ const MESSAGES = {
     recipients: recipientsForBooking,
     buildEmail: (ctx) => {
       const first = firstNameOf(ctx.payload.booking);
-      const built = emailService.buildReminderHtml(ctx.payload.booking, ctx.brand, ctx.qr ? { qr: { cid: ctx.qr.cid } } : {});
+      const built = emailService.buildReminderHtml(ctx.payload.booking, ctx.brand, { ...(ctx.qr ? { qr: { cid: ctx.qr.cid } } : {}), tokens: ctx.tokens });
       return {
         subject: first
           ? `Reminder, ${first} — your booking at ${ctx.payload.booking.venue_name || 'the venue'} is tomorrow`
@@ -188,7 +209,11 @@ const MESSAGES = {
       const attachments = [{ filename: `spots-bill-${booking.id.slice(0, 8)}.pdf`, content: pdf, contentType: 'application/pdf' }];
       let qr;
       if (booking.qr_token) qr = { cid: 'booking-qr.png', png: await emailTemplates.qrPng(booking.qr_token) };
-      const built = emailService.buildBillHtml(booking, ctx.brand, qr ? { qr: { cid: qr.cid } } : {});
+      // The bill reloads its own booking (the dispatch payload only carries
+      // the id), so resolve the Business branding from the reloaded row.
+      const brand = booking.business_name || ctx.brand;
+      const tokens = booking.business_name ? brandTokens(booking.business_brand, ctx.brand) : ctx.tokens;
+      const built = emailService.buildBillHtml(booking, brand, { ...(qr ? { qr: { cid: qr.cid } } : {}), tokens });
       if (qr) attachments.push({ filename: 'booking-qr.png', content: qr.png, contentType: 'image/png', inline: true });
       return {
         to: booking.user_email,
@@ -209,7 +234,9 @@ const MESSAGES = {
       if (!reg || !reg.player_email) return null;
       const pdf = await billService.registrationBillPdf(ctx.payload.registrationId);
       if (!pdf) return null;
-      const built = emailService.buildRegistrationBillHtml(reg, ctx.brand);
+      const brand = reg.business_name || ctx.brand;
+      const tokens = reg.business_name ? brandTokens(reg.business_brand, ctx.brand) : ctx.tokens;
+      const built = emailService.buildRegistrationBillHtml(reg, brand, { tokens });
       return {
         to: reg.player_email,
         subject: `Your bill — ${reg.event_name || 'event registration'}`,
@@ -228,11 +255,11 @@ const MESSAGES = {
     buildInApp: () => ({ type: 'booking_cancelled', title: 'Booking cancelled', body: 'Your booking has been cancelled.' }),
     buildEmail: (ctx, role) => {
       if (role === 'owner') {
-        const built = emailService.buildOwnerBookingCancelledHtml(ctx.payload.booking, ctx.brand);
+        const built = emailService.buildOwnerBookingCancelledHtml(ctx.payload.booking, ctx.brand, { tokens: ctx.tokens });
         return { subject: `Booking cancelled — ${ctx.payload.booking.venue_name || 'your venue'}`, html: built.html, text: built.text };
       }
       const first = firstNameOf(ctx.payload.booking);
-      const built = emailService.buildPlayerCancelledHtml(ctx.payload.booking, ctx.payload.refund, ctx.brand);
+      const built = emailService.buildPlayerCancelledHtml(ctx.payload.booking, ctx.payload.refund, ctx.brand, { tokens: ctx.tokens });
       return {
         subject: first
           ? `${first}, your booking at ${ctx.payload.booking.venue_name || 'the venue'} was cancelled`
@@ -253,7 +280,7 @@ const MESSAGES = {
     recipients: recipientsForBooking,
     buildInApp: () => ({ type: 'booking_cancelled', title: 'Booking cancelled', body: 'Your booking has been cancelled by the venue.' }),
     buildEmail: (ctx) => {
-      const built = emailService.buildVenueCancelledHtml(ctx.payload.booking, ctx.brand);
+      const built = emailService.buildVenueCancelledHtml(ctx.payload.booking, ctx.brand, { tokens: ctx.tokens });
       return { subject: `Booking cancelled — ${ctx.payload.booking.venue_name || 'your booking'}`, html: built.html, text: built.text };
     },
     buildSms: (ctx) => smsService.buildVenueCancelledSms(ctx.payload.booking, ctx.brand)
@@ -266,7 +293,7 @@ const MESSAGES = {
     recipients: recipientsForBooking,
     buildInApp: () => ({ type: 'booking_cancelled', title: 'Booking cancelled', body: 'Your booking has been cancelled.' }),
     buildEmail: (ctx) => {
-      const built = emailService.buildVenueCancelledHtml(ctx.payload.booking, ctx.brand);
+      const built = emailService.buildVenueCancelledHtml(ctx.payload.booking, ctx.brand, { tokens: ctx.tokens });
       return { subject: `Booking cancelled — ${ctx.payload.booking.venue_name || 'your booking'}`, html: built.html, text: built.text };
     },
     buildSms: (ctx) => smsService.buildVenueCancelledSms(ctx.payload.booking, ctx.brand)
@@ -285,7 +312,7 @@ const MESSAGES = {
     recipients: recipientsForRegistration,
     buildInApp: (ctx) => ({ type: 'event_registered', title: 'Registration confirmed', body: `You're registered for ${ctx.payload.registration.event_name || 'the event'}.` }),
     buildEmail: (ctx) => {
-      const built = emailService.buildEventRegisteredHtml(ctx.payload.registration, ctx.brand);
+      const built = emailService.buildEventRegisteredHtml(ctx.payload.registration, ctx.brand, { tokens: ctx.tokens });
       return { subject: `You're in — ${ctx.payload.registration.event_name || 'the event'}`, html: built.html, text: built.text };
     },
     buildSms: (ctx) => smsService.buildEventRegisteredSms(ctx.payload.registration, ctx.brand)
@@ -299,10 +326,10 @@ const MESSAGES = {
     buildInApp: (ctx) => ({ type: 'event_cancelled', title: 'Event cancelled', body: `The event ${ctx.payload.event.name || ''} has been cancelled.` }),
     buildEmail: (ctx, role) => {
       if (role === 'organizer') {
-        const built = emailService.buildEventCancelledOwnerHtml(ctx.payload.event, ctx.brand);
+        const built = emailService.buildEventCancelledOwnerHtml(ctx.payload.event, ctx.brand, { tokens: ctx.tokens });
         return { subject: `Event cancelled — ${ctx.payload.event.name || 'your event'}`, html: built.html, text: built.text };
       }
-      const built = emailService.buildEventCancelledHtml({ event_name: ctx.payload.event.name, event_start: ctx.payload.event.start_at }, ctx.brand);
+      const built = emailService.buildEventCancelledHtml({ event_name: ctx.payload.event.name, event_start: ctx.payload.event.start_at }, ctx.brand, { tokens: ctx.tokens });
       return { subject: `Event cancelled — ${ctx.payload.event.name || ''}`, html: built.html, text: built.text };
     },
     buildSms: (ctx) => smsService.buildEventCancelledSms({ event_name: ctx.payload.event.name, event_start: ctx.payload.event.start_at }, ctx.brand)
@@ -382,6 +409,7 @@ const MESSAGES = {
 
       const html = emailTemplates.shell({
         brand: ctx.brand,
+        tokens: ctx.tokens,
         preheader: statusText,
         content: `
           <h1 class="ms-ink" style="margin:0 0 8px;color:#1c1c1a;font-size:22px;font-weight:800;line-height:1.25;">${ctx.payload.business?.name ? `<span style="color:#8a8a85;font-size:14px;font-weight:600;letter-spacing:.04em;">${emailTemplates.escapeHtml(ctx.payload.business.name).toUpperCase()}</span><br/>` : ''}${statusText}</h1>
@@ -580,7 +608,16 @@ async function dispatch(key, payload, opts = {}) {
   }
 
   const runTransports = async () => {
-    const brand = await getBrandName();
+    const platform = await getBrandName();
+    // Business-scoped messages brand with the Business's own name/logo/colors;
+    // everything else keeps the platform brand (ctx.brand stays the platform
+    // name and ctx.tokens stays null).
+    const business = businessFromPayload(payload);
+    const brand = business?.name || platform;
+    // Always resolve tokens when a Business is present (even a bare name) so
+    // the footer can attribute the platform and the header wordmark keeps a
+    // concrete primary; null tokens means a fully platform-branded message.
+    const tokens = business ? brandTokens(business.brand, platform) : null;
 
     const sendEmailCatch = async (role) => {
       try {
@@ -590,7 +627,7 @@ async function dispatch(key, payload, opts = {}) {
           try {
             // QR (booking.confirmed/reminder): load the token only for the
             // player recipient of the booking — never for owner/admin roles.
-            const ctx = { payload, key, role, brand, qr: null };
+            const ctx = { payload, key, role, brand, tokens, qr: null };
             if (role === 'player' && QR_KEYS.has(key) && rec.email === payload.booking?.user_email && payload.booking?.id) {
               try {
                 const token = await loadQrToken(payload.booking.id);
@@ -623,7 +660,7 @@ async function dispatch(key, payload, opts = {}) {
             // QR SMS (booking.confirmed/reminder): the player's SMS carries
             // the QR link (the token is loaded only for the player recipient,
             // never owner/admin roles). The SMS text is the bearer disclosure.
-            const ctx = { payload, key, role, brand, qrUrl: null };
+            const ctx = { payload, key, role, brand, tokens, qrUrl: null };
             if (role === 'player' && QR_KEYS.has(key) && rec.phone === payload.booking?.user_phone && payload.booking?.id) {
               try {
                 const token = await loadQrToken(payload.booking.id);

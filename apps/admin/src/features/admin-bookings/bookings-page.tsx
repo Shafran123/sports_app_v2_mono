@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { business, venues, sports } from "@myslot/api";
 import { buttonVariants, Button, Card, EmptyState, ErrorState, Input, SelectSheet, StatusPill, Table, TableBody, TableHead, TableRow, Th, Td } from "@myslot/ui";
 import { SkeletonRow } from "@myslot/ui";
-import { cn, formatLkr, formatTime12, toDateKey } from "@myslot/utils";
+import { cn, dayLabel, formatLkr, formatTime12, toDateKey } from "@myslot/utils";
 import { useAuth } from "@/context/auth";
 
 const STATUS_OPTIONS = [
@@ -190,6 +190,7 @@ export function BookingsPage() {
               <Th>Booking</Th>
               <Th>Customer</Th>
               <Th>Court</Th>
+              <Th>Date</Th>
               <Th>Time range</Th>
               <Th>Amount</Th>
               <Th>Status</Th>
@@ -201,6 +202,7 @@ export function BookingsPage() {
                   <Td className="font-mono text-xs text-ink">#{b.id.slice(0, 8)}</Td>
                   <Td className="font-medium text-ink">{b.player_name ?? "Guest"}</Td>
                   <Td>{b.court_name}</Td>
+                  <Td className="whitespace-nowrap">{dayLabel(b.start_at)}</Td>
                   <Td className="whitespace-nowrap tabular-nums">
                     {formatTime12(b.start_at)}–{formatTime12(b.end_at)}
                   </Td>
@@ -237,7 +239,7 @@ export function BookingsPage() {
                 </div>
                 <div className="mt-3 flex items-center justify-between gap-3">
                   <p className="whitespace-nowrap text-sm tabular-nums text-ink-2">
-                    {formatTime12(b.start_at)}–{formatTime12(b.end_at)}
+                    {dayLabel(b.start_at)} · {formatTime12(b.start_at)}–{formatTime12(b.end_at)}
                   </p>
                   <span className="font-display text-lg font-extrabold text-ink">{formatLkr(b.total_price)}</span>
                 </div>

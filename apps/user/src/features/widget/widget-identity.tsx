@@ -7,8 +7,9 @@
 //
 // After sign-in, a details step collects whatever the booking gate requires:
 // name, a Verified Phone (SMS OTP) and a Verified Email (email OTP; a
-// Google-verified email is already Verified Email — no OTP). The picker stays
-// locked until phone AND email are verified (BookPanel's `ready` gate).
+// Google-verified email is already Verified Email — no OTP). The booking only
+// creates once phone AND email are verified (ADR-0033: the gate sits at the
+// confirm step, not before the picker).
 
 import { useEffect, useState, type FormEvent } from "react";
 import { useMutation } from "@tanstack/react-query";
@@ -54,12 +55,14 @@ export function WidgetIdentity({
   widgetKey,
   siteHostname,
   siteName,
-  onDone
+  onDone,
+  hideIntro = false
 }: {
   widgetKey?: string;
   siteHostname?: string | null;
   siteName?: string | null;
   onDone: () => void;
+  hideIntro?: boolean;
 }) {
   const { user, setUser } = useAuth();
   // ADR-0030: when the Business has a live Dedicated Site, the widget signs
@@ -339,16 +342,18 @@ export function WidgetIdentity({
 
         {phase === "signin" ? (
           <>
-            <div>
-              <h3 className="pt-3 font-display text-lg font-extrabold tracking-tight text-ink">Sign in to book</h3>
-              <p className="mt-0.5 text-sm text-ink-2">
-                {siteMode
-                  ? siteName
-                    ? `Use your ${siteName} account to book.`
-                    : "Use your account at this venue to book."
-                  : `Use your ${DEFAULT_BRAND_NAME} account — the same one you use in the app.`}
-              </p>
-            </div>
+            {!hideIntro && (
+              <div>
+                <h3 className="pt-3 font-display text-lg font-extrabold tracking-tight text-ink">Sign in to book</h3>
+                <p className="mt-0.5 text-sm text-ink-2">
+                  {siteMode
+                    ? siteName
+                      ? `Use your ${siteName} account to book.`
+                      : "Use your account at this venue to book."
+                    : `Use your ${DEFAULT_BRAND_NAME} account — the same one you use in the app.`}
+                </p>
+              </div>
+            )}
 
             <form className="space-y-3" onSubmit={handleEmailLogin} noValidate>
               <Input
@@ -407,16 +412,18 @@ export function WidgetIdentity({
           </>
         ) : (
           <>
-            <div>
-              <h3 className="pt-3 font-display text-lg font-extrabold tracking-tight text-ink">Create your account</h3>
-              <p className="mt-0.5 text-sm text-ink-2">
-                {siteMode
-                  ? siteName
-                    ? `Create an account at ${siteName} to book.`
-                    : "Create an account at this venue to book."
-                  : "One account for MySlot.LK — the app, the widget, and more."}
-              </p>
-            </div>
+            {!hideIntro && (
+              <div>
+                <h3 className="pt-3 font-display text-lg font-extrabold tracking-tight text-ink">Create your account</h3>
+                <p className="mt-0.5 text-sm text-ink-2">
+                  {siteMode
+                    ? siteName
+                      ? `Create an account at ${siteName} to book.`
+                      : "Create an account at this venue to book."
+                    : "One account for MySlot.LK — the app, the widget, and more."}
+                </p>
+              </div>
+            )}
 
             <form className="space-y-3" onSubmit={handleRegister} noValidate>
               <Input
@@ -479,12 +486,14 @@ export function WidgetIdentity({
     <div className="space-y-4">
       {error && <p className="rounded-xl bg-error-light px-3 py-2 text-sm text-error" role="alert">{error}</p>}
 
-      <div>
-        <h3 className="pt-3 font-display text-lg font-extrabold tracking-tight text-ink">Complete your booking details</h3>
-        <p className="mt-0.5 text-sm text-ink-2">
-          {allVerified ? "All set — you can book." : "We need these before you can book."}
-        </p>
-      </div>
+      {!hideIntro && (
+        <div>
+          <h3 className="pt-3 font-display text-lg font-extrabold tracking-tight text-ink">Complete your booking details</h3>
+          <p className="mt-0.5 text-sm text-ink-2">
+            {allVerified ? "All set — you can book." : "We need these before you can book."}
+          </p>
+        </div>
+      )}
 
       <VerifiedDetails
         name={name}

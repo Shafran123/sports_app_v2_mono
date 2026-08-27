@@ -7,14 +7,17 @@ const crypto = require('node:crypto');
 const MAX_SLUG_LENGTH = 60;
 const MAX_BRAND_LENGTH = 500;
 const MAX_POLICY_LENGTH = 20000;
-const MAX_GALLERY_SLIDES = 6;
-const MAX_CAPTION_LENGTH = 300;
 const HEX_COLOR = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 const SLUG_SAFE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 // Site-brand contact block (ADR-0031): free-text fields, length-capped, all
 // optional. Unknown keys are dropped like every brand token.
 const CONTACT_CAPS = { phone: 30, email: 120, address: 200, hours: 200 };
+
+// Social Links (ADR-0034): the optional per-platform URLs rendered as icons
+// in the dedicated site footer. Each is an https URL or empty string; unknown
+// keys are dropped.
+const SOCIAL_KEYS = ['facebook', 'instagram', 'tiktok', 'whatsapp', 'youtube'];
 
 // "Colombo Air Force Badminton Court" -> "colombo-air-force-badminton-court"
 // Falls back to a short random stem when the name has no usable characters.
@@ -73,14 +76,6 @@ function validateBrandToken(kind, value) {
     }
     return value.trim();
   }
-  if (kind === 'caption') {
-    if (typeof value !== 'string' || value.trim().length > MAX_CAPTION_LENGTH) {
-      throw Object.assign(new Error(`Captions must be ${MAX_CAPTION_LENGTH} characters or fewer`), {
-        code: 'WIDGET_VALIDATION'
-      });
-    }
-    return value.trim();
-  }
   if (kind === 'url') {
     if (typeof value !== 'string' || (value.length > 0 && !/^https:\/\/.+/.test(value.trim()))) {
       throw Object.assign(new Error('Must be an https URL or empty'), { code: 'WIDGET_VALIDATION' });
@@ -128,30 +123,24 @@ function sanitizeBrand(brand) {
   if (brand.logo_url !== undefined) out.logo_url = validateBrandToken('url', brand.logo_url);
   if (brand.tagline !== undefined) out.tagline = validateBrandToken('short', brand.tagline);
   if (brand.about !== undefined) out.about = validateBrandToken('long', brand.about);
-  // Site-brand tokens (ADR-0031): hero image + headline for the portfolio
-  // root, plus the contact block. Same rules as the shared tokens.
-  if (brand.hero_image !== undefined) out.hero_image = validateBrandToken('url', brand.hero_image);
-  if (brand.headline !== undefined) out.headline = validateBrandToken('short', brand.headline);
+  // Site-brand tokens (ADR-0031): the contact block. Same rules as the shared
+  // tokens.
   if (brand.contact !== undefined) out.contact = sanitizeContact(brand.contact);
-  // Site Gallery (ADR-0032): 1-6 slides of image + optional caption. The
-  // owner's hero carousel; captions power the overlay text on the site home.
-  if (brand.gallery !== undefined) {
-    if (!Array.isArray(brand.gallery) || brand.gallery.length > MAX_GALLERY_SLIDES) {
-      throw Object.assign(new Error(`brand.gallery must be an array of at most ${MAX_GALLERY_SLIDES} slides`), {
-        code: 'WIDGET_VALIDATION'
-      });
+  // Site Banner (ADR-0034 rev.): the owner-chosen top image on the site home.
+  if (brand.banner_image !== undefined) out.banner_image = validateBrandToken('url', brand.banner_image);
+  // Social Links (ADR-0034): optional per-platform https URLs. Each value is
+  // validated as a url token (empty string allowed, which clears on merge).
+  if (brand.social_links !== undefined) {
+    if (typeof brand.social_links !== 'object' || brand.social_links === null || Array.isArray(brand.social_links)) {
+      throw Object.assign(new Error('brand.social_links must be an object'), { code: 'WIDGET_VALIDATION' });
     }
-    out.gallery = brand.gallery.map((slide) => {
-      if (typeof slide !== 'object' || slide === null || Array.isArray(slide)) {
-        throw Object.assign(new Error('Each gallery slide must be an object'), { code: 'WIDGET_VALIDATION' });
-      }
-      if (slide.image_url === undefined) {
-        throw Object.assign(new Error('Each gallery slide needs an image_url'), { code: 'WIDGET_VALIDATION' });
-      }
-      const clean = { image_url: validateBrandToken('url', slide.image_url) };
-      if (slide.caption !== undefined) clean.caption = validateBrandToken('caption', slide.caption);
-      return clean;
-    });
+    const clean = {};
+    for (const key of SOCIAL_KEYS) {
+      const value = brand.social_links[key];
+      if (value === undefined) continue;
+      clean[key] = validateBrandToken('url', value);
+    }
+    out.social_links = clean;
   }
   // Site Policies (ADR-0032): per-business legal copy, capped generously so
   // owners can paste a real policy without fighting character counts.

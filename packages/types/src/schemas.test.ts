@@ -169,6 +169,44 @@ describe("CheckoutResultSchema", () => {
     expect(result.booking?.status).toBe("confirmed");
     expect(result.payment_params).toBeUndefined();
   });
+
+  it("parses a cash checkout booking whose user_id is null (site customer / walk-in)", () => {
+    const result = CheckoutResultSchema.parse({
+      booking: {
+        id: "84fdb133-2115-42e6-ad13-beacbeb5b36a",
+        court_id: "aaaaaaaa-0000-0000-0000-000000000001",
+        user_id: null,
+        start_at: "2026-08-26T16:30:00.000Z",
+        end_at: "2026-08-26T17:30:00.000Z",
+        price_per_slot: 1500,
+        total_price: 1500,
+        currency: "LKR",
+        status: "confirmed",
+        idempotency_key: "6019eeb1-107d-4f1a-b645-3ecc898e9d8e",
+        checked_in_at: null,
+        cancelled_at: null,
+        created_at: "2026-08-26T13:54:32.081Z",
+        updated_at: "2026-08-26T13:54:32.081Z",
+        player_name: "Shafran Naizer",
+        player_phone: "+94771713701",
+        payment_method: "cash",
+        qr_token: "e239ee571ced185daf1760199810a32f",
+        reminder_sent_at: null,
+        tax_rate: 0,
+        tax_amount: 0,
+        venue_tax_rate: 0,
+        venue_tax_amount: 0,
+        subtotal_amount: 1500,
+        discount_amount: 0,
+        site_hostname: "mysite.localhost",
+        site_customer_id: "ec66734f-b9c5-4641-9340-5457f6d4041e"
+      },
+      amount: 1500,
+      currency: "LKR"
+    });
+    expect(result.booking?.status).toBe("confirmed");
+    expect(result.booking?.user_id).toBeNull();
+  });
 });
 
 describe("EventSchema", () => {

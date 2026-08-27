@@ -51,6 +51,17 @@ const lead = { name: 'Kasun Perera', email: 'kasun@example.com', venue_name: 'Ka
 
 const brand = process.env.BRAND || 'MySlot.LK';
 
+// Business-brand theming fixture (brand-consolidation ticket 02): booking and
+// event messages render with the Business's own logo/colors and keep the
+// platform name in the footer. Render with a logo-less business to review the
+// wordmark-in-primary fallback.
+const businessTokens = {
+  logo_url: 'https://cdn.test/smash-arena-logo.png',
+  primary: '#0f766e',
+  accent: '#b45309',
+  platform: brand
+};
+
 async function renderAll() {
   fs.mkdirSync(OUT, { recursive: true });
   const index = [];
@@ -68,21 +79,21 @@ async function renderAll() {
     index.push(`<li><a href="${slug}.html">${slug.replace(/-/g, ' ')}</a></li>`);
   };
 
-  await save('booking-confirmed', emailTemplates.buildBookingHtml, [booking, brand, qrOptsArg()]);
-  await save('booking-reminder', emailTemplates.buildReminderHtml, [booking, brand, qrOptsArg()]);
-  await save('booking-bill', emailTemplates.buildBillHtml, [booking, brand, qrOptsArg()]);
-  await save('booking-cancelled-player', emailTemplates.buildPlayerCancelledHtml, [booking, { refund_amount: 1500 }, brand]);
-  await save('booking-cancelled-owner', emailTemplates.buildOwnerBookingCancelledHtml, [booking, brand]);
-  await save('booking-cancelled-venue', emailTemplates.buildVenueCancelledHtml, [booking, brand]);
-  await save('owner-new-booking', emailTemplates.buildOwnerBookingHtml, [booking, brand]);
+  await save('booking-confirmed', emailTemplates.buildBookingHtml, [booking, brand, { ...qrOptsArg(), tokens: businessTokens }]);
+  await save('booking-reminder', emailTemplates.buildReminderHtml, [booking, brand, { ...qrOptsArg(), tokens: businessTokens }]);
+  await save('booking-bill', emailTemplates.buildBillHtml, [booking, brand, { ...qrOptsArg(), tokens: businessTokens }]);
+  await save('booking-cancelled-player', emailTemplates.buildPlayerCancelledHtml, [booking, { refund_amount: 1500 }, brand, { tokens: businessTokens }]);
+  await save('booking-cancelled-owner', emailTemplates.buildOwnerBookingCancelledHtml, [booking, brand, { tokens: businessTokens }]);
+  await save('booking-cancelled-venue', emailTemplates.buildVenueCancelledHtml, [booking, brand, { tokens: businessTokens }]);
+  await save('owner-new-booking', emailTemplates.buildOwnerBookingHtml, [booking, brand, { tokens: businessTokens }]);
   await save('owner-welcome', emailTemplates.buildOwnerWelcomeHtml, [owner, 'temp-pass-123', plan, bankDetails, brand]);
   await save('owner-renewal', emailTemplates.buildOwnerRenewalHtml, [owner, plan, bankDetails, brand]);
   await save('owner-nudge', emailTemplates.buildOwnerNudgeHtml, [owner, plan, bankDetails, brand]);
   await save('venue-approved', emailTemplates.buildVenueApprovedHtml, [venue, brand]);
   await save('venue-rejected', emailTemplates.buildVenueRejectedHtml, [venue, 'Address could not be verified', brand]);
-  await save('event-registered', emailTemplates.buildEventRegisteredHtml, [reg, brand]);
-  await save('event-cancelled', emailTemplates.buildEventCancelledHtml, [reg, brand]);
-  await save('event-cancelled-owner', emailTemplates.buildEventCancelledOwnerHtml, [event, brand]);
+  await save('event-registered', emailTemplates.buildEventRegisteredHtml, [reg, brand, { tokens: businessTokens }]);
+  await save('event-cancelled', emailTemplates.buildEventCancelledHtml, [reg, brand, { tokens: businessTokens }]);
+  await save('event-cancelled-owner', emailTemplates.buildEventCancelledOwnerHtml, [event, brand, { tokens: businessTokens }]);
   await save('welcome', emailTemplates.buildWelcomeHtml, [brand]);
 
   fs.writeFileSync(path.join(OUT, 'index.html'), `<html><body><h1>MySlot email previews</h1><ul>${index.join('\n')}</ul></body></html>`);

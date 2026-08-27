@@ -24,7 +24,7 @@ import {
   Textarea
 } from "@myslot/ui";
 import { Copy, Globe, Plus, Trash2, X } from "lucide-react";
-import type { BrandGallerySlide, BusinessProfile, WidgetInstance, WidgetInstanceInput } from "@myslot/types";
+import type { BusinessProfile, WidgetInstance, WidgetInstanceInput } from "@myslot/types";
 import { SiteRequestSection } from "./site-request-section";
 
 const blankForm = {
@@ -81,10 +81,6 @@ export function WidgetSitePage() {
       </div>
 
       <BusinessBrandCard profile={profile} onSaved={invalidate} />
-
-      <SiteBrandCard profile={profile} onSaved={invalidate} />
-
-      <SitePoliciesCard profile={profile} onSaved={invalidate} />
 
       <SiteRequestSection profile={profile} />
 
@@ -219,10 +215,10 @@ function readAsDataUrl(file: File): Promise<string> {
   });
 }
 
-// The business-wide brand (ADR-0031): name, colors, logo, tagline, about —
-// shared with every widget and branded page. Sends the FULL brand object so a
-// site-brand save never clobbers these tokens (the backend replaces brand as
-// a whole).
+// The single Business Brand editor (brand-consolidation ticket 03): every
+// brand field in one card, one save, one `brand` object (ADR-0031). Sections
+// are labelled so an owner never enters the same thing twice — tagline (short)
+// vs about (long), and a logo (mark) vs a site banner (wide hero image).
 function BusinessBrandCard({ profile, onSaved }: { profile: BusinessProfile; onSaved: () => void }) {
   const queryClient = useQueryClient();
   const [name, setName] = useState(profile.name);
@@ -231,6 +227,18 @@ function BusinessBrandCard({ profile, onSaved }: { profile: BusinessProfile; onS
   const [logoUrl, setLogoUrl] = useState(profile.brand?.logo_url ?? "");
   const [tagline, setTagline] = useState(profile.brand?.tagline ?? "");
   const [about, setAbout] = useState(profile.brand?.about ?? "");
+  const [bannerImage, setBannerImage] = useState(profile.brand?.banner_image ?? "");
+  const [phone, setPhone] = useState(profile.brand?.contact?.phone ?? "");
+  const [email, setEmail] = useState(profile.brand?.contact?.email ?? "");
+  const [address, setAddress] = useState(profile.brand?.contact?.address ?? "");
+  const [hours, setHours] = useState(profile.brand?.contact?.hours ?? "");
+  const [facebook, setFacebook] = useState(profile.brand?.social_links?.facebook ?? "");
+  const [instagram, setInstagram] = useState(profile.brand?.social_links?.instagram ?? "");
+  const [tiktok, setTiktok] = useState(profile.brand?.social_links?.tiktok ?? "");
+  const [whatsapp, setWhatsapp] = useState(profile.brand?.social_links?.whatsapp ?? "");
+  const [youtube, setYoutube] = useState(profile.brand?.social_links?.youtube ?? "");
+  const [privacy, setPrivacy] = useState(profile.brand?.privacy_policy ?? "");
+  const [terms, setTerms] = useState(profile.brand?.terms_conditions ?? "");
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
 
@@ -248,11 +256,27 @@ function BusinessBrandCard({ profile, onSaved }: { profile: BusinessProfile; onS
           // persists the removal (an undefined key would leave the old value).
           logo_url: logoUrl.trim(),
           tagline: tagline.trim(),
-          about: about.trim()
+          about: about.trim(),
+          banner_image: bannerImage.trim(),
+          contact: {
+            phone: phone.trim(),
+            email: email.trim(),
+            address: address.trim(),
+            hours: hours.trim()
+          },
+          social_links: {
+            facebook: facebook.trim(),
+            instagram: instagram.trim(),
+            tiktok: tiktok.trim(),
+            whatsapp: whatsapp.trim(),
+            youtube: youtube.trim()
+          },
+          privacy_policy: privacy.trim(),
+          terms_conditions: terms.trim()
         }
       }),
     onSuccess: () => {
-      setNotice("Business brand saved. This name and look is used everywhere.");
+      setNotice("Brand saved. This name and look is used everywhere.");
       setError("");
       onSaved();
       void queryClient.invalidateQueries({ queryKey: ["business-me"] });
@@ -268,15 +292,27 @@ function BusinessBrandCard({ profile, onSaved }: { profile: BusinessProfile; onS
       <div>
         <h2 className="font-display text-lg font-extrabold tracking-tight text-ink">Business brand</h2>
         <p className="mt-0.5 text-sm text-ink-2">
-          The name and look shown in every widget and on every branded page.
+          One place for your name, look, and every surface — widgets, your dedicated site, and the
+          emails and SMS we send on your behalf.
         </p>
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <h3 className="sm:col-span-2 mt-3 font-semibold text-ink">Identity</h3>
         <label className="block sm:col-span-2">
           <span className="mb-1.5 block text-xs font-medium text-ink-2">Business name</span>
           <Input value={name} onChange={(e) => setName(e.target.value)} />
         </label>
+        <label className="block sm:col-span-2">
+          <span className="mb-1.5 block text-xs font-medium text-ink-2">Tagline</span>
+          <Input value={tagline} onChange={(e) => setTagline(e.target.value)} placeholder="Book your court in seconds" />
+        </label>
+        <label className="block sm:col-span-2">
+          <span className="mb-1.5 block text-xs font-medium text-ink-2">About</span>
+          <Textarea value={about} onChange={(e) => setAbout(e.target.value)} rows={3} placeholder="Tell visitors what makes your venues special…" />
+        </label>
+
+        <h3 className="sm:col-span-2 mt-3 font-semibold text-ink">Colors</h3>
         <label className="block">
           <span className="mb-1.5 block text-xs font-medium text-ink-2">Primary color</span>
           <div className="flex items-center gap-2">
@@ -303,149 +339,12 @@ function BusinessBrandCard({ profile, onSaved }: { profile: BusinessProfile; onS
             <Input value={accent} onChange={(e) => setAccent(e.target.value)} placeholder="#2563eb" className="flex-1" />
           </div>
         </label>
-        <label className="block sm:col-span-2">
-          <span className="mb-1.5 block text-xs font-medium text-ink-2">Tagline</span>
-          <Input value={tagline} onChange={(e) => setTagline(e.target.value)} placeholder="Book your court in seconds" />
-        </label>
-        <SingleImageField label="Logo URL" value={logoUrl} onChange={setLogoUrl} />
-        <label className="block sm:col-span-2">
-          <span className="mb-1.5 block text-xs font-medium text-ink-2">About</span>
-          <Textarea value={about} onChange={(e) => setAbout(e.target.value)} rows={3} placeholder="Tell visitors what makes your venues special…" />
-        </label>
-      </div>
 
-      <div className="mt-4 flex items-center justify-between gap-3">
-        <p className="text-xs text-ink-3">Prices and availability always come straight from your court setup — no double entry.</p>
-        <Button onClick={() => save.mutate()} loading={save.isPending}>
-          {save.isPending ? "Saving…" : "Save brand"}
-        </Button>
-      </div>
-      {notice && <p className="mt-3 rounded-xl bg-success-light px-3 py-2 text-sm text-success">{notice}</p>}
-      {error && <p className="mt-3 rounded-xl bg-error-light px-3 py-2 text-sm text-error">{error}</p>}
-    </Card>
-  );
-}
+        <h3 className="sm:col-span-2 mt-3 font-semibold text-ink">Images</h3>
+        <SingleImageField label="Logo" value={logoUrl} onChange={setLogoUrl} />
+        <SingleImageField label="Site banner" value={bannerImage} onChange={setBannerImage} />
 
-// The dedicated-site presentation (ADR-0031): hero image, headline and the
-// contact block — rendered only on the Business's own site. Sends the FULL
-// brand object so the shared tokens survive the backend's whole-brand replace.
-function SiteBrandCard({ profile, onSaved }: { profile: BusinessProfile; onSaved: () => void }) {
-  const queryClient = useQueryClient();
-  // The Site Gallery (ADR-0032) replaces the single hero image: 1-6 slides of
-  // URL + caption. An existing hero_image becomes slide 1 on first save.
-  const [gallery, setGallery] = useState<BrandGallerySlide[]>(
-    profile.brand?.gallery?.length
-      ? profile.brand.gallery
-      : profile.brand?.hero_image
-        ? [{ image_url: profile.brand.hero_image, caption: "" }]
-        : []
-  );
-  const [headline, setHeadline] = useState(profile.brand?.headline ?? "");
-  const [phone, setPhone] = useState(profile.brand?.contact?.phone ?? "");
-  const [email, setEmail] = useState(profile.brand?.contact?.email ?? "");
-  const [address, setAddress] = useState(profile.brand?.contact?.address ?? "");
-  const [hours, setHours] = useState(profile.brand?.contact?.hours ?? "");
-  const [notice, setNotice] = useState("");
-  const [error, setError] = useState("");
-
-  const save = useMutation({
-    mutationFn: () =>
-      business.updateMe({
-        brand: {
-          ...profile.brand,
-          gallery: gallery
-            .map((s) => ({
-              image_url: s.image_url.trim(),
-              caption: s.caption?.trim() || undefined
-            }))
-            .filter((s) => s.image_url),
-          // '' clears (merge semantics), undefined would silently keep the
-          // stored value.
-          headline: headline.trim(),
-          contact: {
-            phone: phone.trim(),
-            email: email.trim(),
-            address: address.trim(),
-            hours: hours.trim()
-          }
-        }
-      }),
-    onSuccess: () => {
-      setNotice("Site brand saved. Your dedicated site reflects this now.");
-      setError("");
-      onSaved();
-      void queryClient.invalidateQueries({ queryKey: ["business-me"] });
-    },
-    onError: (err) => {
-      setError(toApiFailure(err).message);
-      setNotice("");
-    }
-  });
-
-  return (
-    <Card className="p-5 md:p-6">
-      <div>
-        <h2 className="font-display text-lg font-extrabold tracking-tight text-ink">Site brand</h2>
-        <p className="mt-0.5 text-sm text-ink-2">
-          The hero, headline and contact shown on your dedicated site — at your own hostname.
-        </p>
-      </div>
-
-      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="sm:col-span-2">
-          <span className="mb-1.5 block text-xs font-medium text-ink-2">Hero gallery</span>
-          <p className="mb-2 text-xs text-ink-3">
-            Up to 6 images shown as slides on your site’s home page. Add a caption to each if you like.
-          </p>
-          <div className="space-y-2">
-            {gallery.map((slide, i) => (
-              <div key={i} className="flex gap-2">
-                <Input
-                  value={slide.image_url}
-                  onChange={(e) =>
-                    setGallery((g) => g.map((s, j) => (j === i ? { ...s, image_url: e.target.value } : s)))
-                  }
-                  placeholder="https://…/image.jpg"
-                  aria-label={`Gallery slide ${i + 1} image URL`}
-                />
-                <Input
-                  value={slide.caption ?? ""}
-                  onChange={(e) =>
-                    setGallery((g) => g.map((s, j) => (j === i ? { ...s, caption: e.target.value } : s)))
-                  }
-                  placeholder="Caption (optional)"
-                  aria-label={`Gallery slide ${i + 1} caption`}
-                  className="max-w-52"
-                />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  aria-label={`Remove slide ${i + 1}`}
-                  onClick={() => setGallery((g) => g.filter((_, j) => j !== i))}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
-          </div>
-          {gallery.length === 0 && (
-            <p className="text-xs text-ink-3">No slides yet — your site will fall back to your logo or venue photos.</p>
-          )}
-          {gallery.length < 6 && (
-            <Button
-              variant="secondary"
-              size="sm"
-              className="mt-2"
-              onClick={() => setGallery((g) => [...g, { image_url: "", caption: "" }])}
-            >
-              <Plus className="h-4 w-4" /> Add slide
-            </Button>
-          )}
-        </div>
-        <label className="block sm:col-span-2">
-          <span className="mb-1.5 block text-xs font-medium text-ink-2">Headline</span>
-          <Input value={headline} onChange={(e) => setHeadline(e.target.value)} placeholder="Colombo’s home of badminton" />
-        </label>
+        <h3 className="sm:col-span-2 mt-3 font-semibold text-ink">Contact</h3>
         <label className="block">
           <span className="mb-1.5 block text-xs font-medium text-ink-2">Contact phone</span>
           <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+94 77 123 4567" />
@@ -462,60 +361,41 @@ function SiteBrandCard({ profile, onSaved }: { profile: BusinessProfile; onSaved
           <span className="mb-1.5 block text-xs font-medium text-ink-2">Opening hours</span>
           <Input value={hours} onChange={(e) => setHours(e.target.value)} placeholder="Mon–Sun 6am–11pm" />
         </label>
-      </div>
 
-      <div className="mt-4 flex items-center justify-between gap-3">
-        <p className="text-xs text-ink-3">Evergreen details for visitors looking to reach you directly.</p>
-        <Button onClick={() => save.mutate()} loading={save.isPending}>
-          {save.isPending ? "Saving…" : "Save site brand"}
-        </Button>
-      </div>
-      {notice && <p className="mt-3 rounded-xl bg-success-light px-3 py-2 text-sm text-success">{notice}</p>}
-      {error && <p className="mt-3 rounded-xl bg-error-light px-3 py-2 text-sm text-error">{error}</p>}
-    </Card>
-  );
-}
+        <div className="sm:col-span-2">
+          <span className="mb-1.5 block text-xs font-medium text-ink-2">Social links</span>
+          <p className="mb-2 text-xs text-ink-3">
+            Shown as icons on your dedicated site. Leave a platform empty to hide it.
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {(
+              [
+                ["Facebook", facebook, setFacebook],
+                ["Instagram", instagram, setInstagram],
+                ["TikTok", tiktok, setTiktok],
+                ["WhatsApp", whatsapp, setWhatsapp],
+                ["YouTube", youtube, setYoutube]
+              ] as const
+            ).map(([label, value, setter]) => (
+              <label key={label} className="block">
+                <span className="mb-1.5 block text-xs font-medium text-ink-2">{label}</span>
+                <Input
+                  value={value}
+                  onChange={(e) => setter(e.target.value)}
+                  placeholder="https://…"
+                  aria-label={`${label} URL`}
+                />
+              </label>
+            ))}
+          </div>
+        </div>
 
-function SitePoliciesCard({ profile, onSaved }: { profile: BusinessProfile; onSaved: () => void }) {
-  const queryClient = useQueryClient();
-  const [privacy, setPrivacy] = useState(profile.brand?.privacy_policy ?? "");
-  const [terms, setTerms] = useState(profile.brand?.terms_conditions ?? "");
-  const [notice, setNotice] = useState("");
-  const [error, setError] = useState("");
-
-  const save = useMutation({
-    mutationFn: () =>
-      business.updateMe({
-        brand: {
-          ...profile.brand,
-          privacy_policy: privacy.trim(),
-          terms_conditions: terms.trim()
-        }
-      }),
-    onSuccess: () => {
-      setNotice("Site policies saved.");
-      setError("");
-      onSaved();
-      void queryClient.invalidateQueries({ queryKey: ["business-me"] });
-    },
-    onError: (err) => {
-      setError(toApiFailure(err).message);
-      setNotice("");
-    }
-  });
-
-  return (
-    <Card className="p-5 md:p-6">
-      <div>
-        <h2 className="font-display text-lg font-extrabold tracking-tight text-ink">Site policies</h2>
-        <p className="mt-0.5 text-sm text-ink-2">
+        <h3 className="sm:col-span-2 mt-3 font-semibold text-ink">Site policies</h3>
+        <p className="sm:col-span-2 -mt-2 text-xs text-ink-3">
           Shown at the footer of your dedicated site. Until you write your own, short platform
           defaults with your business name are shown instead.
         </p>
-      </div>
-
-      <div className="mt-4 space-y-3">
-        <label className="block">
+        <label className="block sm:col-span-2">
           <span className="mb-1.5 block text-xs font-medium text-ink-2">Privacy policy</span>
           <Textarea
             value={privacy}
@@ -524,7 +404,7 @@ function SitePoliciesCard({ profile, onSaved }: { profile: BusinessProfile; onSa
             placeholder="Paste or write your privacy policy…"
           />
         </label>
-        <label className="block">
+        <label className="block sm:col-span-2">
           <span className="mb-1.5 block text-xs font-medium text-ink-2">Terms &amp; conditions</span>
           <Textarea
             value={terms}
@@ -536,9 +416,11 @@ function SitePoliciesCard({ profile, onSaved }: { profile: BusinessProfile; onSa
       </div>
 
       <div className="mt-4 flex items-center justify-between gap-3">
-        <p className="text-xs text-ink-3">Blank fields keep the platform default on your site.</p>
+        <p className="text-xs text-ink-3">
+          Prices and availability always come straight from your court setup — no double entry.
+        </p>
         <Button onClick={() => save.mutate()} loading={save.isPending}>
-          {save.isPending ? "Saving…" : "Save policies"}
+          {save.isPending ? "Saving…" : "Save brand"}
         </Button>
       </div>
       {notice && <p className="mt-3 rounded-xl bg-success-light px-3 py-2 text-sm text-success">{notice}</p>}

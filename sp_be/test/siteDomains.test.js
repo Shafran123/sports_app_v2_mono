@@ -203,33 +203,37 @@ describe('site domain request workflow (ADR-0029)', () => {
     const ids = res.body.data.venues.map((v) => v.id);
     expect(ids).toContain(VENUE_ID);
     expect(ids).toContain(PRIVATE_VENUE_ID);
-    expect(res.body.data.venues[0].sports).toContain('Badminton');
+    expect(res.body.data.venues[0].sports).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: 'Badminton', icon: expect.any(String) })])
+    );
+    // Opening Windows ride along so the home cards can show Open Status.
+    expect(res.body.data.venues[0].hours[0]).toEqual({ day_of_week: 0, open_time: '06:00:00', close_time: '23:00:00' });
   });
 
   it('carries the site-brand fields in the public payload (ADR-0031)', async () => {
     const saved = await request(app)
       .patch('/api/v1/business/me')
       .set('Authorization', `Bearer ${OWNER_TOKEN}`)
-      .send({ brand: { hero_image: 'https://cdn.test/hero.jpg', headline: 'Book direct at the home of badminton', contact: { phone: '+94 77 000 0000' } } });
+      .send({ brand: { banner_image: 'https://cdn.test/banner.jpg', contact: { phone: '+94 77 000 0000' }, social_links: { instagram: 'https://instagram.com/site-sports' } } });
     expect(saved.status).toBe(200);
 
     const res = await request(app).get(`/api/v1/public/site/by-hostname?host=site-test.lk`);
     expect(res.status).toBe(200);
-    expect(res.body.data.business.brand.hero_image).toBe('https://cdn.test/hero.jpg');
-    expect(res.body.data.business.brand.headline).toBe('Book direct at the home of badminton');
+    expect(res.body.data.business.brand.banner_image).toBe('https://cdn.test/banner.jpg');
     expect(res.body.data.business.brand.contact.phone).toBe('+94 77 000 0000');
+    expect(res.body.data.business.brand.social_links.instagram).toBe('https://instagram.com/site-sports');
   });
 
-  it('sanitizes the Site Gallery and Site Policies in the brand (ADR-0032)', async () => {
+  it('sanitizes Site Policies and Social Links in the brand (ADR-0034)', async () => {
     const saved = await request(app)
       .patch('/api/v1/business/me')
       .set('Authorization', `Bearer ${OWNER_TOKEN}`)
       .send({
         brand: {
-          gallery: [
-            { image_url: 'https://cdn.test/slide1.jpg', caption: 'Main hall at dawn' },
-            { image_url: 'https://cdn.test/slide2.jpg', caption: '   padded caption   ' }
-          ],
+          social_links: {
+            facebook: 'https://facebook.com/site-sports',
+            tiktok: '  https://tiktok.com/@site.sports  '
+          },
           privacy_policy: 'We keep your data private.',
           terms_conditions: 'Bookings follow venue rules.'
         }
@@ -238,26 +242,22 @@ describe('site domain request workflow (ADR-0029)', () => {
 
     const res = await request(app).get(`/api/v1/public/site/by-hostname?host=site-test.lk`);
     expect(res.status).toBe(200);
-    expect(res.body.data.business.brand.gallery).toHaveLength(2);
-    expect(res.body.data.business.brand.gallery[0]).toEqual({
-      image_url: 'https://cdn.test/slide1.jpg',
-      caption: 'Main hall at dawn'
-    });
-    expect(res.body.data.business.brand.gallery[1]).toEqual({
-      image_url: 'https://cdn.test/slide2.jpg',
-      caption: 'padded caption'
+    expect(res.body.data.business.brand.social_links).toEqual({
+      instagram: 'https://instagram.com/site-sports',
+      facebook: 'https://facebook.com/site-sports',
+      tiktok: 'https://tiktok.com/@site.sports'
     });
     expect(res.body.data.business.brand.privacy_policy).toBe('We keep your data private.');
     expect(res.body.data.business.brand.terms_conditions).toBe('Bookings follow venue rules.');
   });
 
-  it('rejects a gallery slide with a non-https image URL', async () => {
+  it('rejects a non-https social link', async () => {
     const bad = await request(app)
       .patch('/api/v1/business/me')
       .set('Authorization', `Bearer ${OWNER_TOKEN}`)
       .send({
         brand: {
-          gallery: [{ image_url: 'not-a-url' }]
+          social_links: { whatsapp: 'wa.me/94770000000' }
         }
       });
     expect(bad.status).toBe(400);

@@ -80,6 +80,7 @@ async function updateProfile(businessId, patch, client = pool) {
     const merged = { ...base, ...cleanBrand };
     if (cleanBrand.colors) merged.colors = { ...(base.colors || {}), ...cleanBrand.colors };
     if (cleanBrand.contact) merged.contact = { ...(base.contact || {}), ...cleanBrand.contact };
+    if (cleanBrand.social_links) merged.social_links = { ...(base.social_links || {}), ...cleanBrand.social_links };
     cleanBrand = merged;
   }
 

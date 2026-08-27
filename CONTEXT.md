@@ -9,7 +9,7 @@ The admin-configurable display name of the platform (default "MySlot.LK"), shown
 _Avoid_: product name, brand (bare)
 
 **Business**:
-The Venue Owner's public brand and portfolio — the entity that owns the Brand tokens and the Booking Widget Instances. Every Venue belongs to a Business, and a Business is owned by exactly one Venue Owner; a Business aggregates all of that Owner's Venues. Distinct from the **Venue Owner** (the account that manages it) and from the platform **Brand Name** (the platform's own display name).
+The Venue Owner's public brand and portfolio — the entity that owns the **Business Brand** and the Booking Widget Instances. Every Venue belongs to a Business, and a Business is owned by exactly one Venue Owner; a Business aggregates all of that Owner's Venues. Distinct from the **Venue Owner** (the account that manages it) and from the platform **Brand Name** (the platform's own display name).
 _Avoid_: brand (bare), company, organization, storefront
 
 **Widget Instance**:
@@ -41,7 +41,7 @@ A Venue that is bookable but not discoverable in marketplace discovery — absen
 _Avoid_: hidden listing, private listing, ghost venue
 
 **Booking Widget**:
-The embeddable booking interface a Venue Owner publishes on their own website (iframe) to sell their Venues' courts to their own audience. Delivered as one or more **Widget Instances** per **Business**, each keyed by its own **Embed Key** and pinned to a **Default Venue** — so one embed always books the intended Venue, or lets the customer choose from the Business's approved Venues; tied to a per-Instance domain allowlist (Owner self-serve) so it only renders where the Owner authorized it. Offered to any Business; required for a Private Venue (that Venue's only public surface). The widget signs the buyer in as a **Site Customer** of this Business — the same per-business customer base as the **Dedicated Site** (email + password or Google), never the platform **Player** base — and a Site Customer must hold a **Verified Phone** and a **Verified Email** before the picker unlocks; online payment optional per the Owner's choice, otherwise cash at the venue. The widget exposes the Business's full booking engine (all courts, availability, Variable Pricing, Offers, Closed Dates). When online payments land (P2), the widget uses **embedded checkout** (hosted payment fields inside the iframe), not a redirect, so the flow stays in the iframe and lands back on its success screen.
+The embeddable booking interface a Venue Owner publishes on their own website (iframe) to sell their Venues' courts to their own audience. Delivered as one or more **Widget Instances** per **Business**, each keyed by its own **Embed Key** and pinned to a **Default Venue** — so one embed always books the intended Venue, or lets the customer choose from the Business's approved Venues; tied to a per-Instance domain allowlist (Owner self-serve) so it only renders where the Owner authorized it. Offered to any Business; required for a Private Venue (that Venue's only public surface). The widget signs the buyer in as a **Site Customer** of this Business — the same per-business customer base as the **Dedicated Site** (email + password or Google), never the platform **Player** base. A guest browses and selects slots freely; the sign-in or account-creation step happens at the confirm step, and a Site Customer must hold a **Verified Phone** and a **Verified Email** for the booking to be created; online payment optional per the Owner's choice, otherwise cash at the venue. The widget exposes the Business's full booking engine (all courts, availability, Variable Pricing, Offers, Closed Dates). When online payments land (P2), the widget uses **embedded checkout** (hosted payment fields inside the iframe), not a redirect, so the flow stays in the iframe and lands back on its success screen.
 _Note_: The widget renders the Business's brand with a persistent "Powered by MySlot.LK" attribution, and lets the signed-in Site Customer view and cancel their own bookings for that Venue from inside the embed.
 _Avoid_: embed widget, booking iframe, widget (bare)
 
@@ -51,20 +51,24 @@ _Note_: SUPERSEDED for businesses that run a **Dedicated Site** — the site ser
 _Avoid_: venue landing page, microsite, storefront
 
 **Dedicated Site**:
-A Business's white-labeled, multi-venue website served on the Business's own **Site Hostname** — the owner's domain (`abc.lk`, apex plus `www.` as one) or a platform subdomain (`<brand-slug>.myslot.lk`). One per Business. Not an iframe: it renders the full app booking flow (site sign-in, checkout, holds, QR, payments per the venue's own capability) wrapped in Business brand chrome and site-level presentation (**Site Brand**: hero, headline, about, contact, footer) instead of the marketplace shell — the venue detail pages and booking flow carry full site branding too. Serves the Business's own audience of **Site Customers** — accounts are created and verified inside this Business only, never shared with any other Business or with the marketplace **Player** base. Serves a portfolio root (hero **Site Gallery** carousel, about, venues grid, contact) and one page per venue at `/<slug>`; a single approved venue skips the root and lands directly on its venue page, and venue switching is a header chooser available only on venue pages. When a Site goes live the Business's venues **default off the marketplace** (site-only); the Owner can per-venue opt back into a **Marketplace Listing** (dual-channel). Owner-hosted hostnames are indexable; platform subdomains are noindex. When the Owner Plan lapses past its grace period, the site serves a branded offline slate while confirmed bookings play out.
+A Business's white-labeled, multi-venue website served on the Business's own **Site Hostname** — the owner's domain (`abc.lk`, apex plus `www.` as one) or a platform subdomain (`<brand-slug>.myslot.lk`). One per Business. Not an iframe: it renders the full app booking flow (site sign-in, checkout, holds, QR, payments per the venue's own capability) wrapped in **Business Brand** chrome and site-level presentation (about, contact, **Social Links**, **Site Banner**, footer) instead of the marketplace shell — the venue detail pages and booking flow carry full site branding too. Serves the Business's own audience of **Site Customers** — accounts are created and verified inside this Business only, never shared with any other Business or with the marketplace **Player** base. Serves a one-viewport portfolio root (banner, name, description, slim contact/social bar, minimal venue grid) and one page per venue at `/<slug>`; a single approved venue skips the root and lands directly on its venue page, and venue switching is a header chooser available only on venue pages. When a Site goes live the Business's venues **default off the marketplace** (site-only); the Owner can per-venue opt back into a **Marketplace Listing** (dual-channel). Owner-hosted hostnames are indexable; platform subdomains are noindex. When the Owner Plan lapses past its grace period, the site serves a branded offline slate while confirmed bookings play out.
 _Avoid_: microsite, dedicated page, site (bare)
 
 **Site Hostname**:
 The hostname on which a Business's **Dedicated Site** is served — exactly one per Business. Either the owner's own hostname (`abc.lk`, apex and `www.` treated as one and configured together) or a platform-proposed `<brand-slug>.myslot.lk` subdomain (uniqueness-checked). Provisioned through a **Site Domain Request**; while live it is a runtime-trusted origin for the site's surfaces.
 _Avoid_: domain (bare), custom domain, host
 
-**Site Brand**:
-The site-level presentation layer of a **Dedicated Site** — the **Site Gallery** (hero slide set with per-slide captions), headline, about text, and a contact block (phone, email, address, hours) — owned by the Business and stored in the same `brand` object as the **Business Brand** tokens (name, colors, logo, tagline), which it shares with the **Booking Widget**. Renders on the site's portfolio root; the venue pages carry the Business brand chrome and colors throughout. The site's page background stays neutral — brand colors appear on buttons, links and accents, never as a page wash. Distinct from the platform **Brand Name**.
-_Avoid_: website theme, site theme, website branding
+**Business Brand**:
+The Business's single brand identity — name, primary/accent colors, logo, tagline (short) and about (long), the **Site Banner**, a contact block (phone, email, address, hours), **Social Links**, and **Site Policies** — owned by the Business and stored in one `brand` object shared by the **Booking Widget**, the **Dedicated Site**, and the transactional emails and SMS the platform sends on the Business's behalf (booking/event/site messages carry the Business's name, logo and colors; platform-level messages keep the platform **Brand Name**). On the site, brand colors appear on buttons, links and accents, never as a page wash. Distinct from the platform **Brand Name**.
+_Avoid_: brand (bare), site theme, website theme, website branding
 
-**Site Gallery**:
-The owner-managed hero slide set of a **Dedicated Site** — up to six images, each with an optional caption — shown as the auto-rotating hero carousel on the portfolio root (and the sources of its venue-less fallback: the legacy hero image, then the logo, then the first venue photo). Replaced the single hero image field. Distinct from a Venue's own photos, which the site shows in the same carousel component on the venue page.
-_Avoid_: hero images, slideshow, photo gallery
+**Social Links**:
+The optional per-platform URLs (Facebook, Instagram, TikTok, WhatsApp, YouTube) a Business publishes for its **Dedicated Site** — stored on the **Business Brand**, edited in the owner's *Widget & site* editor, and rendered as icons in the slim bar above the home's venue grid (moved from the footer). A platform with no URL set is simply not shown.
+_Avoid_: socials, social media profiles, follow us
+
+**Site Banner**:
+The single owner-chosen image shown as the top banner of a **Dedicated Site** home — stored on the **Business Brand**, edited in the owner's *Widget & site* editor, and rendered through the same photo carousel as the venue pages, with the business logo and name overlaid. Replaced the Site Gallery and hero image. Distinct from a Venue's own photos.
+_Avoid_: hero image, banner image (ambiguous), cover image
 
 **Site Policies**:
 Per-**Business** legal text — privacy policy and terms & conditions — edited by the Owner in the admin *Widget & site* editor and linked from the **Dedicated Site** footer (`/privacy`, `/terms`). Until the Owner saves their own copy, short platform-authored defaults with the business name substituted are shown. Distinct from the platform's own legal pages.
@@ -97,6 +101,10 @@ _Avoid_: time slot, hour slot
 **Opening Window**:
 A contiguous open→close period within a single day during which a Venue accepts bookings (e.g. 09:00–12:00). A Venue may have several Opening Windows per day — e.g. a mid-day closure splits the day into two — and a day with none is closed. Slots must fit entirely inside one Opening Window; they never span across a gap.
 _Avoid_: hours slot, time block, window (bare)
+
+**Open Status**:
+A derived read on a Venue's present state — shown as a pill on the **Dedicated Site**'s minimal venue cards: "Open now", "Closing soon" (under an hour to the last close) or "Closed" — computed from the venue's **Opening Windows** against the visitor's device clock. Distinct from the venue detail page's "Open today" label, which states the day's hours without a live open/closed verdict.
+_Avoid_: open-close, now status, live status
 
 **Variable Pricing**:
 Court-level pricing that varies by day and time. A Court has a base price per slot; a Slot-time that falls inside a configured day+time window on that Court uses the window's price instead (peak vs off-peak). Not the same as an **Offer** — Variable Pricing sets what the slot costs; an Offer discounts what it costs.
@@ -160,7 +168,7 @@ A paid ticket for an Event.
 _Avoid_: event booking
 
 **Player**:
-An end user who browses, books, and registers on the platform's marketplace surface. Signs in with email+password or Google; on first sign-in completes a details step collecting name, a **Verified Phone**, and a **Verified Email** before the first booking. Both verification attributes gate booking on every surface. Platform-wide: a Player's account and history span the whole marketplace, distinct from a **Site Customer**, whose account is scoped to exactly one Business.
+An end user who browses, books, and registers on the platform's marketplace surface. Signs in with email+password or Google; on first sign-in — which a guest reaches when confirming a booking — completes a details step collecting name, a **Verified Phone**, and a **Verified Email** before the first booking. Both verification attributes gate booking creation on every surface. Platform-wide: a Player's account and history span the whole marketplace, distinct from a **Site Customer**, whose account is scoped to exactly one Business.
 _Avoid_: user, customer, member
 
 **Player Suspension**:

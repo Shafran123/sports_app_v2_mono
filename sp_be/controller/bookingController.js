@@ -398,7 +398,12 @@ exports.getBooking = async (req, res) => {
     }
 
     const booking = rows[0];
-    const isSelf = booking.user_id === req.user.id;
+    // A Site Customer owns the bookings made under their per-Business account
+    // (site_customer_id) — the same "self" right as a Player's user_id booking,
+    // including the QR token (the customer is the player).
+    const isSelf =
+      booking.user_id === req.user.id ||
+      (req.siteCustomer && booking.site_customer_id === req.siteCustomer.id);
     const isAdmin = req.user.role === 'admin';
     const ownsVenue = req.user.role === 'venue_owner' && booking.venue_owner_id === req.user.id;
     if (!isSelf && !isAdmin && !ownsVenue) {
@@ -422,7 +427,10 @@ exports.getBooking = async (req, res) => {
 exports.listMyBookings = async (req, res) => {
   try {
     const { status, venue_id } = req.query;
-    const conditions = [`b.user_id = $1`];
+    // "My bookings" spans both ownership forms: a platform Player's user_id
+    // rows and a Site Customer's per-Business site_customer_id rows (the same
+    // req.user.id — the authenticate middleware maps the site token onto it).
+    const conditions = [`(b.user_id = $1 or b.site_customer_id = $1)`];
     const values = [req.user.id];
     let index = 2;
 
@@ -468,7 +476,13 @@ exports.cancelBooking = async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('begin');
-    const result = await cancellationService.cancelBooking(client, req.params.id, req.user.id, req.user.role);
+    const result = await cancellationService.cancelBooking(
+      client,
+      req.params.id,
+      req.user.id,
+      req.user.role,
+      req.siteCustomer?.id
+    );
     if (result.error) {
       await client.query('rollback');
       return fail(res, result.error.status, result.error.code, result.error.message);

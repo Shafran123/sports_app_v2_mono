@@ -323,7 +323,8 @@ exports.listBookings = async (req, res) => {
     const [{ rows }, { rows: countRows }] = await Promise.all([
       pool.query(
         `select b.*, c.name as court_name, v.name as venue_name, s.name as sport,
-                u.name as player_name, u.phone as player_phone,
+                coalesce(u.name, sc.name, b.player_name) as player_name,
+                coalesce(u.phone, sc.phone, b.player_phone) as player_phone,
                 (select p.status from payments p where p.booking_id = b.id and p.payment_method = 'cash' order by p.created_at desc limit 1) as cash_payment_status,
                 (select p.paid_at from payments p where p.booking_id = b.id and p.payment_method = 'cash' order by p.created_at desc limit 1) as paid_at
          from bookings b
@@ -331,6 +332,7 @@ exports.listBookings = async (req, res) => {
          join venues v on v.id = c.venue_id
          left join sports s on s.id = c.sport_id
          left join users u on u.id = b.user_id
+         left join site_customers sc on sc.id = b.site_customer_id
          where ${where}
          order by b.start_at desc
          limit $${index++} offset $${index}`,

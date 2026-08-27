@@ -9,24 +9,35 @@ const notificationCatalog = require('./notificationCatalog');
 // Walk-in bookings (player row IS the venue owner) are printable at the
 // venue but never emailed — there is no customer inbox to send to.
 
+// Business context rides along (brand-consolidation ticket 02) so bill emails
+// can carry the Business's own branding. The player's email/phone resolve from
+// either the platform user or the site customer, mirroring bookingLoader.
 const BOOKING_BILL_SELECT = `
   select b.*, c.name as court_name, s.name as sport, v.name as venue_name,
          v.address as venue_address, v.city as venue_city, v.phone as venue_phone,
-         u.email as user_email, v.owner_id as venue_owner_id
+         biz.id as business_id, biz.name as business_name, biz.brand as business_brand,
+         coalesce(u.email, sc.email) as user_email,
+         coalesce(u.phone, sc.phone) as user_phone,
+         v.owner_id as venue_owner_id
   from bookings b
   join courts c on c.id = b.court_id
   join venues v on v.id = c.venue_id
+  join businesses biz on biz.id = v.business_id
   left join sports s on s.id = c.sport_id
   left join users u on u.id = b.user_id
+  left join site_customers sc on sc.id = b.site_customer_id
   where b.id = $1`;
 
 const REGISTRATION_BILL_SELECT = `
   select r.id, r.tax_rate, r.tax_amount, r.venue_tax_rate, r.venue_tax_amount, r.status, e.name as event_name,
          e.start_at as event_start, e.end_at as event_end, e.city as event_city,
+         biz.id as business_id, biz.name as business_name, biz.brand as business_brand,
          u.name as player_name, u.email as player_email, u.phone as player_phone,
          (select p.amount from payments p where p.event_registration_id = r.id order by p.created_at desc limit 1) as amount
   from event_registrations r
   join events e on e.id = r.event_id
+  left join venues v on v.id = e.venue_id
+  left join businesses biz on biz.id = v.business_id
   join users u on u.id = r.user_id
   where r.id = $1`;
 

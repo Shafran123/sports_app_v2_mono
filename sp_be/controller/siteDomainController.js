@@ -33,7 +33,9 @@ async function notifyStatusChanged(req, row) {
   if (!ownerRow || !ownerRow.email) return;
   notificationCatalog.dispatch('site.request.status', {
     owner: { id: ownerRow.id, email: ownerRow.email },
-    business: { name: business.name },
+    // Full Business context (name + brand) so the status email is branded to
+    // the Business (brand-consolidation tickets 02/04).
+    business: { name: business.name, brand: business.brand },
     request: {
       hostname: siteDomains.displayHostname(row),
       status: row.status,

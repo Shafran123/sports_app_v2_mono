@@ -2,7 +2,9 @@ const pool = require('../db');
 
 // One booking row loaded with the derived fields the realtime + notification
 // wiring needs: the owning venue's owner id, the player's contact details,
-// and the venue's operator contact for the branded email section.
+// the venue's operator contact for the branded email section, and the
+// Business's identity + brand (brand-consolidation ticket 02) so booking
+// messages can carry the Business's own branding.
 // The secret QR token and idempotency key are NEVER included in these payloads
 // (CONTEXT.md: QR Token is disclosed only to the booking's own player).
 const BOOKING_EVENTS_SELECT = `
@@ -11,12 +13,15 @@ const BOOKING_EVENTS_SELECT = `
          c.name as court_name, v.name as venue_name,
          v.address as venue_address, v.city as venue_city, v.phone as venue_phone,
          v.owner_id as venue_owner_id,
-         u.email as user_email, u.phone as user_phone,
+         biz.id as business_id, biz.name as business_name, biz.brand as business_brand,
+         coalesce(u.email, sc.email) as user_email, coalesce(u.phone, sc.phone) as user_phone,
          o.email as owner_email, o.phone as owner_phone
   from bookings b
   join courts c on c.id = b.court_id
   join venues v on v.id = c.venue_id
+  join businesses biz on biz.id = v.business_id
   left join users u on u.id = b.user_id
+  left join site_customers sc on sc.id = b.site_customer_id
   left join users o on o.id = v.owner_id
   where b.id = $1`;
 

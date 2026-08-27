@@ -45,6 +45,16 @@ function codeFromEmail(email) {
   return match ? match[1] : null;
 }
 
+function htmlParamFromEmail(email) {
+  const call = posted.mock.calls.findLast(([url, opts]) => bodyText(opts).includes(email || ''));
+  const body = call?.[1]?.body;
+  if (!body || typeof body.entries !== 'function') return null;
+  for (const [k, v] of body.entries()) {
+    if (k === 'html') return String(v);
+  }
+  return null;
+}
+
 describe('site customer auth (ADR-0030, ticket 01)', () => {
   beforeAll(async () => {
     process.env.MAILGUN_API_KEY = 'test-key';
@@ -180,6 +190,12 @@ describe('site customer auth (ADR-0030, ticket 01)', () => {
     expect(send.status).toBe(200);
     const code = codeFromEmail(email);
     expect(code).toMatch(/^\d{6}$/);
+    // The site-auth email must carry a real HTML body (built from the same
+    // template as the platform OTP email), not a literal "undefined".
+    const html = htmlParamFromEmail(email);
+    expect(html).toBeTruthy();
+    expect(html).not.toBe('undefined');
+    expect(html).toContain(code);
 
     const good = await request(app).post('/api/v1/site-auth/verify-email/confirm').set('Authorization', `Bearer ${token}`).send({ email, code });
     expect(good.status).toBe(200);
@@ -245,6 +261,10 @@ describe('site customer auth (ADR-0030, ticket 01)', () => {
     expect(online.status).toBe(409);
     expect(online.body.error.code).toBe('PAYMENT_UNAVAILABLE');
 
+    // The Site Customer must receive the booking-confirmation EMAIL (not just
+    // SMS) — the checkout dispatch resolves the recipient from the booking's
+    // user_email, which for a site booking must come from the customer row.
+    const sendEmailSpy = vi.spyOn(require('../utils/emailService'), 'sendEmail').mockResolvedValue({ success: false, error: 'Email not configured' });
     const cash = await request(app)
       .post('/api/v1/bookings/checkout')
       .set('Authorization', `Bearer ${token}`)
@@ -259,6 +279,45 @@ describe('site customer auth (ADR-0030, ticket 01)', () => {
     expect(cash.status).toBe(201);
     expect(cash.body.data.booking.site_customer_id).toBe(reg.body.data.customer.id);
     expect(cash.body.data.booking.user_id).toBeNull();
+
+    const confirmationEmails = sendEmailSpy.mock.calls
+      .map(([arg]) => arg)
+      .filter((arg) => arg.to === `booker-${rand}@abc.test` && (arg.html || '').includes('Your slot is booked'));
+    expect(confirmationEmails.length).toBe(1);
+    sendEmailSpy.mockRestore();
+
+    // The Site Customer must be able to see their own booking after sign-in:
+    // the booking-detail API (with the QR token) and their bookings list.
+    const detail = await request(app)
+      .get(`/api/v1/bookings/${cash.body.data.booking.id}`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(detail.status).toBe(200);
+    expect(detail.body.data.id).toBe(cash.body.data.booking.id);
+    expect(detail.body.data.qr_token).toBeTruthy();
+
+    const list = await request(app)
+      .get('/api/v1/bookings')
+      .set('Authorization', `Bearer ${token}`);
+    expect(list.status).toBe(200);
+    expect(list.body.data.some((b) => b.id === cash.body.data.booking.id)).toBe(true);
+
+    // The Site Customer may cancel their own booking (same ownership model).
+    const cancel = await request(app)
+      .post(`/api/v1/bookings/${cash.body.data.booking.id}/cancel`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(cancel.status).toBe(200);
+    expect(cancel.body.data.status).toBe('cancelled');
+
+    // The owner console sees the Site Customer's name on the booking (the
+    // business bookings query coalesces the site_customer_id to the customer).
+    const ownerBookings = await request(app)
+      .get('/api/v1/business/bookings')
+      .set('Authorization', `Bearer ${await tokenFor(`siteauth-owner-a-${rand}`)}`);
+    expect(ownerBookings.status).toBe(200);
+    const ownerBookingRow = ownerBookings.body.data.find((b) => b.id === cash.body.data.booking.id);
+    expect(ownerBookingRow).toBeTruthy();
+    expect(ownerBookingRow.player_name).toBe('Site Pam');
+    expect(ownerBookingRow.player_phone).toBe('+94777770001');
 
     const noHost = await request(app)
       .post('/api/v1/bookings/checkout')

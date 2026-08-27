@@ -43,6 +43,14 @@ describe('sms service', () => {
     expect(msg).toContain('Court 1');
   });
 
+  it('prefixes the message with the Business name when business-branded (brand-consolidation 04)', () => {
+    const msg = buildBookingSms(
+      { venue_name: 'Smash Arena', court_name: 'Court 1', start_at: '2026-08-22T04:30:00.000Z', payment_method: 'cash' },
+      'Smash Arena Sports'
+    );
+    expect(msg.startsWith('Smash Arena Sports:')).toBe(true);
+  });
+
   it('posts to the SMSGo API when configured', async () => {
     process.env.SMSGO_API_KEY = 'sg_live_test';
     process.env.SMSGO_MASK = 'SPOTS';

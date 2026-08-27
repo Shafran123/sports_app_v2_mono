@@ -7,7 +7,9 @@ const {
   buildVenueApprovedHtml,
   buildEventRegisteredHtml,
   escapeHtml,
-  brandWordmark
+  brandWordmark,
+  brandHeader,
+  themeFor
 } = require('../utils/emailTemplates');
 
 const booking = {
@@ -102,5 +104,49 @@ describe('email templates (prod-grade shell)', () => {
     const html = shell({ brand: 'A & B <img>' });
     expect(html).not.toContain('<img>');
     expect(html).toContain('A &amp; B');
+    // The footer escapes once — never double-escapes the ampersand.
+    expect(html).toContain('A &amp; B &lt;img&gt; — book courts');
+    expect(html).not.toContain('&amp;amp;');
+  });
+
+  it('business tokens theme the header logo, CTA, badge and keep the platform footer (brand-consolidation 04)', () => {
+    const tokens = {
+      logo_url: 'https://cdn.test/smash-logo.png',
+      primary: '#0f766e',
+      accent: '#b45309',
+      platform: 'MySlot.LK'
+    };
+    const built = buildBookingHtml(booking, 'Smash Arena Sports', { tokens });
+    expect(built.html).toContain('https://cdn.test/smash-logo.png');
+    expect(built.html).toContain('Smash Arena Sports');
+    // CTA filled with the Business primary, footer still attributes the platform.
+    expect(built.html).toContain('background:#0f766e');
+    expect(built.html).toContain('MySlot.LK — book courts, join games, find players.');
+    expect(built.html).not.toContain('Smash Arena Sports — book courts, join games, find players.');
+  });
+
+  it('falls back to the wordmark in Business primary when the Business has no logo (brand-consolidation 04)', () => {
+    const tokens = { primary: '#7c3aed', accent: '#2563eb', platform: 'MySlot.LK' };
+    const built = buildBookingHtml(booking, 'Smash Arena Sports', { tokens });
+    expect(built.html).not.toContain('<img');
+    expect(built.html).toContain('#7c3aed');
+    expect(built.html).toContain('Smash Arena Sports');
+    expect(built.html).toContain('MySlot.LK — book courts, join games, find players.');
+  });
+
+  it('event registration badge is tinted from the Business primary (brand-consolidation 04)', () => {
+    const tokens = { primary: '#0f766e', accent: '#b45309', platform: 'MySlot.LK' };
+    const built = buildEventRegisteredHtml({ event_name: 'Social', event_start: '2026-09-01T04:30:00.000Z' }, 'Smash Arena Sports', { tokens });
+    expect(built.html).toContain('Registered');
+    expect(built.html).toContain(themeFor(tokens).badgeBg);
+  });
+
+  it('brandHeader renders the logo image when set, else the themed wordmark', () => {
+    const withLogo = brandHeader('Smash Arena Sports', themeFor({ logo_url: 'https://cdn.test/l.png', primary: '#0f766e', platform: 'MySlot.LK' }));
+    expect(withLogo).toContain('<img');
+    expect(withLogo).toContain('https://cdn.test/l.png');
+    const without = brandHeader('Smash Arena Sports', themeFor({ primary: '#0f766e', platform: 'MySlot.LK' }));
+    expect(without).not.toContain('<img');
+    expect(without).toContain('#0f766e');
   });
 });

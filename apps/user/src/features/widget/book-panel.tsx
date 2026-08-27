@@ -1,9 +1,10 @@
 "use client";
 
-// The Booking Widget's booking flow (ADR-0028, ticket 04): date + court +
-// slots, a cash checkout, and a QR success screen that is also the terminal
-// step online-payment redirects will later return to. Identity is unified:
-// verified players skip the step, phone-only visitors verify first.
+// The Booking Widget's booking flow (ADR-0028, ticket 04; ADR-0033): date +
+// court + slots, a cash checkout, and a QR success screen that is also the
+// terminal step online-payment redirects will later return to. Picker-first
+// (ADR-0033): a guest selects slots freely; sign-in / sign-up + verification
+// happen in a modal at the confirm step, then the booking auto-creates.
 // Scoped per Widget Instance (ADR-0028 v1.5): instanceKey is sent on checkout
 // so the server enforces the instance's venue scope; the branded page books
 // without an instance key.
@@ -12,7 +13,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import * as QRCode from "qrcode";
 import { bookings, toApiFailure } from "@myslot/api";
-import { Button, Card, ErrorState, Skeleton } from "@myslot/ui";
+import { Button, Card, Dialog, DialogContent, ErrorState, Skeleton } from "@myslot/ui";
 import { cn, dayjs, formatDuration, formatLkr, formatTime12, toDateKey, uuidV4 } from "@myslot/utils";
 import type { CourtAvailability, Slot, WidgetConfig } from "@myslot/types";
 import { useAuth } from "@/context/auth";
@@ -28,25 +29,24 @@ import {
 } from "@/features/venue-detail/selection";
 import { WidgetIdentity } from "./widget-identity";
 
-type Stage = "identity" | "pick" | "booked";
+type Stage = "pick" | "booked";
 
 export function BookPanel({ venue, instanceKey, siteHostname }: { venue: WidgetConfig; instanceKey?: string; siteHostname?: string | null }) {
   const { user, setUser, logout, loading } = useAuth();
-  const [stage, setStage] = useState<Stage>("identity");
+  const [stage, setStage] = useState<Stage>("pick");
   const [date, setDate] = useState(() => toDateKey(new Date()));
   const [durationMin, setDurationMin] = useState(0);
   const [selected, setSelected] = useState<SelectedSlots>({});
   const [checkoutKey, setCheckoutKey] = useState(() => uuidV4());
+  // The identity modal gates the confirm step for guests and unverified
+  // users (ADR-0033); the picker itself is never locked.
+  const [identityOpen, setIdentityOpen] = useState(false);
 
   // Verified Email gate: a widget booking needs both a verified phone and a
-  // verified email — the QR must reach an inbox (ticket 04).
+  // verified email — the QR must reach an inbox (ticket 04). Checked at the
+  // confirm step, not before the picker.
   const ready = !!user?.phone_verified_at && !!user?.email_verified_at;
   const identityLabel = user?.name || user?.phone || user?.email || "";
-
-  useEffect(() => {
-    if (loading) return;
-    if (stage === "identity" && ready) setStage("pick");
-  }, [ready, stage, loading]);
 
   const availabilityQuery = useAvailability(venue.id, date);
   const summary = summarizeSelection(selected, availabilityQuery.data);
@@ -81,37 +81,6 @@ export function BookPanel({ venue, instanceKey, siteHostname }: { venue: WidgetC
       onSuccess: () => setStage("booked")
     });
   };
-
-  // The identity decision needs the settled session: while the AuthProvider
-  // is still resolving, show a skeleton instead of flashing the login form
-  // (misleading for a returning, already-verified player).
-  if (stage === "identity") {
-    if (loading) {
-      return (
-        <div data-testid="identity-skeleton" className="space-y-4">
-          <div className="pt-3">
-            <Skeleton className="h-6 w-2/3" />
-            <Skeleton className="mt-2 h-3.5 w-full" />
-          </div>
-          <Skeleton className="h-12 w-full rounded-2xl" />
-          <Skeleton className="h-12 w-full rounded-2xl" />
-          <Skeleton className="h-11 w-full rounded-full" />
-        </div>
-      );
-    }
-    // Session is settled: only show identity when the booking gate is unmet.
-    // A ready player falls through to the picker with no flicker.
-    if (!ready) {
-      return (
-        <WidgetIdentity
-          widgetKey={instanceKey}
-          siteHostname={siteHostname ?? null}
-          siteName={venue.business?.name ?? null}
-          onDone={() => setStage("pick")}
-        />
-      );
-    }
-  }
 
   if (stage === "booked" && checkout.data?.booking) {
     return <BookingSuccess booking={checkout.data.booking} />;
@@ -217,26 +186,58 @@ export function BookPanel({ venue, instanceKey, siteHostname }: { venue: WidgetC
           </div>
           <p className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-surface-2 px-3 py-2 text-xs text-ink-2">
             <span>
-              Booking as <span className="font-semibold text-ink">{identityLabel}</span>
+              Booking as <span className="font-semibold text-ink">{identityLabel || "Guest"}</span>
             </span>
-            <button
-              type="button"
-              onClick={async () => {
-                await logout();
-                setUser(null);
-                setSelected({});
-                setStage("identity");
-              }}
-              className="font-semibold text-primary underline-offset-2 hover:underline"
-            >
-              Switch
-            </button>
+            {user ? (
+              <button
+                type="button"
+                onClick={async () => {
+                  await logout();
+                  setUser(null);
+                  setSelected({});
+                }}
+                className="font-semibold text-primary underline-offset-2 hover:underline"
+              >
+                Switch
+              </button>
+            ) : null}
           </p>
-          <Button className="mt-4 w-full" size="lg" disabled={!acceptsCash} loading={checkout.isPending} onClick={handleConfirm}>
-            {checkout.isPending ? "Booking…" : "Confirm booking — pay at venue"}
-          </Button>
+          {loading ? (
+            <Skeleton className="mt-4 h-11 w-full rounded-full" />
+          ) : !user ? (
+            <Button className="mt-4 w-full" size="lg" onClick={() => setIdentityOpen(true)}>
+              Sign in / Sign up to book
+            </Button>
+          ) : !ready ? (
+            <Button className="mt-4 w-full" size="lg" onClick={() => setIdentityOpen(true)}>
+              Verify to confirm
+            </Button>
+          ) : (
+            <Button className="mt-4 w-full" size="lg" disabled={!acceptsCash} loading={checkout.isPending} onClick={handleConfirm}>
+              {checkout.isPending ? "Booking…" : "Confirm booking — pay at venue"}
+            </Button>
+          )}
         </div>
       )}
+
+      <Dialog open={identityOpen} onOpenChange={setIdentityOpen}>
+        <DialogContent
+          title={user ? "Complete your booking details" : "Sign in to book"}
+          description={user ? "We need these before you can book." : "Your slot stays selected — sign in or create an account to confirm it."}
+          titleClassName="font-display font-extrabold"
+        >
+          <WidgetIdentity
+            widgetKey={instanceKey}
+            siteHostname={siteHostname ?? null}
+            siteName={venue.business?.name ?? null}
+            hideIntro
+            onDone={() => {
+              setIdentityOpen(false);
+              handleConfirm();
+            }}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

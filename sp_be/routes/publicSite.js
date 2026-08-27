@@ -17,8 +17,12 @@ async function siteVenues(businessId) {
   const { rows } = await pool.query(
     `select v.id, v.name, v.slug, v.city, v.address, v.photos, v.visibility, v.lat, v.lng,
             coalesce(court_stats.min_price, null) as min_price,
+            coalesce((
+              select jsonb_agg(jsonb_build_object('day_of_week', h.day_of_week, 'open_time', h.open_time, 'close_time', h.close_time) order by h.day_of_week, h.open_time)
+              from venue_hours h where h.venue_id = v.id
+            ), '[]'::jsonb) as hours,
 coalesce((
-              select jsonb_agg(s.name order by vs.sport_id)
+              select jsonb_agg(jsonb_build_object('name', s.name, 'icon', s.icon) order by vs.sport_id)
               from venue_sports vs join sports s on s.id = vs.sport_id
               where vs.venue_id = v.id
             ), '[]'::jsonb) as sports
