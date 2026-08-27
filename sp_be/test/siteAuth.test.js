@@ -341,6 +341,7 @@ describe('site customer auth (ADR-0030, ticket 01)', () => {
     expect(res.status).toBe(200);
     const row = res.body.data.find((c) => c.email === `booker-${rand}@abc.test`);
     expect(row).toBeTruthy();
+    expect(row.business_id).toBeTruthy();
     expect(row.booking_count).toBeGreaterThanOrEqual(1);
     expect(row.total_spend).toBeGreaterThan(0);
     expect(row.name).toBe('Site Pam');

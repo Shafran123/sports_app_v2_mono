@@ -119,7 +119,7 @@ exports.listCustomers = async (req, res) => {
       where += ` and (sc.name ilike $2 or sc.email ilike $2 or sc.phone ilike $2)`;
     }
     const { rows } = await pool.query(
-      `select sc.id, sc.email, sc.name, sc.phone, sc.email_verified_at, sc.phone_verified_at,
+      `select sc.id, sc.business_id, sc.email, sc.name, sc.phone, sc.email_verified_at, sc.phone_verified_at,
               sc.created_at as joined_at,
               count(b.id)::int as booking_count,
               coalesce(sum(b.total_price), 0)::float8 as total_spend,

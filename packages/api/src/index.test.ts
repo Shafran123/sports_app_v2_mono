@@ -269,6 +269,27 @@ describe("leads.submit", () => {
   });
 });
 
+describe("business.customers", () => {
+  it("parses a customers-directory row exactly as /business/customers returns it", async () => {
+    const backendRow = {
+      id: "sc1",
+      business_id: "b1",
+      email: "pam@abc.test",
+      name: "Site Pam",
+      phone: "+94771234567",
+      email_verified_at: "2026-08-01T00:00:00Z",
+      phone_verified_at: "2026-08-01T00:00:00Z",
+      joined_at: "2026-08-01T00:00:00Z",
+      booking_count: 2,
+      total_spend: 3000,
+      last_booking_at: "2026-08-20T00:00:00Z"
+    };
+    const client = mockClient(() => [backendRow]);
+    const customers = await business.customers(client);
+    expect(customers[0]!.email).toBe("pam@abc.test");
+  });
+});
+
 describe("admin settings & reports", () => {
   const flagDef = (name: string) => ({ name, type: "boolean", default: false, description: "x", value: false });
 
