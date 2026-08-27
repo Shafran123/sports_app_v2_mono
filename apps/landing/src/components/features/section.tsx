@@ -7,23 +7,17 @@ import type { Feature } from "@/lib/copy";
 import { DeviceFrame } from "../device-frame";
 import { TrackSection } from "../track-section";
 import {
-  MockBookings,
-  MockConfirmation,
-  MockDashboard,
-  MockEvents,
-  MockFrontDesk,
-  MockPayments,
-  MockVenueDetail
+  MockAdminBookings,
+  MockAdminDashboard,
+  MockDedicatedSite,
+  MockFrontDesk
 } from "./mockups";
 
 const MOCKUPS: Record<string, () => React.ReactNode> = {
-  "real-time-bookings": MockBookings,
+  "dedicated-site": MockDedicatedSite,
+  "real-time-bookings": MockAdminBookings,
   "front-desk": MockFrontDesk,
-  payments: MockPayments,
-  events: MockEvents,
-  "owner-dashboard": MockDashboard,
-  "player-venue-detail": MockVenueDetail,
-  "player-confirmation": MockConfirmation
+  "owner-dashboard": MockAdminDashboard
 };
 
 function mockFor(featureId: string): () => React.ReactNode {

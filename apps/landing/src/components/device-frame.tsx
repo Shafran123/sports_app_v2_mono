@@ -9,39 +9,48 @@ interface DeviceFrameProps {
 }
 
 /**
- * Renders a feature's screenshot slot inside a phone or browser device frame.
- * A real screenshot (screenshots.ts entry gains a `src`) renders as an image;
- * otherwise the caller's mockup children render inside the frame.
+ * Renders a feature's screenshot slot. A real screenshot (screenshots.ts
+ * entry gains a `src`) renders plainly — the capture already includes its own
+ * device bezel — otherwise the caller's mockup children render inside a
+ * CSS-composed phone, tablet, or browser frame.
  */
 export function DeviceFrame({ shotId, children, className }: DeviceFrameProps) {
   const shot = getScreenshot(shotId);
   const src = resolveScreenshot(shot);
   const frame = (shot?.frame ?? "browser") as FrameKind;
 
+  if (src) {
+    return (
+      <figure
+        className={cn(
+          "overflow-hidden rounded-3xl border border-border bg-surface shadow-soft",
+          frame === "phone" ? "mx-auto w-[320px]" : "w-full",
+          className
+        )}
+      >
+        <img src={src} alt={`Screenshot: ${shot?.label ?? shotId}`} className="block h-auto w-full" />
+      </figure>
+    );
+  }
+
   if (frame === "phone") {
     return (
       <figure className={cn("mx-auto w-[300px] rounded-[2.5rem] bg-ink p-2.5 shadow-soft", className)}>
         <div className="relative h-[calc(100%-1.25rem)] overflow-hidden rounded-[2rem]">
           <span aria-hidden="true" className="absolute left-1/2 top-2 z-10 h-5 w-20 -translate-x-1/2 rounded-full bg-ink" />
-          {src ? (
-            <img src={src} alt={`Screenshot: ${shot?.label ?? shotId}`} className="h-full w-full object-cover" />
-          ) : (
-            <div className="h-full bg-paper p-3">{children}</div>
-          )}
+          <div className="h-full bg-paper p-3">{children}</div>
         </div>
       </figure>
     );
   }
 
-  if (src) {
+  if (frame === "tablet") {
     return (
-      <figure
-        className={cn(
-          "overflow-hidden rounded-3xl border border-border bg-surface shadow-soft w-full aspect-[16/10]",
-          className
-        )}
-      >
-        <img src={src} alt={`Screenshot: ${shot?.label ?? shotId}`} className="h-full w-full object-cover" />
+      <figure className={cn("mx-auto w-full max-w-[560px] rounded-[2.5rem] bg-ink p-2.5 shadow-soft", className)}>
+        <div className="relative overflow-hidden rounded-[2rem]">
+          <span aria-hidden="true" className="absolute left-1/2 top-2 z-10 h-2 w-2 -translate-x-1/2 rounded-full bg-ink-3" />
+          <div className="bg-paper p-4">{children}</div>
+        </div>
       </figure>
     );
   }
@@ -61,7 +70,7 @@ export function DeviceFrame({ shotId, children, className }: DeviceFrameProps) {
 }
 
 function FrameChrome({ frame, label }: { frame: FrameKind; label: string }) {
-  if (frame === "phone") {
+  if (frame === "phone" || frame === "tablet") {
     return (
       <div className="flex justify-center border-b border-border bg-surface py-2">
         <span className="h-1.5 w-16 rounded-full bg-ink-3" aria-hidden="true" />

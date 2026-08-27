@@ -13,10 +13,13 @@ fi
 FAIL=0
 
 # Classes used by apps/landing components (see src/components/**).
-CLASSES="bg-surface-2 max-w-6xl rounded-3xl grid-cols-4 rounded-full h-16 px-4 pt-16 gap-10 lg:grid-cols-2"
+# Colon and arbitrary-value selectors are escaped by Tailwind 4 in the
+# compiled CSS, so entries are listed as they appear there and matched with
+# fixed-string search.
+CLASSES="bg-surface-2 max-w-6xl rounded-3xl grid-cols-3 rounded-full h-16 px-4 gap-10 gap-px bg-success-light lg\:grid-cols-2 group-open\:rotate-45"
 
 for cls in $CLASSES; do
-  if ! rg -q "$cls" "$CSS"; then
+  if ! rg -qF -- "$cls" "$CSS"; then
     echo "MISSING: $cls"
     FAIL=1
   fi

@@ -32,8 +32,9 @@ export const dynamic = "force-dynamic";
 export async function generateMetadata(): Promise<Metadata> {
   const brand = await getBrandName();
   return {
-    title: `${brand} — Find Your Game`,
-    description: "List your venue free for 3 months. MySlot.LK runs your courts, bookings, check-ins, and payments."
+    title: `${brand} — Your venue's own booking website`,
+    description:
+      "Give your sports facility a dedicated website — real-time slot booking, one-tap QR check-ins, and a clear view of your day. List your venue free for 3 months."
   };
 }
 

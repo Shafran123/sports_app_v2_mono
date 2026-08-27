@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { copy } from "./copy";
+import { contact, copy } from "./copy";
 
 describe("landing copy", () => {
   it("labels the hero CTA as a demo, not a free trial", () => {
@@ -18,21 +18,32 @@ describe("landing copy", () => {
     expect("cta" in copy.trialBand).toBe(false);
   });
 
-  it("adds a For players nav link and a mobile demo CTA", () => {
-    expect(copy.nav.players).toBe("For players");
-    expect(copy.nav.mobileCta).toBe("Book a demo");
+  it("pitches the dedicated website to sports facility owners", () => {
+    expect(copy.hero.body).toMatch(/sports facility/i);
+    expect(copy.hero.body).toMatch(/dedicated website/i);
+    expect(copy.hero.usps).toContain("Own website");
   });
 
-  it("keeps five owner feature sections and drops the old players one", () => {
-    expect(copy.features.items).toHaveLength(5);
-    expect(copy.features.items.some((f) => f.id === "players")).toBe(false);
+  it("keeps the owner feature sections and drops players, payments, and events", () => {
+    expect(copy.features.items).toHaveLength(4);
+    const ids = copy.features.items.map((f) => f.id);
+    expect(ids).toEqual(["dedicated-site", "real-time-bookings", "front-desk", "owner-dashboard"]);
+    expect(ids.some((f) => f === "players")).toBe(false);
+    expect(ids.some((f) => f === "payments")).toBe(false);
+    expect(ids.some((f) => f === "events")).toBe(false);
+    expect("playerFeatures" in copy).toBe(false);
   });
 
-  it("declares two player feature sections with distinct ids", () => {
-    expect(copy.playerFeatures.items).toHaveLength(2);
-    const ids = copy.playerFeatures.items.map((f) => f.id);
-    expect(ids).toEqual(["player-venue-detail", "player-confirmation"]);
-    expect(copy.playerFeatures.items[0].cta).toBeUndefined();
+  it("does not market payments or events before they are live", () => {
+    const allCopy = JSON.stringify(copy);
+    expect(allCopy).not.toMatch(/PayHere/i);
+    expect(allCopy).not.toMatch(/Payments your way/i);
+    expect(allCopy).not.toMatch(/Events & registrations/i);
+    expect(allCopy).not.toMatch(/Cashless/i);
+  });
+
+  it("declares no player feature sections anymore", () => {
+    expect("playerFeatures" in copy).toBe(false);
   });
 
   it("has no photo strip and no fabricated social proof", () => {
@@ -45,22 +56,28 @@ describe("landing copy", () => {
     expect(copy.trialBand.sub).toContain("first");
   });
 
-  it("has a working contact email and no dead footer links or player column", () => {
-    expect(copy.footer.contactEmail).toBe("info@myslot.lk");
-    const titles = copy.footer.columns.map((c) => c.title);
-    expect(titles).not.toContain("Players");
-    const flat = copy.footer.columns.flatMap((c) => c.links);
-    expect(flat.some((l) => l.label === "About")).toBe(false);
-    expect(flat.some((l) => l.label === "Explore the player app")).toBe(false);
-    expect(flat.some((l) => l.label === "Contact")).toBe(true);
+  it("exposes a working contact block with address, phone, and email", () => {
+    expect(contact.email).toBe("info@myslot.lk");
+    expect(contact.address).toMatch(/Galle/);
+    expect(contact.phone).toMatch(/^\+94 /);
+    expect(contact.phoneHref).toMatch(/^\+94\d{9}$/);
   });
 
-  it("declares a one-word rotating USP headline", () => {
+  it("footer lists Product and Legal columns with no player column", () => {
+    const titles = copy.footer.columns.map((c) => c.title);
+    expect(titles).toContain("Legal");
+    expect(titles).not.toContain("Players");
+    const flat = copy.footer.columns.flatMap((c) => c.links);
+    const labels = flat.map((l) => l.label);
+    expect(labels).toEqual(expect.arrayContaining(["Privacy Policy", "Terms & Conditions", "FAQ"]));
+    expect(flat.some((l) => l.label === "About")).toBe(false);
+  });
+
+  it("declares a rotating USP headline with short phrases", () => {
     expect(copy.hero.usps.length).toBeGreaterThanOrEqual(3);
     const set = new Set(copy.hero.usps);
     expect(set.size).toBe(copy.hero.usps.length);
     for (const word of copy.hero.usps) {
-      expect(word.split(" ")).toHaveLength(1);
       expect(word.length).toBeGreaterThan(0);
     }
     expect(copy.hero.headline).toBe(copy.hero.usps[0]);
@@ -68,5 +85,38 @@ describe("landing copy", () => {
     expect(copy.hero.finePrint.length).toBeGreaterThan(0);
     expect("headlinePrefix" in copy.hero).toBe(false);
     expect("headlineRotations" in copy.hero).toBe(false);
+  });
+
+  it("lists the owner capabilities in a detailed table", () => {
+    expect(copy.capabilities.items.length).toBeGreaterThanOrEqual(10);
+    for (const item of copy.capabilities.items) {
+      expect(item.term.length).toBeGreaterThan(0);
+      expect(item.desc.length).toBeGreaterThan(0);
+    }
+    const terms = copy.capabilities.items.map((item) => item.term);
+    expect(terms).toEqual(
+      expect.arrayContaining([
+        "Your own dedicated website",
+        "Embeddable booking widget",
+        "Multiple courts",
+        "Cancellation cutoff",
+        "Transparent tax",
+        "Offers & discounts",
+        "Flexible opening windows",
+        "Variable pricing",
+        "Reports",
+        "A clear plan & agreement"
+      ])
+    );
+  });
+
+  it("declares a healthy FAQ and legal pages", () => {
+    expect(copy.faq.items.length).toBeGreaterThanOrEqual(6);
+    for (const item of copy.faq.items) {
+      expect(item.q.length).toBeGreaterThan(0);
+      expect(item.a.length).toBeGreaterThan(0);
+    }
+    expect(copy.legal.privacy.paragraphs.length).toBeGreaterThan(0);
+    expect(copy.legal.terms.paragraphs.length).toBeGreaterThan(0);
   });
 });

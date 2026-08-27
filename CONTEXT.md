@@ -52,6 +52,7 @@ _Avoid_: venue landing page, microsite, storefront
 
 **Dedicated Site**:
 A Business's white-labeled, multi-venue website served on the Business's own **Site Hostname** — the owner's domain (`abc.lk`, apex plus `www.` as one) or a platform subdomain (`<brand-slug>.myslot.lk`). One per Business. Not an iframe: it renders the full app booking flow (site sign-in, checkout, holds, QR, payments per the venue's own capability) wrapped in **Business Brand** chrome and site-level presentation (about, contact, **Social Links**, **Site Banner**, footer) instead of the marketplace shell — the venue detail pages and booking flow carry full site branding too. Serves the Business's own audience of **Site Customers** — accounts are created and verified inside this Business only, never shared with any other Business or with the marketplace **Player** base. Serves a one-viewport portfolio root (banner, name, description, slim contact/social bar, minimal venue grid) and one page per venue at `/<slug>`; a single approved venue skips the root and lands directly on its venue page, and venue switching is a header chooser available only on venue pages. When a Site goes live the Business's venues **default off the marketplace** (site-only); the Owner can per-venue opt back into a **Marketplace Listing** (dual-channel). Owner-hosted hostnames are indexable; platform subdomains are noindex. When the Owner Plan lapses past its grace period, the site serves a branded offline slate while confirmed bookings play out.
+_Note_: The landing page markets this to owners as "your own dedicated website" — the product term is Dedicated Site.
 _Avoid_: microsite, dedicated page, site (bare)
 
 **Site Hostname**:
@@ -73,6 +74,10 @@ _Avoid_: hero image, banner image (ambiguous), cover image
 **Site Policies**:
 Per-**Business** legal text — privacy policy and terms & conditions — edited by the Owner in the admin *Widget & site* editor and linked from the **Dedicated Site** footer (`/privacy`, `/terms`). Until the Owner saves their own copy, short platform-authored defaults with the business name substituted are shown. Distinct from the platform's own legal pages.
 _Avoid_: legal pages, terms page, privacy page
+
+**Platform Legal Pages**:
+The platform's own legal and help pages on the marketing site — Privacy Policy, Terms & Conditions, and FAQ — served from the landing app at `/privacy`, `/terms`, and `/faq`, and linked from the landing footer. Distinct from **Site Policies**, which are per-Business legal text on a **Dedicated Site**.
+_Avoid_: legal pages (bare), site policies (the per-Business ones)
 
 **Marketplace Listing**:
 A per-venue, Owner-controlled state deciding whether an approved Venue appears and can be booked on the marketplace (`myslot.lk`). **Defaults off once the Business's Dedicated Site is live** — the Venue then sells only on the site; the Owner may per-venue opt back on to sell dual-channel (site + marketplace in parallel). Venues without a live site keep their marketplace listing by default. Distinct from Venue visibility (private vs public), which governs marketplace *discovery* rather than the site.
@@ -181,6 +186,7 @@ _Avoid_: delete account, deactivate
 
 **Venue Owner**:
 An operator account that manages one or more Venues (grouped under a single **Business**), created through the Owner Onboarding flow (an Admin provisions it, attaches an Owner Plan, and drafts an Owner Agreement). Console access and venue creation are gated on accepting the current Owner Agreement.
+_Note_: The landing page's marketing copy addresses this audience as "sports facility owners" — the product term remains Venue Owner.
 _Avoid_: partner, vendor, host
 
 **Owner Lead**:
