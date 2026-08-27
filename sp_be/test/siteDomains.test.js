@@ -363,11 +363,14 @@ describe('site domain request workflow (ADR-0029)', () => {
       expect(withSite.status).toBe(201);
     });
 
-    it('hides the venue from marketplace browse + detail while site-live; the owner toggle exempts it', async () => {
+    it('hides the venue from marketplace browse while site-live but still serves the detail endpoint; the owner toggle exempts it from browse', async () => {
       const browse = await request(app).get('/api/v1/venues');
       expect(browse.body.data.some((v) => v.id === listingVenueId)).toBe(false);
+      // Marketplace Listing governs browse only: an off-listing venue still
+      // resolves by id (it exists and is public), so site surfaces and links
+      // never 404 on it.
       const detail = await request(app).get(`/api/v1/venues/${listingVenueId}`);
-      expect(detail.status).toBe(404);
+      expect(detail.status).toBe(200);
 
       const toggle = await request(app)
         .patch(`/api/v1/business/venues/${listingVenueId}/marketplace-listing`)

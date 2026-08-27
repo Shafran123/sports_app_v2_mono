@@ -243,6 +243,9 @@ exports.getVenue = async (req, res) => {
     // Dedicated Site context (ADR-0029): a venue on its own Business's live
     // site is served even when marketplace-private — the site is the venue's
     // storefront. The hostname must be a LIVE site of the venue's Business.
+    // Without a site context the venue is served whenever it is public; the
+    // Marketplace Listing flag (ADR-0031) no longer gates the detail endpoint
+    // — it only governs marketplace browse, not whether a venue exists.
     let visibilityGate = "and v.visibility = 'public'";
     if (site_hostname) {
       const scope = await siteDomains.validateSiteHostname(pool, id, String(site_hostname));
@@ -250,16 +253,6 @@ exports.getVenue = async (req, res) => {
         return fail(res, scope.error.status, scope.error.code, scope.error.message);
       }
       visibilityGate = "";
-    } else {
-      // Marketplace listing gate (ADR-0031): off for live-site businesses
-      // unless the owner opted the venue back in. A site context bypasses it.
-      visibilityGate += ` and (
-        v.marketplace_listing = true
-        or not exists (
-          select 1 from site_domain_requests r
-          where r.business_id = v.business_id and r.status = 'live'
-        )
-      )`;
     }
 
     const { rows } = await pool.query(
