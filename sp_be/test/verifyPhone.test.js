@@ -44,6 +44,7 @@ describe('phone verification — SMSGo OTP challenge', () => {
     posted = vi.fn(async () => ({ ok: true, status: 200, text: async () => '' }));
     vi.stubGlobal('fetch', posted);
     process.env.SMSGO_API_KEY = 'sg_test_key';
+    process.env.SMSGO_MASK = 'MYSLOT';
     await pool.query(
       `delete from verification_otps where user_id = (select id from users where firebase_uid = $1)`,
       [UID]
@@ -53,6 +54,7 @@ describe('phone verification — SMSGo OTP challenge', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     delete process.env.SMSGO_API_KEY;
+    delete process.env.SMSGO_MASK;
   });
 
   afterAll(async () => {
