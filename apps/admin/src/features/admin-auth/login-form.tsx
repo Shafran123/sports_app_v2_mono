@@ -98,6 +98,9 @@ export function LoginForm() {
       <p className="mt-6 text-center text-xs text-ink-3">
         Staff only — players log in at the player app.
       </p>
+      <p className="mt-2 text-center text-[10px] uppercase tracking-wider text-ink-3/60">
+        v{process.env.NEXT_PUBLIC_APP_VERSION}
+      </p>
     </section>
   );
 }

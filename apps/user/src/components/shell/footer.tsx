@@ -30,6 +30,9 @@ export function Footer() {
       </div>
       <p className="border-t border-border py-4 text-center text-xs text-ink-3">
         © {new Date().getFullYear()} {brand}
+        <span className="ml-2 opacity-60" title="Build version">
+          v{process.env.NEXT_PUBLIC_APP_VERSION}
+        </span>
       </p>
     </footer>
   );

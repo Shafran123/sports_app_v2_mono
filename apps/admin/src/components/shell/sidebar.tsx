@@ -167,6 +167,9 @@ export function AdminSidebar({ role }: { role: "admin" | "venue_owner" }) {
           >
             <LogOut className="h-[18px] w-[18px]" /> Log out
           </button>
+          <p className="mt-3 px-2 text-center text-[10px] uppercase tracking-wider text-ink-3/60">
+            v{process.env.NEXT_PUBLIC_APP_VERSION}
+          </p>
         </div>
       </aside>
 
