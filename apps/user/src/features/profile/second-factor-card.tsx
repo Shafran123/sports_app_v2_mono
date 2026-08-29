@@ -17,7 +17,15 @@ import { useAuth } from "@myslot/auth";
 
 type Step = "idle" | "scan" | "codes";
 
-export function SecondFactorCard({ user, onChanged }: { user: User; onChanged: (user: User) => void }) {
+export function SecondFactorCard({
+  user,
+  onChanged,
+  className = ""
+}: {
+  user: User;
+  onChanged: (user: User) => void;
+  className?: string;
+}) {
   // Site Customer surface only — the marketplace Player base has no factor.
   const [isSite, setIsSite] = useState(false);
   useEffect(() => setIsSite(isOwnerSurface()), []);
@@ -119,7 +127,7 @@ export function SecondFactorCard({ user, onChanged }: { user: User; onChanged: (
   };
 
   return (
-    <Card className="p-5 md:p-6">
+    <Card className={`p-5 md:p-6 ${className}`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary-light text-primary">

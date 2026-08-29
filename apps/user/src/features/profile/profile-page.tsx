@@ -255,6 +255,7 @@ function ProfileForm({ user, onLogout }: { user: User; onLogout: () => Promise<v
           rendered only on owner surfaces, where the user is a Site Customer. */}
       <SecondFactorCard
         user={me}
+        className="mt-6"
         onChanged={(updated) => {
           setMe(updated);
           setUser(updated);
