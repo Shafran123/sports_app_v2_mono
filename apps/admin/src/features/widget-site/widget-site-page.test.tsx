@@ -241,4 +241,16 @@ describe("WidgetSitePage (ticket 08)", () => {
       expect(setListingMock).toHaveBeenCalledWith("v1", true);
     });
   });
+
+  it("toggles the per-Business require-second-factor switch (ticket 09)", async () => {
+    wrap(<WidgetSitePage />);
+    await waitFor(() => {
+      expect(screen.getByRole("checkbox", { name: /require two-factor authentication/i })).toBeInTheDocument();
+    });
+    await userEvent.click(screen.getByRole("checkbox", { name: /require two-factor authentication/i }));
+    await waitFor(() => {
+      expect(updateMeMock).toHaveBeenCalledWith({ require_2fa: true });
+    });
+    expect(await screen.findByRole("status")).toHaveTextContent(/now required for every customer sign-in/i);
+  });
 });

@@ -23,7 +23,7 @@ import {
   Skeleton,
   Textarea
 } from "@myslot/ui";
-import { Copy, Globe, Plus, Trash2, X } from "lucide-react";
+import { Copy, Globe, Plus, ShieldCheck, Trash2, X } from "lucide-react";
 import type { BusinessProfile, WidgetInstance, WidgetInstanceInput } from "@myslot/types";
 import { SiteRequestSection } from "./site-request-section";
 
@@ -83,6 +83,8 @@ export function WidgetSitePage() {
       <BusinessBrandCard profile={profile} onSaved={invalidate} />
 
       <SiteRequestSection profile={profile} />
+
+      <RequireSecondFactorCard profile={profile} onSaved={invalidate} />
 
       <Card className="p-5 md:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -425,6 +427,61 @@ function BusinessBrandCard({ profile, onSaved }: { profile: BusinessProfile; onS
       </div>
       {notice && <p className="mt-3 rounded-xl bg-success-light px-3 py-2 text-sm text-success">{notice}</p>}
       {error && <p className="mt-3 rounded-xl bg-error-light px-3 py-2 text-sm text-error">{error}</p>}
+    </Card>
+  );
+}
+
+// Second Factor (ticket 09): the per-Business "require the factor" toggle.
+// When on, every Site Customer of this Business must enable the factor before
+// signing in (server-enforced); existing customers without it are prompted at
+// their next sign-in.
+function RequireSecondFactorCard({ profile, onSaved }: { profile: BusinessProfile; onSaved: () => void }) {
+  const queryClient = useQueryClient();
+  const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
+  const required = !!profile.require_2fa;
+
+  const toggle = useMutation({
+    mutationFn: () => business.updateMe({ require_2fa: !required }),
+    onSuccess: () => {
+      setNotice(required ? "Two-factor authentication is no longer required." : "Two-factor authentication is now required for every customer sign-in.");
+      setError("");
+      onSaved();
+      void queryClient.invalidateQueries({ queryKey: ["business-me"] });
+    },
+    onError: (err) => {
+      setError(toApiFailure(err).message);
+      setNotice("");
+    }
+  });
+
+  return (
+    <Card className="p-5 md:p-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex items-start gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary-light text-primary">
+            <ShieldCheck className="h-5 w-5" />
+          </span>
+          <div>
+            <h2 className="font-display text-lg font-extrabold tracking-tight text-ink">
+              Require two-factor authentication
+            </h2>
+            <p className="mt-0.5 max-w-xl text-sm text-ink-2">
+              Your site&apos;s customers sign in with email+password or Google. When this is on,
+              every customer must also enter a code from their authenticator app — customers
+              without it are asked to enable it at their next sign-in.
+            </p>
+          </div>
+        </div>
+        <Checkbox
+          checked={required}
+          disabled={toggle.isPending}
+          onChange={() => toggle.mutate()}
+          aria-label="Require two-factor authentication"
+        />
+      </div>
+      {notice && <p className="mt-3 rounded-xl bg-success-light px-3 py-2 text-sm text-success" role="status">{notice}</p>}
+      {error && <p className="mt-3 rounded-xl bg-error-light px-3 py-2 text-sm text-error" role="alert">{error}</p>}
     </Card>
   );
 }

@@ -44,6 +44,9 @@ router.patch('/venues/:id/marketplace-listing', writeLimiter, siteDomainControll
 router.get('/bookings', businessController.listBookings);
 router.get('/invoices', businessController.listInvoices);
 router.get('/customers', siteAuthController.listCustomers);
+// Recovery (ticket 07): the Venue Owner resets one of their OWN Business's
+// customers' Second Factor — also revokes all of that customer's sessions.
+router.post('/customers/:id/reset-factor', writeLimiter, siteAuthController.resetCustomerFactor);
 router.get('/overview', businessController.overview);
 router.get('/reports', businessController.reports);
 router.post('/bookings/manual', writeLimiter, businessController.createManualBooking);

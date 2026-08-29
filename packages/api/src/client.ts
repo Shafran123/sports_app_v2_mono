@@ -9,6 +9,14 @@ export const SITE_CUSTOMER_TOKEN_KEY = "site_customer_token";
 // to a Site Customer on return to the embed (ADR-0030): the embed settles the
 // redirect on mount, before its async config has loaded.
 export const SITE_GOOGLE_PENDING_KEY = "site_google_pending";
+// Where the widget's Google-redirect settle stashes a pending Second Factor
+// challenge (ticket 08): the settle runs before the identity step mounts, so
+// the challenge is parked here and picked up by WidgetIdentity on mount.
+export const SITE_TOTP_PENDING_KEY = "site_totp_pending";
+// Where the widget's Google-redirect settle parks a sign-in error (e.g. a
+// Business that requires the Second Factor) for the identity step to surface
+// on mount — the settle runs before any sign-in UI exists.
+export const SITE_AUTH_ERROR_KEY = "site_auth_error";
 
 /** True when the current surface is a Dedicated Site host or a widget embed. */
 export function isOwnerSurface(): boolean {

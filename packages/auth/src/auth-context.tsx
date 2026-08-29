@@ -40,6 +40,8 @@ export function toAppUser(customer: {
   phone: string | null;
   email_verified_at: string | null;
   phone_verified_at: string | null;
+  totp_enabled?: boolean;
+  totp_required?: boolean;
 }): User {
   return {
     id: customer.id,
@@ -50,7 +52,9 @@ export function toAppUser(customer: {
     city: null,
     phone_verified_at: customer.phone_verified_at,
     email_verified_at: customer.email_verified_at ?? null,
-    onboarding_state: "grandfathered"
+    onboarding_state: "grandfathered",
+    totp_enabled: customer.totp_enabled,
+    totp_required: customer.totp_required
   };
 }
 

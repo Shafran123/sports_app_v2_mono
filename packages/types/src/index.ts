@@ -60,7 +60,11 @@ export const UserSchema = z.object({
   phone_verified_at: z.string().nullable(),
   email_verified_at: z.string().nullable().optional(),
   onboarding_state: z.enum(["pending", "accepted", "grandfathered"]).optional(),
-  must_change_password: z.boolean().optional()
+  must_change_password: z.boolean().optional(),
+  // Site Customer Second Factor state (tickets 07-09), surfaced on owner
+  // surfaces where the user is a Site Customer rather than a platform user.
+  totp_enabled: z.boolean().optional(),
+  totp_required: z.boolean().optional()
 });
 export type User = z.infer<typeof UserSchema>;
 
@@ -185,7 +189,9 @@ export const BusinessProfileSchema = BusinessInfoSchema.extend({
       // the Business's site is live.
       marketplace_listing: z.boolean().optional()
     })
-  )
+  ),
+  // Second Factor (ticket 07): the per-Business "require 2FA" toggle.
+  require_2fa: z.boolean().optional()
 });
 export type BusinessProfile = z.infer<typeof BusinessProfileSchema>;
 
@@ -198,7 +204,11 @@ export const SiteCustomerSchema = z.object({
   name: z.string().nullable(),
   phone: z.string().nullable(),
   email_verified_at: z.string().nullable(),
-  phone_verified_at: z.string().nullable()
+  phone_verified_at: z.string().nullable(),
+  // Second Factor (tickets 07-09): whether the customer has the factor on,
+  // and whether their Business makes it mandatory.
+  totp_enabled: z.boolean().optional(),
+  totp_required: z.boolean().optional()
 });
 export type SiteCustomer = z.infer<typeof SiteCustomerSchema>;
 
@@ -209,11 +219,13 @@ export const SiteSessionSchema = z.object({
 });
 export type SiteSession = z.infer<typeof SiteSessionSchema>;
 
-// The Anti-bot Check escalation (ticket 05): a low-score sign-in/registration
-// is not hard-blocked — the server refuses the session and answers with an
-// email-OTP challenge the visitor completes to finish signing in.
+// A sign-in escalation: the Anti-bot Check's email-OTP challenge (kind
+// 'email', ticket 05) or the Second Factor TOTP/backup-code challenge (kind
+// 'totp', tickets 07-08). Both complete through the same confirm endpoint;
+// neither ever carries a session.
 export const SiteAuthChallengeSchema = z.object({
   escalated: z.literal(true),
+  kind: z.enum(["email", "totp"]),
   challenge_id: z.string(),
   email: z.string(),
   expires_at: z.string()
@@ -224,12 +236,13 @@ export const SiteAuthResultSchema = z.union([SiteSessionSchema, SiteAuthChalleng
 export type SiteAuthResult = z.infer<typeof SiteAuthResultSchema>;
 
 // Owner Console Customers directory row (ADR-0030): a Site Customer with
-// booking aggregates.
+// booking aggregates + Second Factor state (tickets 07-09).
 export const SiteCustomerSummarySchema = SiteCustomerSchema.extend({
   joined_at: z.string(),
   booking_count: z.number(),
   total_spend: z.number(),
-  last_booking_at: z.string().nullable()
+  last_booking_at: z.string().nullable(),
+  totp_enabled_at: z.string().nullable()
 });
 export type SiteCustomerSummary = z.infer<typeof SiteCustomerSummarySchema>;
 

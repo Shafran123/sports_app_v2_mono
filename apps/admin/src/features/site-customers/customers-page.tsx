@@ -6,11 +6,11 @@
 // per-Business (the API scopes it server-side).
 
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { business, toApiFailure } from "@myslot/api";
-import { ErrorState, Input, SkeletonCard } from "@myslot/ui";
+import { Badge, Button, Dialog, DialogContent, ErrorState, Input, SkeletonCard } from "@myslot/ui";
 import { formatLkr } from "@myslot/utils";
-import { Download, Search } from "lucide-react";
+import { Download, KeyRound, Search } from "lucide-react";
 import type { SiteCustomerSummary } from "@myslot/types";
 
 function isoDate(value: string | null | undefined): string {
@@ -20,10 +20,20 @@ function isoDate(value: string | null | undefined): string {
 
 export function CustomersPage() {
   const [q, setQ] = useState("");
+  const [resetting, setResetting] = useState<SiteCustomerSummary | null>(null);
+  const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: ["business-customers"],
     queryFn: () => business.customers(),
     staleTime: 30_000
+  });
+
+  const resetFactor = useMutation({
+    mutationFn: () => business.resetCustomerFactor(resetting!.id),
+    onSuccess: () => {
+      setResetting(null);
+      void queryClient.invalidateQueries({ queryKey: ["business-customers"] });
+    }
   });
 
   const rows = useMemo(() => {
@@ -101,6 +111,7 @@ export function CustomersPage() {
                 <th className="px-5 py-3 font-semibold">Bookings</th>
                 <th className="px-5 py-3 font-semibold">Total spend</th>
                 <th className="px-5 py-3 font-semibold">Last booking</th>
+                <th className="px-5 py-3 font-semibold">Second factor</th>
               </tr>
             </thead>
             <tbody>
@@ -116,12 +127,52 @@ export function CustomersPage() {
                   </td>
                   <td className="px-5 py-3 font-semibold text-ink">{c.total_spend > 0 ? formatLkr(c.total_spend) : "—"}</td>
                   <td className="px-5 py-3 text-ink-2">{isoDate(c.last_booking_at)}</td>
+                  <td className="px-5 py-3">
+                    {c.totp_enabled_at ? (
+                      <div className="flex items-center gap-2">
+                        <Badge variant="success">
+                          <KeyRound className="h-3 w-3" /> On
+                        </Badge>
+                        <Button variant="ghost" size="sm" onClick={() => setResetting(c)} className="text-error hover:bg-error-light hover:text-error">
+                          Reset
+                        </Button>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-ink-3">—</span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
+
+      <Dialog open={!!resetting} onOpenChange={(o) => !o && setResetting(null)}>
+        <DialogContent
+          title="Reset two-factor authentication?"
+          description="The customer will be signed out everywhere and can sign in again without the app code."
+        >
+          {resetting && (
+            <div className="space-y-3">
+              {resetFactor.isError && (
+                <p className="rounded-xl bg-error-light px-3 py-2 text-sm text-error">{toApiFailure(resetFactor.error).message}</p>
+              )}
+              <p className="text-sm text-ink-2">
+                Resetting <span className="font-semibold text-ink">{resetting.name || resetting.email}</span>&apos;s
+                factor lets them back in without their authenticator app. Their backup codes stop
+                working too.
+              </p>
+              <div className="flex justify-end gap-2">
+                <Button variant="secondary" onClick={() => setResetting(null)}>Cancel</Button>
+                <Button variant="destructive" loading={resetFactor.isPending} onClick={() => resetFactor.mutate()}>
+                  Reset factor
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

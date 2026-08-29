@@ -61,7 +61,7 @@ async function ensureForOwner(ownerId, name, client = pool) {
 // versa — ADR-0031 keeps one shared brand object). Nested objects (colors,
 // contact) merge at their own level; sending an explicit empty string clears.
 async function updateProfile(businessId, patch, client = pool) {
-  const { name, brand } = patch;
+  const { name, brand, require_2fa } = patch;
   let cleanBrand = null;
   if (brand !== undefined) {
     try {
@@ -72,6 +72,9 @@ async function updateProfile(businessId, patch, client = pool) {
   }
   if (name !== undefined && (typeof name !== 'string' || name.trim().length === 0 || name.trim().length > 80)) {
     throw Object.assign(new Error('Business name must be 1–80 characters'), { code: 'WIDGET_VALIDATION' });
+  }
+  if (require_2fa !== undefined && typeof require_2fa !== 'boolean') {
+    throw Object.assign(new Error('require_2fa must be a boolean'), { code: 'WIDGET_VALIDATION' });
   }
 
   if (cleanBrand !== null) {
@@ -88,13 +91,15 @@ async function updateProfile(businessId, patch, client = pool) {
     `update businesses set
        name = coalesce($2, name),
        brand = coalesce($3::jsonb, brand),
+       require_2fa = coalesce($4, require_2fa),
        updated_at = now()
      where id = $1
      returning *`,
     [
       businessId,
       name !== undefined ? name.trim() : null,
-      cleanBrand !== null ? JSON.stringify(cleanBrand) : null
+      cleanBrand !== null ? JSON.stringify(cleanBrand) : null,
+      require_2fa === undefined ? null : require_2fa
     ]
   );
   return rows[0] || null;

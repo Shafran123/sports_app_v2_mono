@@ -5,9 +5,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { CustomersPage } from "./customers-page";
 
 const customersMock = vi.hoisted(() => vi.fn());
+const resetFactorMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@myslot/api", () => ({
-  business: { customers: customersMock },
+  business: { customers: customersMock, resetCustomerFactor: resetFactorMock },
   toApiFailure: (e: { code?: string; message?: string }) => ({
     status: 0,
     code: e?.code ?? "UNKNOWN",
@@ -24,6 +25,7 @@ const rows = [
     phone: "+94 77 123 4567",
     email_verified_at: "2026-08-01T00:00:00Z",
     phone_verified_at: null,
+    totp_enabled_at: "2026-08-15T00:00:00Z",
     joined_at: "2026-08-01T00:00:00Z",
     booking_count: 3,
     total_spend: 5400,
@@ -37,6 +39,7 @@ const rows = [
     phone: null,
     email_verified_at: null,
     phone_verified_at: null,
+    totp_enabled_at: null,
     joined_at: "2026-08-10T00:00:00Z",
     booking_count: 0,
     total_spend: 0,
@@ -80,5 +83,24 @@ describe("CustomersPage (ADR-0030, ticket 05)", () => {
     expect(clickSpy).toHaveBeenCalled();
     expect(urlSpy).toHaveBeenCalled();
     clickSpy.mockRestore();
+  });
+
+  it("shows the second factor state and lets the owner reset an enrolled customer's factor (ticket 07)", async () => {
+    resetFactorMock.mockResolvedValue({ reset: true });
+    wrap(<CustomersPage />);
+    await screen.findByText("Pam Silva");
+
+    // Enrolled customer has an On badge + reset action; the other has neither.
+    expect(screen.getByText("On")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /reset/i })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /reset/i }));
+    expect(screen.getByText(/signed out everywhere/i)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /reset factor/i }));
+
+    await waitFor(() => {
+      expect(resetFactorMock).toHaveBeenCalledWith("c1");
+    });
+    expect(screen.queryByText(/signed out everywhere/i)).toBeNull();
   });
 });

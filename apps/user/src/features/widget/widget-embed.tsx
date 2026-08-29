@@ -9,7 +9,7 @@
 
 import { useMemo, useState, useEffect, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { widget, featureFlags, auth as authApi, toApiFailure, siteCustomerAuth, persistSiteToken, TOKEN_KEY, SITE_GOOGLE_PENDING_KEY } from "@myslot/api";
+import { widget, featureFlags, auth as authApi, toApiFailure, siteCustomerAuth, persistSiteToken, TOKEN_KEY, SITE_GOOGLE_PENDING_KEY, SITE_TOTP_PENDING_KEY, SITE_AUTH_ERROR_KEY } from "@myslot/api";
 import { ErrorState, Skeleton } from "@myslot/ui";
 import { DEFAULT_BRAND_NAME } from "@myslot/utils";
 import { finishGoogleRedirect, toAppUser } from "@myslot/auth";
@@ -55,11 +55,29 @@ export function WidgetEmbed({ widgetKey }: { widgetKey: string }) {
         window.sessionStorage.removeItem(SITE_GOOGLE_PENDING_KEY);
         try {
           const session = await siteCustomerAuth.google({ site_hostname: pendingHost, id_token: idToken });
+          if ("escalated" in session) {
+            // Enrolled customer: the Second Factor challenge comes back
+            // instead of a session (ticket 08). Park it for WidgetIdentity
+            // to pick up on mount, then settle into the sign-in surface.
+            window.sessionStorage.setItem(SITE_TOTP_PENDING_KEY, JSON.stringify(session));
+            window.location.reload();
+            return;
+          }
           persistSiteToken(session.token);
           setUser(toAppUser(session.customer));
-        } catch {
-          // The Site Customer could not be created — drop the identity and let
-          // the guest try again from the identity step.
+        } catch (err) {
+          // A Business that requires the Second Factor refuses an unenrolled
+          // customer — park the message so the identity step can explain
+          // (ticket 09), then settle into the sign-in surface. Any other
+          // failure just drops the identity for a fresh attempt.
+          if (toApiFailure(err).code === "SECOND_FACTOR_REQUIRED") {
+            window.sessionStorage.setItem(
+              SITE_AUTH_ERROR_KEY,
+              JSON.stringify({ message: toApiFailure(err).message })
+            );
+            window.location.reload();
+            return;
+          }
         }
         return;
       }

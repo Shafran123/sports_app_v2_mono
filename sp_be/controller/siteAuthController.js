@@ -7,12 +7,23 @@ const { ok, fail } = require('../utils/response');
 const logger = require('../utils/logger');
 const pool = require('../db');
 const siteCustomers = require('../services/siteCustomers');
+const siteTotp = require('../services/siteTotp');
 const recaptcha = require('../services/recaptcha');
 
 function ssoCustomer(customer) {
-  return (({ id, business_id, email, name, phone, email_verified_at, phone_verified_at }) => ({
-    id, business_id, email, name, phone, email_verified_at, phone_verified_at
+  return (({ id, business_id, email, name, phone, email_verified_at, phone_verified_at, totp_enabled_at, totp_required }) => ({
+    id, business_id, email, name, phone, email_verified_at, phone_verified_at,
+    // Second Factor (tickets 07-09): whether the customer has the factor on
+    // and whether their Business makes it mandatory.
+    totp_enabled: Boolean(totp_enabled_at),
+    totp_required: Boolean(totp_required)
   }))(customer);
+}
+
+// A sign-in that needs the Second Factor answers 202 with the challenge the
+// client completes via /challenge/confirm (kind 'totp') — never a session.
+function escalated(res, challenge, kind) {
+  ok(res, 202, { escalated: true, kind, challenge_id: challenge.id, email: challenge.email, expires_at: challenge.expires_at });
 }
 
 // The Anti-bot Check (ticket 05): a low siteverify score escalates the
@@ -22,15 +33,11 @@ function lowScore(req) {
   return Boolean(req.captcha) && req.captcha.score < recaptcha.minScore();
 }
 
-function escalated(res, challenge) {
-  ok(res, 202, { escalated: true, challenge_id: challenge.id, email: challenge.email, expires_at: challenge.expires_at });
-}
-
 exports.register = async (req, res) => {
   try {
     if (lowScore(req)) {
       const challenge = await siteCustomers.registerChallenge(req.body || {});
-      return escalated(res, challenge);
+      return escalated(res, challenge, 'email');
     }
     const { customer, session } = await siteCustomers.register(req.body || {});
     ok(res, 201, { customer: ssoCustomer(customer), token: session.token, expires_at: session.expires_at });
@@ -47,11 +54,16 @@ exports.login = async (req, res) => {
   try {
     if (lowScore(req)) {
       const challenge = await siteCustomers.loginChallenge(req.body || {});
-      return escalated(res, challenge);
+      // An enrolled customer's escalation is the Second Factor itself (the
+      // service answers a purpose 'totp' challenge); anyone else gets the
+      // email-OTP challenge (tickets 05 + 08).
+      return escalated(res, challenge, challenge.purpose === 'totp' ? 'totp' : 'email');
     }
-    const { customer, session } = await siteCustomers.login(req.body || {});
-    ok(res, 200, { customer: ssoCustomer(customer), token: session.token, expires_at: session.expires_at });
+    const result = await siteCustomers.login(req.body || {});
+    if (result.challenge) return escalated(res, result.challenge, 'totp');
+    ok(res, 200, { customer: ssoCustomer(result.customer), token: result.session.token, expires_at: result.session.expires_at });
   } catch (error) {
+    if (error.code === 'SECOND_FACTOR_REQUIRED') return fail(res, 403, error.code, error.message);
     if (error.code) return fail(res, error.code === 'SITE_CUSTOMER_BAD_CREDENTIALS' ? 401 : 400, error.code, error.message);
     logger.error(`Error logging in site customer: ${error.message}`);
     fail(res, 500, 'INTERNAL_SERVER_ERROR', 'Something went wrong');
@@ -75,9 +87,11 @@ exports.confirmChallenge = async (req, res) => {
 
 exports.google = async (req, res) => {
   try {
-    const { customer, session } = await siteCustomers.googleUpsert(req.body || {});
-    ok(res, 201, { customer: ssoCustomer(customer), token: session.token, expires_at: session.expires_at });
+    const result = await siteCustomers.googleUpsert(req.body || {});
+    if (result.challenge) return escalated(res, result.challenge, 'totp');
+    ok(res, 201, { customer: ssoCustomer(result.customer), token: result.session.token, expires_at: result.session.expires_at });
   } catch (error) {
+    if (error.code === 'SECOND_FACTOR_REQUIRED') return fail(res, 403, error.code, error.message);
     if (error.code === 'SITE_HOST_NOT_LIVE') return fail(res, 403, error.code, error.message);
     if (error.code === 'GOOGLE_TOKEN_REQUIRED') return fail(res, 400, error.code, error.message);
     if (error.code === 'GOOGLE_TOKEN_INVALID') return fail(res, 401, error.code, error.message);
@@ -141,6 +155,104 @@ exports.confirmEmailCode = async (req, res) => {
   }
 };
 
+// ---- Second Factor (tickets 07-09) ----
+
+// Begin enrollment: generate the secret, encrypt it at rest, return the
+// otpauth URL (the QR the authenticator app scans) — the plaintext secret is
+// returned exactly once, here.
+exports.totpStart = async (req, res) => {
+  try {
+    const result = await siteTotp.startEnrollment(req.siteCustomer.id, req.siteCustomer.business_name);
+    ok(res, 200, result);
+  } catch (error) {
+    if (error.code === 'TOTP_ALREADY_ENABLED') return fail(res, 409, error.code, error.message);
+    if (error.code) return fail(res, 400, error.code, error.message);
+    logger.error(`Error starting TOTP enrollment: ${error.message}`);
+    fail(res, 500, 'INTERNAL_SERVER_ERROR', 'Something went wrong');
+  }
+};
+
+// Finish enrollment with a live code from the app: enables the factor and
+// returns the ten backup codes, shown exactly once.
+exports.totpConfirmEnable = async (req, res) => {
+  try {
+    const backupCodes = await siteTotp.confirmEnrollment(req.siteCustomer.id, req.body?.code);
+    ok(res, 200, { enabled: true, backup_codes: backupCodes });
+  } catch (error) {
+    if (error.code === 'TOTP_ALREADY_ENABLED') return fail(res, 409, error.code, error.message);
+    if (error.code === 'TOTP_NOT_STARTED') return fail(res, 400, error.code, error.message);
+    if (error.code === 'TOTP_INVALID') return fail(res, 400, error.code, error.message);
+    logger.error(`Error confirming TOTP enrollment: ${error.message}`);
+    fail(res, 500, 'INTERNAL_SERVER_ERROR', 'Something went wrong');
+  }
+};
+
+// Disable the factor, proving control with a current code or a backup code.
+// A Business that requires the factor never allows disabling.
+exports.totpDisable = async (req, res) => {
+  try {
+    await siteTotp.disableFactor(req.siteCustomer.id, req.body?.code);
+    ok(res, 200, { disabled: true });
+  } catch (error) {
+    if (error.code === 'SECOND_FACTOR_REQUIRED') return fail(res, 403, error.code, error.message);
+    if (error.code === 'TOTP_NOT_ENABLED') return fail(res, 400, error.code, error.message);
+    if (error.code === 'TOTP_INVALID') return fail(res, 400, error.code, error.message);
+    logger.error(`Error disabling TOTP: ${error.message}`);
+    fail(res, 500, 'INTERNAL_SERVER_ERROR', 'Something went wrong');
+  }
+};
+
+// Replace the backup codes with a fresh set of ten; old ones are dead.
+exports.totpRegenerate = async (req, res) => {
+  try {
+    const backupCodes = await siteTotp.regenerateBackupCodes(req.siteCustomer.id);
+    ok(res, 200, { backup_codes: backupCodes });
+  } catch (error) {
+    if (error.code) return fail(res, 400, error.code, error.message);
+    logger.error(`Error regenerating backup codes: ${error.message}`);
+    fail(res, 500, 'INTERNAL_SERVER_ERROR', 'Something went wrong');
+  }
+};
+
+// Recovery (Venue Owner): reset the factor of one of the owner's OWN Business
+// customers. Clearing the factor also revokes all of the customer's sessions.
+exports.resetCustomerFactor = async (req, res) => {
+  try {
+    const business = await pool.query(`select id from businesses where owner_id = $1`, [req.user.id]);
+    const businessId = business.rows[0]?.id;
+    if (!businessId) {
+      return fail(res, 404, 'BUSINESS_NOT_FOUND', 'No business is set up for this account');
+    }
+    const customer = await pool.query(
+      `select id from site_customers where id = $1 and business_id = $2`,
+      [req.params.id, businessId]
+    );
+    if (!customer.rows[0]) {
+      return fail(res, 404, 'SITE_CUSTOMER_NOT_FOUND', 'This customer does not belong to your business');
+    }
+    await siteTotp.resetFactor(customer.rows[0].id);
+    ok(res, 200, { reset: true });
+  } catch (error) {
+    logger.error(`Error resetting site customer factor: ${error.message}`);
+    fail(res, 500, 'INTERNAL_SERVER_ERROR', 'Something went wrong');
+  }
+};
+
+// Recovery (Admin backstop): reset any Site Customer's factor, anywhere.
+exports.adminResetCustomerFactor = async (req, res) => {
+  try {
+    const customer = await pool.query(`select id from site_customers where id = $1`, [req.params.id]);
+    if (!customer.rows[0]) {
+      return fail(res, 404, 'SITE_CUSTOMER_NOT_FOUND', 'No such site customer');
+    }
+    await siteTotp.resetFactor(customer.rows[0].id);
+    ok(res, 200, { reset: true });
+  } catch (error) {
+    logger.error(`Error resetting site customer factor (admin): ${error.message}`);
+    fail(res, 500, 'INTERNAL_SERVER_ERROR', 'Something went wrong');
+  }
+};
+
 // Owner Console Customers directory (ADR-0030): the Business's Site
 // Customers with their booking aggregates — the owner's own audience asset.
 exports.listCustomers = async (req, res) => {
@@ -159,7 +271,7 @@ exports.listCustomers = async (req, res) => {
     }
     const { rows } = await pool.query(
       `select sc.id, sc.business_id, sc.email, sc.name, sc.phone, sc.email_verified_at, sc.phone_verified_at,
-              sc.created_at as joined_at,
+              sc.totp_enabled_at, sc.created_at as joined_at,
               count(b.id)::int as booking_count,
               coalesce(sum(b.total_price), 0)::float8 as total_spend,
               max(b.start_at) as last_booking_at

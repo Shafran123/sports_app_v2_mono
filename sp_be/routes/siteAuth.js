@@ -28,4 +28,12 @@ router.post('/verify-phone/confirm', otpLimiter, siteAuthController.requireSiteC
 router.post('/verify-email/send', otpLimiter, siteAuthController.requireSiteCustomer, siteAuthController.sendEmailCode);
 router.post('/verify-email/confirm', otpLimiter, siteAuthController.requireSiteCustomer, siteAuthController.confirmEmailCode);
 
+// Second Factor (tickets 07-09): enrollment lives in the Dedicated Site
+// account panel only — the widget never enrolls. The sign-in challenge itself
+// runs through /challenge/confirm (purpose 'totp'), shared by both surfaces.
+router.post('/totp/enable', otpLimiter, siteAuthController.requireSiteCustomer, siteAuthController.totpStart);
+router.post('/totp/enable/confirm', otpLimiter, siteAuthController.requireSiteCustomer, siteAuthController.totpConfirmEnable);
+router.post('/totp/disable', otpLimiter, siteAuthController.requireSiteCustomer, siteAuthController.totpDisable);
+router.post('/totp/backup-codes/regenerate', otpLimiter, siteAuthController.requireSiteCustomer, siteAuthController.totpRegenerate);
+
 module.exports = router;

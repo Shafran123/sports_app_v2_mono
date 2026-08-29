@@ -50,6 +50,8 @@ vi.mock("@myslot/api", () => ({
   },
   persistSiteToken: persistSiteTokenMock,
   SITE_GOOGLE_PENDING_KEY: "site_google_pending",
+  SITE_TOTP_PENDING_KEY: "site_totp_pending",
+  SITE_AUTH_ERROR_KEY: "site_auth_error",
   toApiFailure: (e: { code?: string; message?: string }) => ({
     status: 0,
     code: e?.code ?? "UNKNOWN",
@@ -73,7 +75,9 @@ vi.mock("@myslot/auth", () => ({
 }));
 
 vi.mock("qrcode", () => ({
-  toDataURL: vi.fn(async () => "data:image/png;base64,x")
+  __esModule: true,
+  toDataURL: vi.fn(async () => "data:image/png;base64,x"),
+  default: { toDataURL: vi.fn(async () => "data:image/png;base64,x") }
 }));
 
 const baseConfig = {
@@ -500,5 +504,119 @@ describe("WidgetIdentity", () => {
     });
     await userEvent.click(screen.getByRole("button", { name: /use a different method/i }));
     expect(screen.getByPlaceholderText("you@example.com")).toBeInTheDocument();
+  });
+
+  it("challenges an enrolled customer with the Second Factor at site login, then issues the session (ticket 08)", async () => {
+    getRecaptchaTokenMock.mockResolvedValue("tok-1");
+    loginMock.mockResolvedValue({
+      escalated: true,
+      kind: "totp",
+      challenge_id: "ch-totp",
+      email: "pam@site.test",
+      expires_at: "2026-08-22T10:10:00.000Z"
+    });
+    confirmChallengeMock.mockResolvedValue({
+      token: "sc-token",
+      expires_at: "2026-09-22T10:00:00.000Z",
+      customer: {
+        id: "sc-1",
+        business_id: "biz-1",
+        email: "pam@site.test",
+        name: "Pam",
+        phone: null,
+        email_verified_at: null,
+        phone_verified_at: null,
+        totp_enabled: true
+      }
+    });
+    wrap(<WidgetIdentity siteHostname="courtgroup.lk" siteName="Court Group" onDone={vi.fn()} />);
+
+    await userEvent.type(screen.getByPlaceholderText("you@example.com"), "pam@site.test");
+    await userEvent.type(screen.getByPlaceholderText("Password"), "password-1");
+    await userEvent.click(screen.getByRole("button", { name: /sign in/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/from your authenticator app/i)).toBeInTheDocument();
+      expect(screen.getByPlaceholderText("6-digit code or XXXX-XXXX")).toBeInTheDocument();
+      expect(persistSiteTokenMock).not.toHaveBeenCalled();
+    });
+
+    await userEvent.type(screen.getByPlaceholderText("6-digit code or XXXX-XXXX"), "123456");
+    await userEvent.click(screen.getByRole("button", { name: /verify/i }));
+
+    await waitFor(() => {
+      expect(confirmChallengeMock).toHaveBeenCalledWith("ch-totp", "123456");
+      expect(persistSiteTokenMock).toHaveBeenCalledWith("sc-token");
+      expect(setUserMock).toHaveBeenCalledWith(expect.objectContaining({ id: "sc-1", totp_enabled: true }));
+    });
+  });
+
+  it("an enrolled customer's Google popup lands on the Second Factor step, never a session (ticket 08)", async () => {
+    const { loginWithGooglePopup } = await import("@myslot/auth");
+    vi.mocked(loginWithGooglePopup).mockResolvedValue({ idToken: "id-token-1" });
+    siteGoogleMock.mockResolvedValue({
+      escalated: true,
+      kind: "totp",
+      challenge_id: "ch-gtotp",
+      email: "g@pam.test",
+      expires_at: "2026-08-22T10:10:00.000Z"
+    });
+    confirmChallengeMock.mockResolvedValue({
+      token: "sc-token",
+      expires_at: "2026-09-22T10:00:00.000Z",
+      customer: {
+        id: "sc-1",
+        business_id: "biz-1",
+        email: "g@pam.test",
+        name: "G Pam",
+        phone: null,
+        email_verified_at: "2026-08-22T10:00:00.000Z",
+        phone_verified_at: null
+      }
+    });
+    wrap(<WidgetIdentity siteHostname="courtgroup.lk" siteName="Court Group" onDone={vi.fn()} />);
+    await userEvent.click(screen.getByRole("button", { name: /continue with google/i }));
+
+    await waitFor(() => {
+      expect(siteGoogleMock).toHaveBeenCalledWith({ site_hostname: "courtgroup.lk", id_token: "id-token-1" });
+      expect(screen.getByText(/from your authenticator app/i)).toBeInTheDocument();
+      expect(persistSiteTokenMock).not.toHaveBeenCalled();
+    });
+
+    await userEvent.type(screen.getByPlaceholderText("6-digit code or XXXX-XXXX"), "654321");
+    await userEvent.click(screen.getByRole("button", { name: /verify/i }));
+    await waitFor(() => {
+      expect(confirmChallengeMock).toHaveBeenCalledWith("ch-gtotp", "654321");
+      expect(persistSiteTokenMock).toHaveBeenCalledWith("sc-token");
+    });
+  });
+
+  it("a venue that requires 2FA explains itself to the widget visitor (ticket 09)", async () => {
+    loginMock.mockRejectedValue({
+      code: "SECOND_FACTOR_REQUIRED",
+      message: "This venue requires two-factor authentication. Enable it in your profile to sign in."
+    });
+    wrap(<WidgetIdentity widgetKey="k1" siteHostname="courtgroup.lk" siteName="Court Group" onDone={vi.fn()} />);
+
+    await userEvent.type(screen.getByPlaceholderText("you@example.com"), "pam@site.test");
+    await userEvent.type(screen.getByPlaceholderText("Password"), "password-1");
+    await userEvent.click(screen.getByRole("button", { name: /sign in/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent(/enable it in your account on the venue's site/i);
+    });
+  });
+
+  it("shows a parked require-2FA error after the widget's Google redirect settle (ticket 09)", async () => {
+    window.sessionStorage.setItem(
+      "site_auth_error",
+      JSON.stringify({ message: "This venue requires two-factor authentication. Enable it in your profile to sign in." })
+    );
+    wrap(<WidgetIdentity widgetKey="k1" siteHostname="courtgroup.lk" siteName="Court Group" onDone={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent(/enable it in your profile to sign in/i);
+    });
+    expect(window.sessionStorage.getItem("site_auth_error")).toBeNull();
   });
 });

@@ -13,8 +13,8 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { auth as authApi, toApiFailure, featureFlags, siteCustomerAuth, persistSiteToken, SITE_GOOGLE_PENDING_KEY } from "@myslot/api";
-import type { SiteAuthChallenge } from "@myslot/types";
+import { auth as authApi, toApiFailure, featureFlags, siteCustomerAuth, persistSiteToken, SITE_GOOGLE_PENDING_KEY, SITE_TOTP_PENDING_KEY, SITE_AUTH_ERROR_KEY } from "@myslot/api";
+import type { SiteAuthChallenge, SiteAuthResult } from "@myslot/types";
 import {
   loginWithEmail,
   registerWithEmail,
@@ -28,7 +28,7 @@ import { DEFAULT_BRAND_NAME, getRecaptchaToken } from "@myslot/utils";
 import { useAuth } from "@/context/auth";
 import { GoogleLogo, VerifiedDetails } from "./identity-parts";
 
-type Phase = "signin" | "register" | "details" | "challenge";
+type Phase = "signin" | "register" | "details" | "challenge" | "totp";
 
 // Map a Site Customer onto the app user shape (ADR-0030): the booking gate
 // reads the same verified flags + name/phone/email fields.
@@ -39,6 +39,8 @@ function toAppUser(customer: {
   phone: string | null;
   email_verified_at: string | null;
   phone_verified_at: string | null;
+  totp_enabled?: boolean;
+  totp_required?: boolean;
 }) {
   return {
     id: customer.id,
@@ -49,12 +51,25 @@ function toAppUser(customer: {
     city: null,
     phone_verified_at: customer.phone_verified_at,
     email_verified_at: customer.email_verified_at ?? null,
-    onboarding_state: "grandfathered" as const
+    onboarding_state: "grandfathered" as const,
+    totp_enabled: customer.totp_enabled,
+    totp_required: customer.totp_required
   };
 }
 
-function isChallenge(result: SiteAuthChallenge | { token: string }): result is SiteAuthChallenge {
+function isChallenge(result: SiteAuthResult): result is SiteAuthChallenge {
   return (result as SiteAuthChallenge).escalated === true;
+}
+
+// A Business that requires the Second Factor refuses unenrolled sign-ins
+// (ticket 09). The server message points at "your profile"; inside the widget
+// iframe that means the venue's site account page, so say so plainly.
+function signInError(err: unknown, widgetKey?: string): string {
+  const failure = toApiFailure(err);
+  if (failure.code === "SECOND_FACTOR_REQUIRED" && widgetKey) {
+    return "This venue requires two-factor authentication. Enable it in your account on the venue's site, then sign in again.";
+  }
+  return failure.message;
 }
 
 export function WidgetIdentity({
@@ -97,6 +112,39 @@ export function WidgetIdentity({
   const [challengeCode, setChallengeCode] = useState("");
   const [challengeFrom, setChallengeFrom] = useState<"signin" | "register">("signin");
 
+  // Second Factor (ticket 08): the widget's Google redirect settles before
+  // this step mounts, so a pending TOTP challenge is parked in sessionStorage
+  // by the embed and picked up here. A parked sign-in error (e.g. a venue
+  // requiring the factor) is surfaced the same way (ticket 09).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const pending = window.sessionStorage.getItem(SITE_TOTP_PENDING_KEY);
+    if (pending) {
+      try {
+        const parsed = JSON.parse(pending) as SiteAuthChallenge;
+        if (parsed && parsed.challenge_id) {
+          setChallenge(parsed);
+          setChallengeCode("");
+          setChallengeFrom("signin");
+          setPhase("totp");
+        }
+      } catch {
+        // Corrupt parking note — ignore; the visitor signs in fresh.
+      }
+      window.sessionStorage.removeItem(SITE_TOTP_PENDING_KEY);
+    }
+    const pendingError = window.sessionStorage.getItem(SITE_AUTH_ERROR_KEY);
+    if (pendingError) {
+      try {
+        const parsed = JSON.parse(pendingError) as { message?: string };
+        if (parsed?.message) setError(parsed.message);
+      } catch {
+        // Corrupt parking note — ignore.
+      }
+      window.sessionStorage.removeItem(SITE_AUTH_ERROR_KEY);
+    }
+  }, []);
+
   // Details step (phone + email verification)
   const [name, setName] = useState(user?.name ?? "");
   const [phone, setPhone] = useState(user?.phone ?? "");
@@ -136,7 +184,7 @@ export function WidgetIdentity({
           setChallenge(result);
           setChallengeCode("");
           setChallengeFrom("signin");
-          setPhase("challenge");
+          setPhase(result.kind === "totp" ? "totp" : "challenge");
           return;
         }
         persistSiteToken(result.token);
@@ -148,7 +196,7 @@ export function WidgetIdentity({
       }
       setPhase("details");
     } catch (err) {
-      setError(toApiFailure(err).message);
+      setError(signInError(err, widgetKey));
     } finally {
       setBusy(false);
     }
@@ -184,7 +232,7 @@ export function WidgetIdentity({
           setChallenge(result);
           setChallengeCode("");
           setChallengeFrom("register");
-          setPhase("challenge");
+          setPhase(result.kind === "totp" ? "totp" : "challenge");
           return;
         }
         persistSiteToken(result.token);
@@ -197,17 +245,19 @@ export function WidgetIdentity({
       }
       setPhase("details");
     } catch (err) {
-      setError(toApiFailure(err).message);
+      setError(signInError(err, widgetKey));
     } finally {
       setBusy(false);
     }
   };
 
-  // Complete an escalated sign-in/register: the code from the inbox proves
-  // the human controls the email, then the session is issued.
+  // Complete an escalated sign-in/registration: the code from the inbox
+  // (kind 'email') or the authenticator app / a backup code (kind 'totp')
+  // proves the human, then the session is issued.
   const confirmChallenge = async () => {
     if (!challenge) return;
-    if (!/^\d{6}$/.test(challengeCode)) {
+    const totp = challenge.kind === "totp";
+    if (!totp && !/^\d{6}$/.test(challengeCode)) {
       setError("Enter the 6-digit code from the email.");
       return;
     }
@@ -215,11 +265,12 @@ export function WidgetIdentity({
     setError("");
     try {
       const session = await siteCustomerAuth.confirmChallenge(challenge.challenge_id, challengeCode.trim());
+      if (typeof window !== "undefined") window.sessionStorage.removeItem(SITE_TOTP_PENDING_KEY);
       persistSiteToken(session.token);
       setUser(toAppUser(session.customer));
       setPhase("details");
     } catch (err) {
-      setError(toApiFailure(err).message);
+      setError(signInError(err, widgetKey));
     } finally {
       setBusy(false);
     }
@@ -244,6 +295,15 @@ export function WidgetIdentity({
           // platform Player (ADR-0030).
           const { idToken } = await loginWithGooglePopup();
           const session = await siteCustomerAuth.google({ site_hostname: siteHostname!, id_token: idToken });
+          if (isChallenge(session)) {
+            // Enrolled customer: the Second Factor challenge comes back
+            // instead of a session (ticket 08).
+            setChallenge(session);
+            setChallengeCode("");
+            setChallengeFrom("signin");
+            setPhase("totp");
+            return;
+          }
           persistSiteToken(session.token);
           setUser(toAppUser(session.customer));
           setPhase("details");
@@ -253,7 +313,7 @@ export function WidgetIdentity({
         await loginWithGoogleRedirect();
       }
     } catch (err) {
-      setError(toApiFailure(err).message);
+      setError(signInError(err, widgetKey));
     } finally {
       setBusy(false);
     }
@@ -271,7 +331,7 @@ export function WidgetIdentity({
       setError("");
       alert("Password reset email sent — check your inbox.");
     } catch (err) {
-      setError(toApiFailure(err).message);
+      setError(signInError(err, widgetKey));
     } finally {
       setBusy(false);
     }
@@ -312,7 +372,7 @@ export function WidgetIdentity({
       setPhoneSent(true);
       setError("");
     } catch (err) {
-      setError(toApiFailure(err).message);
+      setError(signInError(err, widgetKey));
     } finally {
       setBusy(false);
     }
@@ -336,7 +396,7 @@ export function WidgetIdentity({
       setPhoneCode("");
       setError("");
     } catch (err) {
-      setError(toApiFailure(err).message);
+      setError(signInError(err, widgetKey));
     } finally {
       setBusy(false);
     }
@@ -359,7 +419,7 @@ export function WidgetIdentity({
       setEmailSent(true);
       setError("");
     } catch (err) {
-      setError(toApiFailure(err).message);
+      setError(signInError(err, widgetKey));
     } finally {
       setBusy(false);
     }
@@ -383,7 +443,7 @@ export function WidgetIdentity({
       setEmailCode("");
       setError("");
     } catch (err) {
-      setError(toApiFailure(err).message);
+      setError(signInError(err, widgetKey));
     } finally {
       setBusy(false);
     }
@@ -404,7 +464,7 @@ export function WidgetIdentity({
       }
       onDone();
     } catch (err) {
-      setError(toApiFailure(err).message);
+      setError(signInError(err, widgetKey));
     }
   };
 
@@ -558,14 +618,25 @@ export function WidgetIdentity({
     );
   }
 
-  if (phase === "challenge") {
+  if (phase === "challenge" || phase === "totp") {
+    const totp = phase === "totp";
     return (
       <div className="space-y-4">
         <div>
           <h3 className="pt-3 font-display text-lg font-extrabold tracking-tight text-ink">Verify it&apos;s you</h3>
           <p className="mt-0.5 text-sm text-ink-2">
-            We emailed a 6-digit code to <span className="font-semibold text-ink">{challenge?.email}</span>.
-            Enter it here to finish {challengeFrom === "register" ? "creating your account" : "signing in"}.
+            {totp ? (
+              <>
+                Enter the 6-digit code from your authenticator app, or an unused backup code{" "}
+                <span className="font-semibold text-ink">XXXX-XXXX</span>.
+              </>
+            ) : (
+              <>
+                We emailed a 6-digit code to{" "}
+                <span className="font-semibold text-ink">{challenge?.email}</span>. Enter it here to
+                finish {challengeFrom === "register" ? "creating your account" : "signing in"}.
+              </>
+            )}
           </p>
         </div>
 
@@ -580,12 +651,18 @@ export function WidgetIdentity({
         >
           <Input
             type="text"
-            inputMode="numeric"
-            maxLength={6}
+            inputMode={totp ? "text" : "numeric"}
+            maxLength={totp ? 9 : 6}
             value={challengeCode}
-            onChange={(e) => setChallengeCode(e.target.value.replace(/\D/g, ""))}
-            placeholder="6-digit code"
-            autoComplete="one-time-code"
+            onChange={(e) =>
+              setChallengeCode(
+                totp
+                  ? e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, "").slice(0, 9)
+                  : e.target.value.replace(/\D/g, "")
+              )
+            }
+            placeholder={totp ? "6-digit code or XXXX-XXXX" : "6-digit code"}
+            autoComplete={totp ? "off" : "one-time-code"}
             autoFocus
           />
           <Button type="submit" loading={busy} className="w-full">

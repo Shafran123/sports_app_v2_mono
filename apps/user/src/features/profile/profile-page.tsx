@@ -9,6 +9,7 @@ import type { User } from "@myslot/types";
 import { useAuth } from "@/context/auth";
 import { VerifyPhoneModal } from "@/features/verify-phone/verify-phone-modal";
 import { VerifyEmailModal } from "@/features/verify-email/verify-email-modal";
+import { SecondFactorCard } from "./second-factor-card";
 
 interface Feedback {
   tone: "success" | "error";
@@ -247,6 +248,16 @@ function ProfileForm({ user, onLogout }: { user: User; onLogout: () => Promise<v
         onVerified={(verified) => {
           setMe(verified);
           setEnteredEmail(verified.email ?? "");
+        }}
+      />
+
+      {/* The Dedicated Site account panel's Second Factor section (ticket 09):
+          rendered only on owner surfaces, where the user is a Site Customer. */}
+      <SecondFactorCard
+        user={me}
+        onChanged={(updated) => {
+          setMe(updated);
+          setUser(updated);
         }}
       />
     </main>

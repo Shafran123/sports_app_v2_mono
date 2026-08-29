@@ -20,6 +20,9 @@ vi.mock("@/context/auth", () => ({
 vi.mock("@myslot/api", () => ({
   bookings: { list: listMock, get: getMock, cancel: cancelMock },
   widget: { phoneSend: vi.fn(), phoneConfirm: vi.fn() },
+  SITE_GOOGLE_PENDING_KEY: "site_google_pending",
+  SITE_TOTP_PENDING_KEY: "site_totp_pending",
+  SITE_AUTH_ERROR_KEY: "site_auth_error",
   toApiFailure: (e: { code?: string; message?: string }) => ({
     status: 0,
     code: e?.code ?? "UNKNOWN",

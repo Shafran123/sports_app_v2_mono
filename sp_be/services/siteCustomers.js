@@ -8,6 +8,7 @@ const crypto = require('node:crypto');
 const pool = require('../db');
 const siteDomains = require('./siteDomains');
 const siteChallenges = require('./siteChallenges');
+const siteTotp = require('./siteTotp');
 const { generateCode, hashCode, timingSafeEqualHex, CODE_TTL_MINUTES, MAX_ATTEMPTS, HOURLY_SEND_LIMIT } = require('../utils/otpCode');
 const { formatSriLankanPhone } = require('../utils/smsService');
 const { sendSms } = require('../utils/smsService');
@@ -104,7 +105,7 @@ async function createSession(customerId, client = pool) {
 // Resolve a bearer token to its Site Customer (+ business) or null.
 async function customerForToken(token) {
   const { rows } = await pool.query(
-    `select sc.*, b.name as business_name
+    `select sc.*, b.name as business_name, b.require_2fa as totp_required
      from site_customer_sessions s
      join site_customers sc on sc.id = s.site_customer_id
      join businesses b on b.id = sc.business_id
@@ -210,7 +211,9 @@ async function register({ site_hostname, name, email, password }) {
 async function authenticateCredentials(businessId, { email, password }) {
   const cleanEmail = String(email || '').trim().toLowerCase();
   const { rows } = await pool.query(
-    `select * from site_customers where business_id = $1 and lower(email) = $2`,
+    `select sc.*, b.require_2fa as totp_required
+     from site_customers sc join businesses b on b.id = sc.business_id
+     where sc.business_id = $1 and lower(sc.email) = $2`,
     [businessId, cleanEmail]
   );
   const customer = rows[0] || null;
@@ -220,9 +223,38 @@ async function authenticateCredentials(businessId, { email, password }) {
   return customer;
 }
 
+// ---- Second Factor (tickets 07-08) ----
+
+// Every sign-in gate — email+password and Google alike — routes through this:
+// a Business that requires the factor refuses the sign-in of a customer who
+// has not enabled it (SECOND_FACTOR_REQUIRED), and an enrolled customer must
+// complete a TOTP/backup-code challenge BEFORE any session is issued. The
+// challenge is bound to the customer server-side; the client never supplies
+// the identity. `customer.totp_required` arrives on the caller's join.
+async function assertSecondFactorReady(businessId, customer) {
+  const required = Boolean(customer.totp_required);
+  if (required && !customer.totp_enabled_at) {
+    throw Object.assign(
+      new Error('This venue requires two-factor authentication. Enable it in your profile to sign in.'),
+      { code: 'SECOND_FACTOR_REQUIRED' }
+    );
+  }
+  if (customer.totp_enabled_at) {
+    return siteChallenges.createChallenge({
+      businessId,
+      purpose: 'totp',
+      email: customer.email,
+      siteCustomerId: customer.id
+    });
+  }
+  return null;
+}
+
 async function login({ site_hostname, email, password }) {
   const { businessId } = await liveBusinessForHostname(site_hostname);
   const customer = await authenticateCredentials(businessId, { email, password });
+  const challenge = await assertSecondFactorReady(businessId, customer);
+  if (challenge) return { challenge };
   const session = await createSession(customer.id);
   return { customer, session };
 }
@@ -231,10 +263,15 @@ async function login({ site_hostname, email, password }) {
 
 // A low-score sign-in never issues a session: credentials are still checked
 // (a bot without the password gets the identical 401), then the human must
-// prove control of the inbox before the session is issued.
+// prove control of the inbox before the session is issued. The Second Factor
+// still applies on this path — an enrolled customer proves the human with the
+// factor itself (a TOTP challenge, no email needed), and a Business that
+// requires the factor still refuses an unenrolled customer (ticket 07).
 async function loginChallenge({ site_hostname, email, password }) {
   const { businessId } = await liveBusinessForHostname(site_hostname);
   const customer = await authenticateCredentials(businessId, { email, password });
+  const factor = await assertSecondFactorReady(businessId, customer);
+  if (factor) return factor;
   const challenge = await siteChallenges.createChallenge({
     businessId,
     purpose: 'login',
@@ -260,22 +297,54 @@ async function registerChallenge({ site_hostname, name, email, password }) {
   return challenge;
 }
 
-// Consume a challenge with its inbox code and finish the sign-in it guards:
-// a login challenge issues a session for the customer the challenge was bound
-// to; a register challenge creates the account with the stored hash (guarded
-// against the email being taken between escalation and confirm).
+// Consume a challenge and finish the sign-in it guards: a login challenge
+// issues a session for the customer the challenge was bound to; a register
+// challenge creates the account with the stored hash (guarded against the
+// email being taken between escalation and confirm); a TOTP challenge has
+// already been verified (code or backup code) inside confirmChallenge and
+// just issues the session — a wrong or exhausted code never gets here.
 async function completeChallenge({ challenge_id, code }) {
   const challenge = await siteChallenges.confirmChallenge(challenge_id, String(code || '').trim());
+  if (challenge.purpose === 'totp') {
+    const { rows } = await pool.query(
+      `select * from site_customers where id = $1`,
+      [challenge.site_customer_id]
+    );
+    const customer = rows[0] || null;
+    if (!customer || !customer.totp_enabled_at) {
+      throw Object.assign(new Error('Two-factor authentication is no longer active. Sign in again.'), { code: 'TOTP_NOT_ENABLED' });
+    }
+    const session = await createSession(customer.id);
+    return { customer, session };
+  }
   if (challenge.purpose === 'login') {
     const { rows } = await pool.query(
-      `select * from site_customers where business_id = $1 and lower(email) = $2`,
+      `select sc.*, b.require_2fa as totp_required
+       from site_customers sc join businesses b on b.id = sc.business_id
+       where sc.business_id = $1 and lower(sc.email) = $2`,
       [challenge.business_id, String(challenge.email).toLowerCase()]
     );
     if (!rows[0]) {
       throw Object.assign(new Error('Incorrect email or password.'), { code: 'SITE_CUSTOMER_BAD_CREDENTIALS' });
     }
-    const session = await createSession(rows[0].id);
-    return { customer: rows[0], session };
+    // The factor state can change between escalation and confirm (the
+    // customer enrolled in the meantime, or the Business turned the toggle
+    // on). Never let this email-OTP path mint a session that skips it.
+    const customer = rows[0];
+    if (customer.totp_required && !customer.totp_enabled_at) {
+      throw Object.assign(
+        new Error('This venue requires two-factor authentication. Enable it in your profile to sign in.'),
+        { code: 'SECOND_FACTOR_REQUIRED' }
+      );
+    }
+    if (customer.totp_enabled_at) {
+      throw Object.assign(
+        new Error('Finish signing in again to complete your second factor.'),
+        { code: 'SECOND_FACTOR_PENDING' }
+      );
+    }
+    const session = await createSession(customer.id);
+    return { customer, session };
   }
   const customer = await insertCustomer(challenge.business_id, challenge.email, challenge.name || null, challenge.password_hash);
   const session = await createSession(customer.id);
@@ -348,6 +417,18 @@ async function googleUpsert({ site_hostname, id_token }) {
     }
   }
 
+  // Re-read with the Business join so every consumer sees the Second Factor
+  // state (totp_enabled_at + the Business's require_2fa as totp_required).
+  const { rows: fresh } = await pool.query(
+    `select sc.*, b.require_2fa as totp_required
+     from site_customers sc join businesses b on b.id = sc.business_id
+     where sc.id = $1`,
+    [customer.id]
+  );
+  customer = fresh[0] || customer;
+
+  const challenge = await assertSecondFactorReady(businessId, customer);
+  if (challenge) return { challenge };
   const session = await createSession(customer.id);
   return { customer, session };
 }

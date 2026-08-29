@@ -54,7 +54,7 @@ import {
   BookingSettingsSchema
 } from "@myslot/types";
 import type { OwnerAgreement, OwnerPlan, VenueBrand, WidgetInstanceInput, SiteRequestInput } from "@myslot/types";
-export { TOKEN_KEY, SITE_CUSTOMER_TOKEN_KEY, SITE_GOOGLE_PENDING_KEY, persistSiteToken, isOwnerSurface } from "./client";
+export { TOKEN_KEY, SITE_CUSTOMER_TOKEN_KEY, SITE_GOOGLE_PENDING_KEY, SITE_TOTP_PENDING_KEY, SITE_AUTH_ERROR_KEY, persistSiteToken, isOwnerSurface } from "./client";
 export { toApiFailure, getClient, setClient, createClient, type ApiFailure } from "./client";
 export { parseData, parseList, parsePaginated } from "./parse";
 export { submitPayHere, PAYHERE_CHECKOUT_URL, type PayHereUserFields } from "./payhere";
@@ -337,7 +337,9 @@ export const siteCustomerAuth = {
     client: AxiosInstance = getClient()
   ) {
     const res = await client.post("/site-auth/google", input);
-    return parseData(SiteSessionSchema, res.data.data ?? res.data);
+    // Enrolled customers get a Second Factor challenge (kind 'totp') back
+    // instead of a session (tickets 07-08).
+    return parseData(SiteAuthResultSchema, res.data.data ?? res.data);
   },
   async confirmChallenge(challengeId: string, code: string, client: AxiosInstance = getClient()) {
     const res = await client.post("/site-auth/challenge/confirm", { challenge_id: challengeId, code });
@@ -366,6 +368,25 @@ export const siteCustomerAuth = {
   async verifyEmailConfirm(email: string, code: string, client: AxiosInstance = getClient()) {
     const res = await client.post("/site-auth/verify-email/confirm", { email, code });
     return res.data.data as { confirmed: boolean };
+  },
+  // Second Factor (tickets 07-09): enrollment lives in the Dedicated Site
+  // account panel only; the sign-in challenge itself runs through
+  // confirmChallenge (kind 'totp') on every surface.
+  async totpEnable(client: AxiosInstance = getClient()) {
+    const res = await client.post("/site-auth/totp/enable");
+    return res.data.data as { secret: string; otpauth_url: string };
+  },
+  async totpEnableConfirm(code: string, client: AxiosInstance = getClient()) {
+    const res = await client.post("/site-auth/totp/enable/confirm", { code });
+    return res.data.data as { enabled: boolean; backup_codes: string[] };
+  },
+  async totpDisable(code: string, client: AxiosInstance = getClient()) {
+    const res = await client.post("/site-auth/totp/disable", { code });
+    return res.data.data as { disabled: boolean };
+  },
+  async totpRegenerateBackupCodes(client: AxiosInstance = getClient()) {
+    const res = await client.post("/site-auth/totp/backup-codes/regenerate");
+    return res.data.data as { backup_codes: string[] };
   }
 };
 
@@ -582,7 +603,7 @@ export const business = {
     return parseData(BusinessProfileSchema, res.data.data ?? res.data);
   },
   async updateMe(
-    input: { name?: string; brand?: Partial<VenueBrand> },
+    input: { name?: string; brand?: Partial<VenueBrand>; require_2fa?: boolean },
     client: AxiosInstance = getClient()
   ) {
     const res = await client.patch("/business/me", input);
@@ -620,6 +641,12 @@ export const business = {
   async customers(client: AxiosInstance = getClient()) {
     const res = await client.get("/business/customers");
     return parseList(SiteCustomerSummarySchema, res.data.data ?? res.data);
+  },
+  // Recovery (ticket 07): the Venue Owner resets one of their OWN Business's
+  // customers' Second Factor — also revokes all of that customer's sessions.
+  async resetCustomerFactor(customerId: string, client: AxiosInstance = getClient()) {
+    const res = await client.post(`/business/customers/${customerId}/reset-factor`);
+    return res.data.data ?? res.data;
   },
   // Marketplace Listing (ADR-0031): per-venue opt back into the marketplace
   // once the Business's Dedicated Site is live (default off at site-live).
