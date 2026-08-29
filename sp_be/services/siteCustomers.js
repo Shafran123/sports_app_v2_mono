@@ -7,6 +7,8 @@
 const crypto = require('node:crypto');
 const pool = require('../db');
 const siteDomains = require('./siteDomains');
+const siteChallenges = require('./siteChallenges');
+const { generateCode, hashCode, timingSafeEqualHex, CODE_TTL_MINUTES, MAX_ATTEMPTS, HOURLY_SEND_LIMIT } = require('../utils/otpCode');
 const { formatSriLankanPhone } = require('../utils/smsService');
 const { sendSms } = require('../utils/smsService');
 const { sendEmail, buildVerificationCodeHtml } = require('../utils/emailService');
@@ -22,10 +24,7 @@ const SESSION_TTL_DAYS = 30;
 const ROTATION_WINDOW_HOURS = 24;
 const MAX_SESSIONS = 20;
 
-const CODE_TTL_MINUTES = 10;
-const MAX_ATTEMPTS = 5;
 const RESEND_WINDOW_SECONDS = 60;
-const HOURLY_SEND_LIMIT = 5;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -129,21 +128,6 @@ async function revokeToken(token) {
 
 // ---- OTP (mirrors the platform verification_otps hardening) ----
 
-function generateCode() {
-  return String(crypto.randomInt(0, 1000000)).padStart(6, '0');
-}
-
-function hashCode(code, salt) {
-  return crypto.createHmac('sha256', process.env.OTP_HMAC_SECRET || process.env.JWT_SECRET).update(`${salt}${code}`).digest('hex');
-}
-
-function timingSafeEqualHex(a, b) {
-  const aBuf = Buffer.from(String(a || ''), 'hex');
-  const bBuf = Buffer.from(String(b || ''), 'hex');
-  if (aBuf.length !== bBuf.length) return false;
-  return crypto.timingSafeEqual(aBuf, bBuf);
-}
-
 async function findActiveOtp(customerId, channel, target) {
   const { rows } = await pool.query(
     `select id, code_hash, salt, expires_at, attempts from site_customer_otps
@@ -171,10 +155,11 @@ async function verifyOtp(customerId, channel, target, code) {
 
 // ---- Public operations ----
 
-// Register an email+password Site Customer inside a live site's Business.
-// Same email at another Business creates a fully independent account.
-async function register({ site_hostname, name, email, password }) {
-  const { businessId } = await liveBusinessForHostname(site_hostname);
+// Shared register validation: email shape, name, password strength, and the
+// per-Business uniqueness of the email. Used by the direct register and by
+// the Anti-bot Check escalation (a low-score registration must fail on the
+// same rules BEFORE a challenge is issued, so bots get identical answers).
+async function validateRegisterInput(businessId, { name, email, password }) {
   const cleanEmail = String(email || '').trim().toLowerCase();
   const cleanName = String(name || '').trim().slice(0, 80);
   if (!EMAIL_RE.test(cleanEmail)) {
@@ -184,22 +169,45 @@ async function register({ site_hostname, name, email, password }) {
     throw Object.assign(new Error('Password must be at least 8 characters.'), { code: 'PASSWORD_WEAK' });
   }
   const { rows } = await pool.query(
+    `select 1 from site_customers where business_id = $1 and lower(email) = $2`,
+    [businessId, cleanEmail]
+  );
+  if (rows.length > 0) {
+    throw Object.assign(new Error('An account with this email already exists at this site.'), { code: 'SITE_CUSTOMER_EXISTS' });
+  }
+  return { email: cleanEmail, name: cleanName };
+}
+
+// Insert a Site Customer row; a duplicate email at the Business surfaces as
+// SITE_CUSTOMER_EXISTS. Shared by the direct register and the Anti-bot Check
+// register-challenge completion.
+async function insertCustomer(businessId, email, name, passwordHash) {
+  return pool.query(
     `insert into site_customers (business_id, email, name, password_hash)
      values ($1, $2, $3, $4)
      returning *`,
-    [businessId, cleanEmail, cleanName, hashPassword(String(password))]
+    [businessId, email, name, passwordHash]
   ).catch((error) => {
     if (error.code === '23505') {
       throw Object.assign(new Error('An account with this email already exists at this site.'), { code: 'SITE_CUSTOMER_EXISTS' });
     }
     throw error;
-  });
-  const session = await createSession(rows[0].id);
-  return { customer: rows[0], session };
+  }).then((result) => result.rows[0]);
 }
 
-async function login({ site_hostname, email, password }) {
+// Register an email+password Site Customer inside a live site's Business.
+// Same email at another Business creates a fully independent account.
+async function register({ site_hostname, name, email, password }) {
   const { businessId } = await liveBusinessForHostname(site_hostname);
+  const clean = await validateRegisterInput(businessId, { name, email, password });
+  const customer = await insertCustomer(businessId, clean.email, clean.name, hashPassword(String(password)));
+  const session = await createSession(customer.id);
+  return { customer, session };
+}
+
+// Verify an email+password against a known Business. Throws
+// SITE_CUSTOMER_BAD_CREDENTIALS without revealing which half was wrong.
+async function authenticateCredentials(businessId, { email, password }) {
   const cleanEmail = String(email || '').trim().toLowerCase();
   const { rows } = await pool.query(
     `select * from site_customers where business_id = $1 and lower(email) = $2`,
@@ -209,6 +217,67 @@ async function login({ site_hostname, email, password }) {
   if (!customer || !verifyPassword(String(password || ''), customer.password_hash)) {
     throw Object.assign(new Error('Incorrect email or password.'), { code: 'SITE_CUSTOMER_BAD_CREDENTIALS' });
   }
+  return customer;
+}
+
+async function login({ site_hostname, email, password }) {
+  const { businessId } = await liveBusinessForHostname(site_hostname);
+  const customer = await authenticateCredentials(businessId, { email, password });
+  const session = await createSession(customer.id);
+  return { customer, session };
+}
+
+// ---- Anti-bot Check escalation (ticket 05) ----
+
+// A low-score sign-in never issues a session: credentials are still checked
+// (a bot without the password gets the identical 401), then the human must
+// prove control of the inbox before the session is issued.
+async function loginChallenge({ site_hostname, email, password }) {
+  const { businessId } = await liveBusinessForHostname(site_hostname);
+  const customer = await authenticateCredentials(businessId, { email, password });
+  const challenge = await siteChallenges.createChallenge({
+    businessId,
+    purpose: 'login',
+    email: customer.email
+  });
+  return challenge;
+}
+
+// A low-score registration escalates on the same validation rules as a normal
+// register — email shape, password strength, uniqueness — and stashes the
+// scrypt hash so the confirm step creates the account without trusting the
+// client again.
+async function registerChallenge({ site_hostname, name, email, password }) {
+  const { businessId } = await liveBusinessForHostname(site_hostname);
+  const clean = await validateRegisterInput(businessId, { name, email, password });
+  const challenge = await siteChallenges.createChallenge({
+    businessId,
+    purpose: 'register',
+    email: clean.email,
+    name: clean.name,
+    passwordHash: hashPassword(String(password))
+  });
+  return challenge;
+}
+
+// Consume a challenge with its inbox code and finish the sign-in it guards:
+// a login challenge issues a session for the customer the challenge was bound
+// to; a register challenge creates the account with the stored hash (guarded
+// against the email being taken between escalation and confirm).
+async function completeChallenge({ challenge_id, code }) {
+  const challenge = await siteChallenges.confirmChallenge(challenge_id, String(code || '').trim());
+  if (challenge.purpose === 'login') {
+    const { rows } = await pool.query(
+      `select * from site_customers where business_id = $1 and lower(email) = $2`,
+      [challenge.business_id, String(challenge.email).toLowerCase()]
+    );
+    if (!rows[0]) {
+      throw Object.assign(new Error('Incorrect email or password.'), { code: 'SITE_CUSTOMER_BAD_CREDENTIALS' });
+    }
+    const session = await createSession(rows[0].id);
+    return { customer: rows[0], session };
+  }
+  const customer = await insertCustomer(challenge.business_id, challenge.email, challenge.name || null, challenge.password_hash);
   const session = await createSession(customer.id);
   return { customer, session };
 }
@@ -369,6 +438,9 @@ module.exports = {
   liveBusinessForHostname,
   register,
   login,
+  loginChallenge,
+  registerChallenge,
+  completeChallenge,
   googleUpsert,
   sendPhoneCode,
   confirmPhoneCode,

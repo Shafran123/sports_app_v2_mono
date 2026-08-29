@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { BookPanel } from "./book-panel";
 
-const { checkoutMock, meMock, updateMeMock, verifyPhoneSendMock, verifyPhoneConfirmMock, verifyEmailSendMock, verifyEmailConfirmMock, siteGoogleMock, persistSiteTokenMock } = vi.hoisted(() => ({
+const { checkoutMock, meMock, updateMeMock, verifyPhoneSendMock, verifyPhoneConfirmMock, verifyEmailSendMock, verifyEmailConfirmMock, siteGoogleMock, persistSiteTokenMock, loginMock, registerMock, confirmChallengeMock, getRecaptchaTokenMock } = vi.hoisted(() => ({
   checkoutMock: vi.fn(),
   meMock: vi.fn(),
   updateMeMock: vi.fn(),
@@ -14,7 +14,11 @@ const { checkoutMock, meMock, updateMeMock, verifyPhoneSendMock, verifyPhoneConf
   verifyEmailSendMock: vi.fn(),
   verifyEmailConfirmMock: vi.fn(),
   siteGoogleMock: vi.fn(),
-  persistSiteTokenMock: vi.fn()
+  persistSiteTokenMock: vi.fn(),
+  loginMock: vi.fn(),
+  registerMock: vi.fn(),
+  confirmChallengeMock: vi.fn(),
+  getRecaptchaTokenMock: vi.fn()
 }));
 
 let ctxUser: Record<string, unknown> | null = null;
@@ -38,7 +42,12 @@ vi.mock("@myslot/api", () => ({
     verifyEmailSend: verifyEmailSendMock,
     verifyEmailConfirm: verifyEmailConfirmMock
   },
-  siteCustomerAuth: { google: siteGoogleMock },
+  siteCustomerAuth: {
+    google: siteGoogleMock,
+    login: loginMock,
+    register: registerMock,
+    confirmChallenge: confirmChallengeMock
+  },
   persistSiteToken: persistSiteTokenMock,
   SITE_GOOGLE_PENDING_KEY: "site_google_pending",
   toApiFailure: (e: { code?: string; message?: string }) => ({
@@ -47,6 +56,11 @@ vi.mock("@myslot/api", () => ({
     message: e?.message ?? "err"
   })
 }));
+
+vi.mock("@myslot/utils", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@myslot/utils")>();
+  return { ...actual, getRecaptchaToken: getRecaptchaTokenMock };
+});
 
 vi.mock("@myslot/auth", () => ({
   loginWithEmail: vi.fn(),
@@ -333,5 +347,158 @@ describe("WidgetIdentity", () => {
       expect(window.sessionStorage.getItem("site_google_pending")).toBe("courtgroup.lk");
       expect(siteGoogleMock).not.toHaveBeenCalled();
     });
+  });
+
+  it("first-party site login carries an anti-bot token and signs in on a good score (ticket 05)", async () => {
+    getRecaptchaTokenMock.mockResolvedValue("tok-1");
+    loginMock.mockResolvedValue({
+      token: "sc-token",
+      expires_at: "2026-09-22T10:00:00.000Z",
+      customer: {
+        id: "sc-1",
+        business_id: "biz-1",
+        email: "pam@site.test",
+        name: "Pam",
+        phone: null,
+        email_verified_at: null,
+        phone_verified_at: null
+      }
+    });
+    wrap(<WidgetIdentity siteHostname="courtgroup.lk" siteName="Court Group" onDone={vi.fn()} />);
+
+    await userEvent.type(screen.getByPlaceholderText("you@example.com"), "pam@site.test");
+    await userEvent.type(screen.getByPlaceholderText("Password"), "password-1");
+    await userEvent.click(screen.getByRole("button", { name: /sign in/i }));
+
+    await waitFor(() => {
+      expect(getRecaptchaTokenMock).toHaveBeenCalledWith("site_login");
+      expect(loginMock).toHaveBeenCalledWith({
+        site_hostname: "courtgroup.lk",
+        email: "pam@site.test",
+        password: "password-1",
+        captcha_token: "tok-1"
+      });
+      expect(persistSiteTokenMock).toHaveBeenCalledWith("sc-token");
+      expect(setUserMock).toHaveBeenCalledWith(expect.objectContaining({ id: "sc-1", email: "pam@site.test" }));
+    });
+  });
+
+  it("never mints an anti-bot token inside the widget iframe (ADR-0042)", async () => {
+    getRecaptchaTokenMock.mockResolvedValue("tok-1");
+    loginMock.mockResolvedValue({
+      token: "sc-token",
+      expires_at: "2026-09-22T10:00:00.000Z",
+      customer: {
+        id: "sc-1",
+        business_id: "biz-1",
+        email: "pam@site.test",
+        name: "Pam",
+        phone: null,
+        email_verified_at: null,
+        phone_verified_at: null
+      }
+    });
+    wrap(<WidgetIdentity widgetKey="k1" siteHostname="courtgroup.lk" siteName="Court Group" onDone={vi.fn()} />);
+
+    await userEvent.type(screen.getByPlaceholderText("you@example.com"), "pam@site.test");
+    await userEvent.type(screen.getByPlaceholderText("Password"), "password-1");
+    await userEvent.click(screen.getByRole("button", { name: /sign in/i }));
+
+    await waitFor(() => {
+      expect(getRecaptchaTokenMock).not.toHaveBeenCalled();
+      expect(loginMock).toHaveBeenCalledWith({
+        site_hostname: "courtgroup.lk",
+        email: "pam@site.test",
+        password: "password-1",
+        captcha_token: undefined
+      });
+    });
+  });
+
+  it("escalates a low-score site login to an email-OTP challenge and finishes it (ticket 05)", async () => {
+    getRecaptchaTokenMock.mockResolvedValue("tok-1");
+    loginMock.mockResolvedValue({
+      escalated: true,
+      challenge_id: "ch-1",
+      email: "pam@site.test",
+      expires_at: "2026-08-22T10:10:00.000Z"
+    });
+    confirmChallengeMock.mockResolvedValue({
+      token: "sc-token",
+      expires_at: "2026-09-22T10:00:00.000Z",
+      customer: {
+        id: "sc-1",
+        business_id: "biz-1",
+        email: "pam@site.test",
+        name: "Pam",
+        phone: null,
+        email_verified_at: null,
+        phone_verified_at: null
+      }
+    });
+    wrap(<WidgetIdentity siteHostname="courtgroup.lk" siteName="Court Group" onDone={vi.fn()} />);
+
+    await userEvent.type(screen.getByPlaceholderText("you@example.com"), "pam@site.test");
+    await userEvent.type(screen.getByPlaceholderText("Password"), "password-1");
+    await userEvent.click(screen.getByRole("button", { name: /sign in/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/we emailed a 6-digit code/i)).toBeInTheDocument();
+      expect(loginMock).toHaveBeenCalledWith(expect.objectContaining({ captcha_token: "tok-1" }));
+      expect(persistSiteTokenMock).not.toHaveBeenCalled();
+    });
+
+    await userEvent.type(screen.getByPlaceholderText("6-digit code"), "123456");
+    await userEvent.click(screen.getByRole("button", { name: /verify/i }));
+
+    await waitFor(() => {
+      expect(confirmChallengeMock).toHaveBeenCalledWith("ch-1", "123456");
+      expect(persistSiteTokenMock).toHaveBeenCalledWith("sc-token");
+      expect(setUserMock).toHaveBeenCalledWith(expect.objectContaining({ id: "sc-1" }));
+    });
+  });
+
+  it("escalates a low-score site registration the same way (ticket 05)", async () => {
+    getRecaptchaTokenMock.mockResolvedValue("tok-1");
+    registerMock.mockResolvedValue({
+      escalated: true,
+      challenge_id: "ch-2",
+      email: "reg@site.test",
+      expires_at: "2026-08-22T10:10:00.000Z"
+    });
+    wrap(<WidgetIdentity siteHostname="courtgroup.lk" siteName="Court Group" onDone={vi.fn()} />);
+
+    await userEvent.click(screen.getByRole("button", { name: /create an account/i }));
+    await userEvent.type(screen.getByPlaceholderText("Your name"), "Reg Pam");
+    await userEvent.type(screen.getByPlaceholderText("you@example.com"), "reg@site.test");
+    await userEvent.type(screen.getByPlaceholderText("Password (6+ characters)"), "password-1");
+    await userEvent.click(screen.getByRole("button", { name: /create account/i }));
+
+    await waitFor(() => {
+      expect(registerMock).toHaveBeenCalledWith(expect.objectContaining({ captcha_token: "tok-1" }));
+      expect(screen.getByText(/creating your account/i)).toBeInTheDocument();
+      expect(getRecaptchaTokenMock).toHaveBeenCalledWith("site_register");
+    });
+  });
+
+  it("lets the visitor abandon an escalation back to the sign-in form", async () => {
+    getRecaptchaTokenMock.mockResolvedValue("tok-1");
+    loginMock.mockResolvedValue({
+      escalated: true,
+      challenge_id: "ch-3",
+      email: "pam@site.test",
+      expires_at: "2026-08-22T10:10:00.000Z"
+    });
+    wrap(<WidgetIdentity siteHostname="courtgroup.lk" siteName="Court Group" onDone={vi.fn()} />);
+
+    await userEvent.type(screen.getByPlaceholderText("you@example.com"), "pam@site.test");
+    await userEvent.type(screen.getByPlaceholderText("Password"), "password-1");
+    await userEvent.click(screen.getByRole("button", { name: /sign in/i }));
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText("6-digit code")).toBeInTheDocument();
+    });
+    await userEvent.click(screen.getByRole("button", { name: /use a different method/i }));
+    expect(screen.getByPlaceholderText("you@example.com")).toBeInTheDocument();
   });
 });

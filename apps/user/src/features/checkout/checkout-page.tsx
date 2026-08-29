@@ -7,7 +7,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Banknote, Clock, ShieldCheck, Wallet } from "lucide-react";
 import { bookings, featureFlags, toApiFailure, venues } from "@myslot/api";
 import { Badge, Button, Card, CardContent, CountdownPill, ErrorState, Skeleton } from "@myslot/ui";
-import { formatDateLong, formatDuration, formatLkr, formatTime12, uuidV4 } from "@myslot/utils";
+import { formatDateLong, formatDuration, formatLkr, formatTime12, getRecaptchaToken, uuidV4 } from "@myslot/utils";
 import { useAuth } from "@/context/auth";
 import { currentHostname, isSiteHost } from "@/lib/site-host";
 import { submitPayHere } from "@myslot/api";
@@ -80,8 +80,12 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
   const effectiveMethod: PaymentMethod = onlineAvailable ? method : "cash";
 
   const checkout = useMutation({
-    mutationFn: () =>
-      bookings.checkout({
+    mutationFn: async () => {
+      // Anti-bot Check (ticket 05): Dedicated Site checkouts carry a
+      // reCAPTCHA token; the server rejects low-score bookings. Marketplace
+      // and widget checkouts never mint one (ADR-0042).
+      const captcha_token = siteHostname ? await getRecaptchaToken("site_checkout") : undefined;
+      return bookings.checkout({
         court_id: courtId,
         start_at: startAt,
         end_at: endAt,
@@ -91,8 +95,10 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
         // Dedicated Site context (ADR-0029): bookings made on a live site host
         // carry the hostname (the server validates it is the venue's own live
         // site and stores it for allowance/reporting context).
-        site_hostname: siteHostname
-      })
+        site_hostname: siteHostname,
+        captcha_token
+      });
+    }
   });
 
   React.useEffect(() => {

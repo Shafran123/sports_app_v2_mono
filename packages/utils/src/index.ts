@@ -21,6 +21,7 @@ export {
 } from "./imagery";
 export { cn } from "./cn";
 export { uuidV4 } from "./uuid";
+export { getRecaptchaToken } from "./recaptcha";
 export { DEFAULT_BRAND_NAME } from "./brand";
 export {
   MAX_SLOTS,

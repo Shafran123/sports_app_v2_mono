@@ -209,6 +209,20 @@ export const SiteSessionSchema = z.object({
 });
 export type SiteSession = z.infer<typeof SiteSessionSchema>;
 
+// The Anti-bot Check escalation (ticket 05): a low-score sign-in/registration
+// is not hard-blocked — the server refuses the session and answers with an
+// email-OTP challenge the visitor completes to finish signing in.
+export const SiteAuthChallengeSchema = z.object({
+  escalated: z.literal(true),
+  challenge_id: z.string(),
+  email: z.string(),
+  expires_at: z.string()
+});
+export type SiteAuthChallenge = z.infer<typeof SiteAuthChallengeSchema>;
+
+export const SiteAuthResultSchema = z.union([SiteSessionSchema, SiteAuthChallengeSchema]);
+export type SiteAuthResult = z.infer<typeof SiteAuthResultSchema>;
+
 // Owner Console Customers directory row (ADR-0030): a Site Customer with
 // booking aggregates.
 export const SiteCustomerSummarySchema = SiteCustomerSchema.extend({

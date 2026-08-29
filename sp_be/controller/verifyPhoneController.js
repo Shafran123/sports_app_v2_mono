@@ -5,11 +5,9 @@ const logger = require('../utils/logger');
 const { sendSms, formatSriLankanPhone } = require('../utils/smsService');
 const { recordOutbound } = require('../utils/notificationCatalog');
 const { getBrandName } = require('../utils/featureFlags');
+const { generateCode, hashCode, timingSafeEqualHex, CODE_TTL_MINUTES, MAX_ATTEMPTS, HOURLY_SEND_LIMIT } = require('../utils/otpCode');
 
-const CODE_TTL_MINUTES = 10;
-const MAX_ATTEMPTS = 5;
 const RESEND_WINDOW_SECONDS = 60;
-const HOURLY_SEND_LIMIT = 5;
 
 // Keyed HMAC (not plain sha256) so a leaked DB cannot be brute-forced with a
 // fast hash — the 10^6 code space stays protected by an unknown server key.
@@ -17,21 +15,6 @@ const HOURLY_SEND_LIMIT = 5;
 // run with JWT_SECRET set).
 function hmacKey() {
   return process.env.OTP_HMAC_SECRET || process.env.JWT_SECRET;
-}
-
-function hashCode(code, salt) {
-  return crypto.createHmac('sha256', hmacKey()).update(`${salt}${code}`).digest('hex');
-}
-
-function generateCode() {
-  return String(crypto.randomInt(0, 1000000)).padStart(6, '0');
-}
-
-function timingSafeEqualHex(a, b) {
-  const aBuf = Buffer.from(String(a || ''), 'hex');
-  const bBuf = Buffer.from(String(b || ''), 'hex');
-  if (aBuf.length !== bBuf.length) return false;
-  return crypto.timingSafeEqual(aBuf, bBuf);
 }
 
 exports.sendVerificationCode = async (req, res) => {

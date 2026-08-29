@@ -14,6 +14,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { auth as authApi, toApiFailure, featureFlags, siteCustomerAuth, persistSiteToken, SITE_GOOGLE_PENDING_KEY } from "@myslot/api";
+import type { SiteAuthChallenge } from "@myslot/types";
 import {
   loginWithEmail,
   registerWithEmail,
@@ -23,11 +24,11 @@ import {
   logoutFirebase
 } from "@myslot/auth";
 import { Button, Input, PasswordInput } from "@myslot/ui";
-import { DEFAULT_BRAND_NAME } from "@myslot/utils";
+import { DEFAULT_BRAND_NAME, getRecaptchaToken } from "@myslot/utils";
 import { useAuth } from "@/context/auth";
 import { GoogleLogo, VerifiedDetails } from "./identity-parts";
 
-type Phase = "signin" | "register" | "details";
+type Phase = "signin" | "register" | "details" | "challenge";
 
 // Map a Site Customer onto the app user shape (ADR-0030): the booking gate
 // reads the same verified flags + name/phone/email fields.
@@ -52,6 +53,10 @@ function toAppUser(customer: {
   };
 }
 
+function isChallenge(result: SiteAuthChallenge | { token: string }): result is SiteAuthChallenge {
+  return (result as SiteAuthChallenge).escalated === true;
+}
+
 export function WidgetIdentity({
   widgetKey,
   siteHostname,
@@ -70,6 +75,10 @@ export function WidgetIdentity({
   // the buyer in as a Site Customer of that Business (own auth, per-Business
   // verified gates). Without a live site the platform (Firebase) flow stays.
   const siteMode = Boolean(siteHostname);
+  // The Anti-bot Check (ticket 05) runs only on first-party Dedicated Site
+  // surfaces — never inside the widget iframe (ADR-0042). The widget is the
+  // only caller that passes a widgetKey; the site surfaces never do.
+  const firstPartySite = siteMode && !widgetKey;
   const [phase, setPhase] = useState<Phase>(user ? "details" : "signin");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -82,6 +91,11 @@ export function WidgetIdentity({
   const [regName, setRegName] = useState("");
   const [regEmail, setRegEmail] = useState("");
   const [regPassword, setRegPassword] = useState("");
+
+  // Anti-bot escalation (low-score sign-in/register -> email-OTP challenge)
+  const [challenge, setChallenge] = useState<SiteAuthChallenge | null>(null);
+  const [challengeCode, setChallengeCode] = useState("");
+  const [challengeFrom, setChallengeFrom] = useState<"signin" | "register">("signin");
 
   // Details step (phone + email verification)
   const [name, setName] = useState(user?.name ?? "");
@@ -111,13 +125,22 @@ export function WidgetIdentity({
     setBusy(true);
     try {
       if (siteMode) {
-        const session = await siteCustomerAuth.login({
+        const captcha_token = firstPartySite ? await getRecaptchaToken("site_login") : undefined;
+        const result = await siteCustomerAuth.login({
           site_hostname: siteHostname!,
           email: email.trim(),
-          password
+          password,
+          captcha_token
         });
-        persistSiteToken(session.token);
-        setUser(toAppUser(session.customer));
+        if (isChallenge(result)) {
+          setChallenge(result);
+          setChallengeCode("");
+          setChallengeFrom("signin");
+          setPhase("challenge");
+          return;
+        }
+        persistSiteToken(result.token);
+        setUser(toAppUser(result.customer));
       } else {
         await loginWithEmail(email.trim(), password);
         const me = await authApi.me();
@@ -149,20 +172,51 @@ export function WidgetIdentity({
     setBusy(true);
     try {
       if (siteMode) {
-        const session = await siteCustomerAuth.register({
+        const captcha_token = firstPartySite ? await getRecaptchaToken("site_register") : undefined;
+        const result = await siteCustomerAuth.register({
           site_hostname: siteHostname!,
           name: regName.trim(),
           email: regEmail.trim(),
-          password: regPassword
+          password: regPassword,
+          captcha_token
         });
-        persistSiteToken(session.token);
-        setUser(toAppUser(session.customer));
+        if (isChallenge(result)) {
+          setChallenge(result);
+          setChallengeCode("");
+          setChallengeFrom("register");
+          setPhase("challenge");
+          return;
+        }
+        persistSiteToken(result.token);
+        setUser(toAppUser(result.customer));
       } else {
         await registerWithEmail(regEmail.trim(), regPassword);
         await authApi.updateMe(undefined, { name: regName.trim() });
         const me = await authApi.me();
         setUser(me);
       }
+      setPhase("details");
+    } catch (err) {
+      setError(toApiFailure(err).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Complete an escalated sign-in/register: the code from the inbox proves
+  // the human controls the email, then the session is issued.
+  const confirmChallenge = async () => {
+    if (!challenge) return;
+    if (!/^\d{6}$/.test(challengeCode)) {
+      setError("Enter the 6-digit code from the email.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const session = await siteCustomerAuth.confirmChallenge(challenge.challenge_id, challengeCode.trim());
+      persistSiteToken(session.token);
+      setUser(toAppUser(session.customer));
       setPhase("details");
     } catch (err) {
       setError(toApiFailure(err).message);
@@ -500,6 +554,56 @@ export function WidgetIdentity({
             </p>
           </>
         )}
+      </div>
+    );
+  }
+
+  if (phase === "challenge") {
+    return (
+      <div className="space-y-4">
+        <div>
+          <h3 className="pt-3 font-display text-lg font-extrabold tracking-tight text-ink">Verify it&apos;s you</h3>
+          <p className="mt-0.5 text-sm text-ink-2">
+            We emailed a 6-digit code to <span className="font-semibold text-ink">{challenge?.email}</span>.
+            Enter it here to finish {challengeFrom === "register" ? "creating your account" : "signing in"}.
+          </p>
+        </div>
+
+        {error && <p className="rounded-xl bg-error-light px-3 py-2 text-sm text-error" role="alert">{error}</p>}
+
+        <form
+          className="space-y-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void confirmChallenge();
+          }}
+        >
+          <Input
+            type="text"
+            inputMode="numeric"
+            maxLength={6}
+            value={challengeCode}
+            onChange={(e) => setChallengeCode(e.target.value.replace(/\D/g, ""))}
+            placeholder="6-digit code"
+            autoComplete="one-time-code"
+            autoFocus
+          />
+          <Button type="submit" loading={busy} className="w-full">
+            {busy ? "Verifying…" : "Verify"}
+          </Button>
+        </form>
+
+        <button
+          type="button"
+          onClick={() => {
+            setError("");
+            setChallenge(null);
+            setPhase(challengeFrom);
+          }}
+          className="mx-auto block text-xs font-medium text-ink-3 underline-offset-2 hover:underline"
+        >
+          Use a different method
+        </button>
       </div>
     );
   }

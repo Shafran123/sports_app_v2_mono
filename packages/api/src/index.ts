@@ -48,6 +48,7 @@ import {
   SiteRequestInputSchema,
   SiteConfigSchema,
   SiteSessionSchema,
+  SiteAuthResultSchema,
   SiteCustomerSchema,
   SiteCustomerSummarySchema,
   BookingSettingsSchema
@@ -186,6 +187,9 @@ export const bookings = {
       player_phone?: string;
       widget_instance_key?: string;
       site_hostname?: string;
+      // Anti-bot Check (ticket 05): Dedicated Site checkouts carry a
+      // reCAPTCHA token; the server rejects low-score bookings.
+      captcha_token?: string;
     },
     client: AxiosInstance = getClient()
   ) {
@@ -309,27 +313,34 @@ export const site = {
 };
 
 // Site Customer auth (ADR-0030): per-Business identities for Dedicated Sites
-// and Booking Widgets — our own auth, never Firebase.
+// and Booking Widgets — our own auth, never Firebase. Sign-in and registration
+// carry an optional Anti-bot Check token (ticket 05); a low-score response is
+// an email-OTP escalation (SiteAuthChallenge) the caller completes via
+// confirmChallenge before a session exists.
 export const siteCustomerAuth = {
   async register(
-    input: { site_hostname: string; name: string; email: string; password: string },
+    input: { site_hostname: string; name: string; email: string; password: string; captcha_token?: string },
     client: AxiosInstance = getClient()
   ) {
     const res = await client.post("/site-auth/register", input);
-    return parseData(SiteSessionSchema, res.data.data ?? res.data);
+    return parseData(SiteAuthResultSchema, res.data.data ?? res.data);
   },
   async login(
-    input: { site_hostname: string; email: string; password: string },
+    input: { site_hostname: string; email: string; password: string; captcha_token?: string },
     client: AxiosInstance = getClient()
   ) {
     const res = await client.post("/site-auth/login", input);
-    return parseData(SiteSessionSchema, res.data.data ?? res.data);
+    return parseData(SiteAuthResultSchema, res.data.data ?? res.data);
   },
   async google(
     input: { site_hostname: string; id_token: string },
     client: AxiosInstance = getClient()
   ) {
     const res = await client.post("/site-auth/google", input);
+    return parseData(SiteSessionSchema, res.data.data ?? res.data);
+  },
+  async confirmChallenge(challengeId: string, code: string, client: AxiosInstance = getClient()) {
+    const res = await client.post("/site-auth/challenge/confirm", { challenge_id: challengeId, code });
     return parseData(SiteSessionSchema, res.data.data ?? res.data);
   },
   async me(client: AxiosInstance = getClient()) {
@@ -814,7 +825,20 @@ export const admin = {
 
 // Public + owner-side onboarding surfaces.
 export const leads = {
-  async submit(input: { name: string; email: string; phone?: string; venue_name?: string; city?: string; message?: string }, client: AxiosInstance = getClient()) {
+  async submit(
+    input: {
+      name: string;
+      email: string;
+      phone?: string;
+      venue_name?: string;
+      city?: string;
+      message?: string;
+      // Anti-bot Check (ticket 06): the owner-lead form carries a reCAPTCHA
+      // token; the server rejects low-score submissions.
+      captcha_token?: string;
+    },
+    client: AxiosInstance = getClient()
+  ) {
     const res = await client.post("/public/leads", input);
     // sp_be submitLead returns a minimal `{ id, status }` envelope on 201, not
     // the full OwnerLead row (it never echoes back submitted PII).

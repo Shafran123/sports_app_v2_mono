@@ -7,6 +7,7 @@ const { ok, fail } = require('../utils/response');
 const logger = require('../utils/logger');
 const pool = require('../db');
 const siteCustomers = require('../services/siteCustomers');
+const recaptcha = require('../services/recaptcha');
 
 function ssoCustomer(customer) {
   return (({ id, business_id, email, name, phone, email_verified_at, phone_verified_at }) => ({
@@ -14,8 +15,23 @@ function ssoCustomer(customer) {
   }))(customer);
 }
 
+// The Anti-bot Check (ticket 05): a low siteverify score escalates the
+// sign-in to an email-OTP challenge instead of hard-blocking — the visitor
+// proves control of the inbox and the session is issued afterwards.
+function lowScore(req) {
+  return Boolean(req.captcha) && req.captcha.score < recaptcha.minScore();
+}
+
+function escalated(res, challenge) {
+  ok(res, 202, { escalated: true, challenge_id: challenge.id, email: challenge.email, expires_at: challenge.expires_at });
+}
+
 exports.register = async (req, res) => {
   try {
+    if (lowScore(req)) {
+      const challenge = await siteCustomers.registerChallenge(req.body || {});
+      return escalated(res, challenge);
+    }
     const { customer, session } = await siteCustomers.register(req.body || {});
     ok(res, 201, { customer: ssoCustomer(customer), token: session.token, expires_at: session.expires_at });
   } catch (error) {
@@ -29,11 +45,30 @@ exports.register = async (req, res) => {
 
 exports.login = async (req, res) => {
   try {
+    if (lowScore(req)) {
+      const challenge = await siteCustomers.loginChallenge(req.body || {});
+      return escalated(res, challenge);
+    }
     const { customer, session } = await siteCustomers.login(req.body || {});
     ok(res, 200, { customer: ssoCustomer(customer), token: session.token, expires_at: session.expires_at });
   } catch (error) {
     if (error.code) return fail(res, error.code === 'SITE_CUSTOMER_BAD_CREDENTIALS' ? 401 : 400, error.code, error.message);
     logger.error(`Error logging in site customer: ${error.message}`);
+    fail(res, 500, 'INTERNAL_SERVER_ERROR', 'Something went wrong');
+  }
+};
+
+// Finish an escalated sign-in/registration: the inbox code proves the human
+// controls the email, then the session is issued (or the account created).
+exports.confirmChallenge = async (req, res) => {
+  try {
+    const { customer, session } = await siteCustomers.completeChallenge(req.body || {});
+    ok(res, 200, { customer: ssoCustomer(customer), token: session.token, expires_at: session.expires_at });
+  } catch (error) {
+    if (error.code === 'SITE_CUSTOMER_BAD_CREDENTIALS') return fail(res, 401, error.code, error.message);
+    if (error.code === 'SITE_CUSTOMER_EXISTS') return fail(res, 409, error.code, error.message);
+    if (error.code) return fail(res, error.code === 'OTP_TOO_MANY_ATTEMPTS' ? 429 : 400, error.code, error.message);
+    logger.error(`Error confirming site customer challenge: ${error.message}`);
     fail(res, 500, 'INTERNAL_SERVER_ERROR', 'Something went wrong');
   }
 };

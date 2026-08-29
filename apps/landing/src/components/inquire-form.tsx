@@ -4,6 +4,7 @@ import * as React from "react";
 import { useMutation } from "@tanstack/react-query";
 import { leads, toApiFailure } from "@myslot/api";
 import { Button, Card, Input, Textarea } from "@myslot/ui";
+import { getRecaptchaToken } from "@myslot/utils";
 import { copy } from "@/lib/copy";
 import { trackEvent } from "@/lib/analytics";
 
@@ -13,15 +14,22 @@ export function InquireForm() {
   const [submitted, setSubmitted] = React.useState(false);
 
   const submit = useMutation({
-    mutationFn: () =>
-      leads.submit({
+    // Anti-bot Check (ticket 06): the lead pipeline (list-your-place and the
+    // demo CTA) carries a reCAPTCHA v3 token; the server rejects low-score
+    // submissions. When no site key is configured the helper returns
+    // undefined and the server's gate is off too.
+    mutationFn: async () => {
+      const captcha_token = await getRecaptchaToken("lead_submit");
+      return leads.submit({
         name: form.name,
         email: form.email,
         phone: form.phone.trim() || undefined,
         venue_name: form.venue_name.trim() || undefined,
         city: form.city.trim() || undefined,
-        message: form.message.trim() || undefined
-      }),
+        message: form.message.trim() || undefined,
+        captcha_token
+      });
+    },
     onSuccess: () => {
       setSubmitted(true);
       trackEvent("inquire_submit");

@@ -3,8 +3,9 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
-const { leadsSubmitMock } = vi.hoisted(() => ({
-  leadsSubmitMock: vi.fn()
+const { leadsSubmitMock, getRecaptchaTokenMock } = vi.hoisted(() => ({
+  leadsSubmitMock: vi.fn(),
+  getRecaptchaTokenMock: vi.fn()
 }));
 
 vi.mock("@myslot/api", () => ({
@@ -15,6 +16,11 @@ vi.mock("@myslot/api", () => ({
     message: e instanceof Error ? e.message : "Unexpected error"
   })
 }));
+
+vi.mock("@myslot/utils", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@myslot/utils")>();
+  return { ...actual, getRecaptchaToken: getRecaptchaTokenMock };
+});
 
 import { InquireForm } from "./inquire-form";
 
@@ -44,6 +50,26 @@ describe("InquireForm", () => {
 
   it("submits a lead and shows the success card", async () => {
     leadsSubmitMock.mockResolvedValue({ id: "lead-1" });
+    getRecaptchaTokenMock.mockResolvedValue("tok-123");
+    const user = userEvent.setup();
+    renderForm();
+
+    await user.type(screen.getByLabelText("Name *"), "Dev Shah");
+    await user.type(screen.getByLabelText("Email *"), "dev@example.com");
+    await user.click(screen.getByRole("button", { name: /book a demo/i }));
+
+    // Anti-bot Check (ticket 06): the submission carries a reCAPTCHA token
+    // minted for the lead action.
+    expect(getRecaptchaTokenMock).toHaveBeenCalledWith("lead_submit");
+    expect(leadsSubmitMock).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "Dev Shah", email: "dev@example.com", captcha_token: "tok-123" })
+    );
+    expect(await screen.findByText("Thank you — we'll be in touch")).toBeInTheDocument();
+  });
+
+  it("still submits without a token when reCAPTCHA is not configured", async () => {
+    leadsSubmitMock.mockResolvedValue({ id: "lead-2" });
+    getRecaptchaTokenMock.mockResolvedValue(undefined);
     const user = userEvent.setup();
     renderForm();
 
@@ -52,7 +78,7 @@ describe("InquireForm", () => {
     await user.click(screen.getByRole("button", { name: /book a demo/i }));
 
     expect(leadsSubmitMock).toHaveBeenCalledWith(
-      expect.objectContaining({ name: "Dev Shah", email: "dev@example.com" })
+      expect.objectContaining({ name: "Dev Shah", email: "dev@example.com", captcha_token: undefined })
     );
     expect(await screen.findByText("Thank you — we'll be in touch")).toBeInTheDocument();
   });
