@@ -67,10 +67,31 @@ function decryptSecret(stored) {
 
 // ---- TOTP codes (RFC 6238, HMAC-SHA1, 6 digits, 30s period) ----
 
+// Authenticator apps treat the secret as base32-encoded bytes — the HMAC key
+// is the DECODED secret, never the base32 characters themselves. Without this
+// the server and the app compute different codes and every correct code fails.
+function base32Decode(secret) {
+  const cleaned = String(secret || '').toUpperCase().replace(/=+$/g, '');
+  let bits = 0;
+  let value = 0;
+  const bytes = [];
+  for (const ch of cleaned) {
+    const index = BASE32_ALPHABET.indexOf(ch);
+    if (index < 0) continue;
+    value = (value << 5) | index;
+    bits += 5;
+    if (bits >= 8) {
+      bytes.push((value >>> (bits - 8)) & 0xff);
+      bits -= 8;
+    }
+  }
+  return Buffer.from(bytes);
+}
+
 function totpCode(secret, timeStep = Math.floor(Date.now() / 1000 / TOTP_PERIOD_SECONDS)) {
   const buffer = Buffer.alloc(8);
   buffer.writeBigUInt64BE(BigInt(timeStep));
-  const key = Buffer.from(String(secret || ''), 'utf8');
+  const key = base32Decode(secret);
   const digest = crypto.createHmac('sha1', key).update(buffer).digest();
   const offset = digest[digest.length - 1] & 0x0f;
   const code = ((digest.readUInt32BE(offset) & 0x7fffffff) % 1000000).toString().padStart(6, '0');

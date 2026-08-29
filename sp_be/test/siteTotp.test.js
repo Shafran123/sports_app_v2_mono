@@ -6,6 +6,7 @@
 // backstop) which also revokes all of the customer's active sessions.
 
 const request = require('supertest');
+const crypto = require('node:crypto');
 const app = require('../app');
 const pool = require('../db');
 const siteTotp = require('../services/siteTotp');
@@ -15,6 +16,36 @@ let BUSINESS;
 let posted;
 
 const rand = Math.random().toString(36).slice(2, 10);
+
+// A real authenticator app (Google Authenticator, Authy, 1Password) DECODES
+// the base32 secret and uses the decoded bytes as the HMAC key. This
+// independent reference mirrors that — deliberately written to never touch
+// siteTotp.totpCode, so a regression in the server's base32 handling (or a
+// server that keys on the base32 characters) fails the tests below.
+const BASE32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+function appDecodeSecret(secret) {
+  let bits = 0;
+  let value = 0;
+  const bytes = [];
+  for (const ch of String(secret).toUpperCase().replace(/=+$/g, '')) {
+    const index = BASE32.indexOf(ch);
+    if (index < 0) continue;
+    value = (value << 5) | index;
+    bits += 5;
+    if (bits >= 8) {
+      bytes.push((value >>> (bits - 8)) & 0xff);
+      bits -= 8;
+    }
+  }
+  return Buffer.from(bytes);
+}
+function appTotpCode(secret, step) {
+  const buffer = Buffer.alloc(8);
+  buffer.writeBigUInt64BE(BigInt(step));
+  const digest = crypto.createHmac('sha1', appDecodeSecret(secret)).update(buffer).digest();
+  const offset = digest[digest.length - 1] & 0x0f;
+  return ((digest.readUInt32BE(offset) & 0x7fffffff) % 1000000).toString().padStart(6, '0');
+}
 
 async function tokenFor(uid, extra = {}) {
   const { SignJWT } = require('jose');
@@ -84,6 +115,47 @@ describe('site customer second factor (tickets 07-08)', () => {
     expect(siteTotp.decryptSecret(enc)).toBe(secret);
     expect(siteTotp.decryptSecret(enc.slice(0, -4) + 'ffff')).toBeNull();
     expect(siteTotp.decryptSecret('garbage')).toBeNull();
+  });
+
+  it('computes the same code as a real authenticator app (base32-decoded HMAC key)', () => {
+    // The server must key HMAC on the DECODED secret bytes, exactly like the
+    // apps do — keying on the base32 characters makes every real code fail.
+    const secret = siteTotp.generateSecret();
+    const step = 1_000_000;
+    expect(siteTotp.totpCode(secret, step)).toBe(appTotpCode(secret, step));
+    expect(siteTotp.verifyCode(secret, appTotpCode(secret, Math.floor(Date.now() / 1000 / 30)))).toBe(true);
+
+    // A well-known demo secret (RFC-adjacent): JBSWY3DPEHPK3PXP decodes to
+    // the 10 bytes 0x48 0x65 0x6c 0x6c 0x6f 0x21 0xde 0xad 0xbe 0xef.
+    expect(appDecodeSecret('JBSWY3DPEHPK3PXP').toString('hex')).toBe('48656c6c6f21deadbeef');
+  });
+
+  it('accepts the enrollment code an authenticator app would produce (regression: base32 key)', async () => {
+    const email = `app-${rand}@abc.test`;
+    const reg = await registerAt('site-totp.test', email);
+    const token = reg.body.data.token;
+
+    const start = await request(app).post('/api/v1/site-auth/totp/enable').set('Authorization', `Bearer ${token}`).send({});
+    expect(start.status).toBe(200);
+    const secret = start.body.data.secret;
+
+    // The code computed the way the app computes it — decoded secret bytes —
+    // must enable the factor. This is the exact flow the reported failure
+    // exercised: correct app code -> TOTP_INVALID.
+    const appCode = appTotpCode(secret, Math.floor(Date.now() / 1000 / 30));
+    const confirm = await request(app).post('/api/v1/site-auth/totp/enable/confirm').set('Authorization', `Bearer ${token}`).send({ code: appCode });
+    expect(confirm.status).toBe(200);
+    expect(confirm.body.data.enabled).toBe(true);
+
+    // And the same app-computed code completes a sign-in challenge.
+    const login = await request(app).post('/api/v1/site-auth/login').send({ site_hostname: 'site-totp.test', email, password: 'correct-horse-9' });
+    expect(login.status).toBe(202);
+    const done = await request(app).post('/api/v1/site-auth/challenge/confirm').send({
+      challenge_id: login.body.data.challenge_id,
+      code: appTotpCode(secret, Math.floor(Date.now() / 1000 / 30))
+    });
+    expect(done.status).toBe(200);
+    expect(done.body.data.token).toMatch(/^[0-9a-f]{64}$/);
   });
 
   it('enrolls: secret returned once and stored encrypted; wrong code does not enable', async () => {
