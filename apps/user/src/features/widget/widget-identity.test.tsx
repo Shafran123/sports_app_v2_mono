@@ -249,6 +249,12 @@ describe("WidgetIdentity", () => {
   beforeEach(() => {
     ctxUser = null;
     vi.clearAllMocks();
+    // Faithful auth context: setUser actually updates the signed-in user, so
+    // components that react to the session (prefilling details, etc.) behave
+    // like production.
+    setUserMock.mockImplementation((u: Record<string, unknown> | null) => {
+      ctxUser = u as typeof ctxUser;
+    });
     meMock.mockResolvedValue({
       id: "u-1",
       name: "Asif",
@@ -301,6 +307,35 @@ describe("WidgetIdentity", () => {
     expect(screen.getByRole("heading", { name: /complete your booking details/i })).toBeInTheDocument();
     expect(screen.getByText(/verified phone/i)).toBeInTheDocument();
     expect(screen.getByText(/verified email/i)).toBeInTheDocument();
+  });
+
+  it("prefills the details step with the signed-in customer's name when the session starts null (regression: name asked again after login)", async () => {
+    // Site-mode sign-in: the component mounts signed OUT (user null), then
+    // the login response carries the stored customer — with a name already in
+    // the DB. The details step must prefill it, not ask for it again.
+    loginMock.mockResolvedValue({
+      token: "sc-token",
+      expires_at: "2026-09-22T10:00:00.000Z",
+      customer: {
+        id: "sc-1",
+        business_id: "biz-1",
+        email: "pam@site.test",
+        name: "Pam Silva",
+        phone: "+94771234000",
+        email_verified_at: "2026-08-22T10:00:00.000Z",
+        phone_verified_at: "2026-08-22T10:05:00.000Z"
+      }
+    });
+    wrap(<WidgetIdentity siteHostname="courtgroup.lk" siteName="Court Group" onDone={vi.fn()} />);
+
+    await userEvent.type(screen.getByPlaceholderText("you@example.com"), "pam@site.test");
+    await userEvent.type(screen.getByPlaceholderText("Password"), "password-1");
+    await userEvent.click(screen.getByRole("button", { name: /sign in/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: /complete your booking details/i })).toBeInTheDocument();
+    });
+    expect(screen.getByPlaceholderText("Your name")).toHaveValue("Pam Silva");
   });
 
   it("brands the sign-in copy to the Business on a live site (ADR-0030)", () => {

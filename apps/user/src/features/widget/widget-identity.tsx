@@ -161,6 +161,17 @@ export function WidgetIdentity({
     return () => clearInterval(t);
   }, [resendIn]);
 
+  // The component mounts signed OUT (the identity step), so the name/phone/
+  // email fields were initialized from a null user. When a sign-in lands, the
+  // session carries the stored customer — prefill the fields from it instead
+  // of asking again (only fills empty fields, so in-progress typing survives).
+  useEffect(() => {
+    if (!user) return;
+    setName((v) => v || user.name || "");
+    setPhone((v) => v || user.phone || "");
+    setDetailsEmail((v) => v || user.email || "");
+  }, [user]);
+
   // ---- Sign-in / register ----
 
   const handleEmailLogin = async (e: FormEvent) => {
