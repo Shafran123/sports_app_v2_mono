@@ -47,12 +47,12 @@ export function SiteAccountPanel({ business, onDark = false }: { business: Busin
           aria-label="Go to profile"
           className={
             onDark
-              ? "flex h-9 w-9 items-center justify-center rounded-full border border-white/30 bg-white/10 text-white backdrop-blur transition-colors hover:bg-white/20 sm:gap-2 sm:px-3 sm:py-2 sm:text-sm sm:font-semibold"
-              : "flex h-9 w-9 items-center justify-center rounded-full border border-border bg-surface text-ink-2 transition-colors hover:text-ink sm:gap-2 sm:px-3 sm:py-2 sm:text-sm sm:font-semibold"
+              ? "flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/30 bg-white/10 text-white backdrop-blur transition-colors hover:bg-white/20 sm:h-auto sm:w-auto sm:gap-2 sm:px-3 sm:py-2 sm:text-sm sm:font-semibold"
+              : "flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-ink-2 transition-colors hover:text-ink sm:h-auto sm:w-auto sm:gap-2 sm:px-3 sm:py-2 sm:text-sm sm:font-semibold"
           }
         >
           <User className="h-4 w-4 shrink-0" />
-          <span className="hidden sm:inline truncate">{signedInLabel}</span>
+          <span className="hidden max-w-56 truncate sm:inline">{signedInLabel}</span>
         </button>
         <button
           type="button"
