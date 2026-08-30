@@ -125,8 +125,10 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
     queryKey: ["checkout-paid", slotQueryKey],
     queryFn: async () => {
       const list = await bookings.list("upcoming", { venue_id: venueId });
-      return list.find(
-        (b) => b.court_id === courtId && b.start_at === startAt && b.end_at === endAt
+      return (
+        list.find(
+          (b) => b.court_id === courtId && b.start_at === startAt && b.end_at === endAt
+        ) ?? null
       );
     },
     enabled: !!user && !!courtId,
