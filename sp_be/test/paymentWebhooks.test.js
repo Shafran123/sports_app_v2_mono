@@ -296,4 +296,19 @@ describe('payment webhooks', () => {
     expect(res.status).toBe(409);
     expect(res.body.error.code).toBe('ALREADY_REFUNDED');
   });
+
+  it('admin payment summary aggregates boolean flags with bool_or (regression: max(boolean))', async () => {
+    const adminToken = await tokenFor('demo-admin-uid');
+    const res = await request(app)
+      .get('/api/v1/admin/payments/summary')
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.businesses).toEqual(expect.any(Array));
+    for (const b of res.body.data.businesses) {
+      expect(typeof b.cash_enabled).toBe('boolean');
+      expect(typeof b.payhere_enabled).toBe('boolean');
+      expect(typeof b.payhere_configured).toBe('boolean');
+    }
+  });
 });

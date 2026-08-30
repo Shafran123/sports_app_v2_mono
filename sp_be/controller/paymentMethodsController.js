@@ -140,9 +140,9 @@ exports.adminSummary = async (req, res) => {
   try {
     const { rows } = await pool.query(
       `select b.id as business_id, b.name as business_name,
-              max(bpm.cash_enabled) as cash_enabled,
-              max(bpm.payhere_enabled) as payhere_enabled,
-              max(bpm.payhere_configured) as payhere_configured,
+              bool_or(bpm.cash_enabled) as cash_enabled,
+              bool_or(bpm.payhere_enabled) as payhere_enabled,
+              bool_or(bpm.payhere_configured) as payhere_configured,
               max(bpm.app_id) as app_id_last4
        from businesses b
        left join lateral (
