@@ -19,6 +19,10 @@ const SECRET_API = 'https://secretmanager.googleapis.com/v1';
 const DEFAULT_PROJECT = 'myslot-preprod';
 
 function isConfigured(env = process.env) {
+  // Tests never touch GSM (they run against the platform env keys via the
+  // businessPaymentMethods fallback) even though app.js loads .env — a real
+  // SECRET_MANAGER_CREDENTIALS in the dev .env must not leak into the suite.
+  if (env.NODE_ENV === 'test') return false;
   return Boolean(env.SECRET_MANAGER_CREDENTIALS);
 }
 

@@ -119,7 +119,7 @@ exports.checkout = async (req, res) => {
       const split = await splitCourtTotal(client, court_id, listedTotal, taxRate);
       const user = req.user;
       const { rows: holdBusinessRows } = await client.query(
-        `select v.business_id from holds h
+        `select v.business_id, v.id as venue_id from holds h
          join courts c on c.id = h.court_id
          join venues v on v.id = c.venue_id
          where h.id = $1`,
@@ -133,6 +133,9 @@ exports.checkout = async (req, res) => {
       if (!creds) {
         return fail(res, 409, 'PAYMENT_UNAVAILABLE', 'Online payment is not available right now. Choose pay-at-venue instead.');
       }
+      const returnUrl = siteHostname
+        ? siteReturnUrl(siteHostname, holdBusinessRows[0].venue_id, req)
+        : widgetReturnUrl(widgetInstanceKey);
       return ok(res, 201, {
         hold_id: hold.id,
         idempotency_key,
@@ -149,7 +152,7 @@ exports.checkout = async (req, res) => {
           baseUrl: requestBaseUrl(),
           merchantId: creds.merchantId,
           merchantSecret: creds.merchantSecret,
-          returnUrl: widgetReturnUrl(widgetInstanceKey)
+          returnUrl
         })
       });
     }
@@ -432,7 +435,7 @@ exports.checkout = async (req, res) => {
         baseUrl: requestBaseUrl(),
         merchantId: creds.merchantId,
         merchantSecret: creds.merchantSecret,
-        returnUrl: widgetReturnUrl(widgetInstanceKey)
+        returnUrl: siteHostname ? siteReturnUrl(siteHostname, court.venue_id, req) : widgetReturnUrl(widgetInstanceKey)
       })
     });
   } catch (error) {
@@ -453,6 +456,37 @@ exports.checkout = async (req, res) => {
 function widgetReturnUrl(instanceKey) {
   if (!instanceKey) return null;
   return `${requestBaseUrl()}/embed/${encodeURIComponent(String(instanceKey))}`;
+}
+
+// A Dedicated Site checkout's PayHere redirect returns to the site's own book
+// page — the exact URL the customer came from (Referer, validated against the
+// presented site hostname), so the slot context restores; fall back to the
+// Origin header (scheme-safe) or a plain http(s) book URL. Never the platform
+// root. Re-checkout on the returned page is safe: the own-hold guard answers
+// SLOT_HELD instead of minting a second payment.
+function siteReturnUrl(siteHostname, venueId, req) {
+  const host = String(siteHostname || '').trim().toLowerCase().replace(/^https?:\/\//, '');
+  if (host) {
+    const referer = req.get('referer');
+    if (referer) {
+      try {
+        const url = new URL(referer);
+        if (url.hostname.toLowerCase() === host) return referer;
+      } catch {
+        // ignore malformed referer
+      }
+    }
+    const origin = req.get('origin');
+    if (origin) {
+      try {
+        const url = new URL(origin);
+        if (url.hostname.toLowerCase() === host) return `${origin}/book/${venueId}`;
+      } catch {
+        // ignore malformed origin
+      }
+    }
+  }
+  return null;
 }
 
 async function computeAmount(client, courtId, start, end) {
