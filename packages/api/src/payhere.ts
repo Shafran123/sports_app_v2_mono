@@ -1,8 +1,11 @@
 /** PayHere checkout endpoints. Prefer the server-provided checkout_url when present. */
 export const PAYHERE_CHECKOUT_URL = "https://sandbox.payhere.lk/pay/checkout";
 
-const SANDBOX_SCRIPT = "https://sandbox.payhere.lk/lib/payhere.js";
-const LIVE_SCRIPT = "https://www.payhere.lk/lib/payhere.js";
+// PayHere serves ONE onsite-checkout script, from the live host: startCheckout
+// routes to the sandbox itself when its config carries sandbox: true. The
+// sandbox host has no /lib/payhere.js (404), so a sandbox-specific script URL
+// would silently fall back to the redirect — losing the in-page overlay.
+const PAYHERE_SCRIPT = "https://www.payhere.lk/lib/payhere.js";
 
 declare global {
   interface Window {
@@ -67,16 +70,16 @@ export function submitPayHere(
 
 let payhereScriptPromise: Promise<boolean> | null = null;
 
-// Load PayHere's onsite-checkout script once. The sandbox build is only used
-// while the checkout_url points at sandbox.payhere.lk; the live build for
-// production. Resolves true when window.PayHere.startCheckout is available.
-function loadPayHereScript(sandbox: boolean): Promise<boolean> {
+// Load PayHere's onsite-checkout script once (single live build serves both
+// environments; sandbox routing is a startCheckout config flag). Resolves
+// true when window.PayHere.startCheckout is available.
+function loadPayHereScript(): Promise<boolean> {
   if (payhereScriptPromise) return payhereScriptPromise;
   payhereScriptPromise = new Promise((resolve) => {
     if (typeof window === "undefined") return resolve(false);
     if (window.PayHere?.startCheckout) return resolve(true);
     const script = document.createElement("script");
-    script.src = sandbox ? SANDBOX_SCRIPT : LIVE_SCRIPT;
+    script.src = PAYHERE_SCRIPT;
     script.async = true;
     script.onload = () => resolve(Boolean(window.PayHere?.startCheckout));
     script.onerror = () => resolve(false);
@@ -101,7 +104,7 @@ export async function startPayHereCheckout(
       ? paymentParams.checkout_url
       : PAYHERE_CHECKOUT_URL;
   const sandbox = checkoutUrl.includes("sandbox");
-  const loaded = await loadPayHereScript(sandbox);
+  const loaded = await loadPayHereScript();
   if (!loaded) {
     submitPayHere(paymentParams, user);
     return false;

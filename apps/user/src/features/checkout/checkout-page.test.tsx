@@ -417,6 +417,16 @@ describe("CheckoutPage payhere_enabled OFF (payments paused)", () => {
     const back = await screen.findByRole("link", { name: /Smash Arena/i });
     expect(back).toHaveAttribute("href", "/venues/v1?date=2026-08-22");
   });
+
+  it("back link goes to the venue's page slug when the venue has one", async () => {
+    pauseOnlinePayments();
+    vi.mocked(venues.detail).mockResolvedValue({ ...cashVenue, slug: "smash-arena" } as never);
+
+    renderPage();
+
+    const back = await screen.findByRole("link", { name: /Smash Arena/i });
+    expect(back).toHaveAttribute("href", "/smash-arena?date=2026-08-22");
+  });
 });
 
 describe("CheckoutPage venue/court display", () => {

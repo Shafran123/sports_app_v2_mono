@@ -194,9 +194,13 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
   const failure = checkout.error ? toApiFailure(checkout.error) : null;
   const slotTaken = failure?.code === "BOOKING_SLOT_UNAVAILABLE";
   const dateKey = startAt.slice(0, 10);
-  // The venue route segment is the venue UUID (venues/[id]) — never the sport
-  // slug that the CTA carries for display purposes.
-  const venueHref = `/venues/${venueId}?date=${dateKey}`;
+  // Back / alternatives navigation returns to the venue's own page. The
+  // marketplace route (venues/[id]) is retired (ADR-0045) and now renders the
+  // marketplace-closed screen, so prefer the venue's page slug from the detail
+  // fetch — a Dedicated Site serves the venue at /<slug> — with the UUID route
+  // as a legacy fallback when the venue has no slug.
+  const venueSlug = venueQuery.data?.slug ?? null;
+  const venueHref = venueSlug ? `/${venueSlug}?date=${dateKey}` : `/venues/${venueId}?date=${dateKey}`;
 
   const renderVerifyModal = () => (
     <VerifyPhoneModal

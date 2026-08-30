@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AxiosInstance } from "axios";
-import { venues, bookings, events, notifications, auth, business, admin, uploads, featureFlags, ownerOnboarding, leads } from "./index";
+import { venues, bookings, events, notifications, auth, business, admin, uploads, featureFlags, ownerOnboarding, leads, startPayHereCheckout } from "./index";
 
 function mockClient(handler: (method: string, url: string, opts?: unknown) => unknown): AxiosInstance {
   return {
@@ -339,5 +339,44 @@ describe("ownerOnboarding.agreementPdf", () => {
     const blob = await ownerOnboarding.agreementPdf("ag1", client);
     expect(get).toHaveBeenCalledWith("/owner-onboarding/agreements/ag1/pdf", { responseType: "blob" });
     expect(blob).toBeInstanceOf(Blob);
+  });
+});
+
+// Onsite Checkout regression (sandbox script URL 404): PayHere serves ONE
+// onsite-checkout script at www.payhere.lk/lib/payhere.js — the sandbox host
+// has no /lib/payhere.js, so a sandbox checkout_url must load the live script
+// and pass sandbox: true to startCheckout. Loading the sandbox URL silently
+// falls back to a full-page redirect instead of the in-page overlay.
+describe("startPayHereCheckout", () => {
+  it("loads the live script for a sandbox checkout_url and opens the in-page overlay", async () => {
+    const startCheckout = vi.fn();
+    const scripts: Array<{ src?: string; onload?: () => void; onerror?: () => void }> = [];
+    const windowStub = {} as { PayHere?: { startCheckout: typeof startCheckout } };
+    vi.stubGlobal("window", windowStub);
+    vi.stubGlobal("document", {
+      createElement: (tag: string) => (tag === "script" ? { src: "" } : {}),
+      head: {
+        // Simulate PayHere's script defining window.PayHere once it loads.
+        appendChild: (script: { onload?: () => void }) => {
+          scripts.push(script);
+          windowStub.PayHere = { startCheckout };
+          script.onload?.();
+        }
+      },
+      body: { appendChild: () => {} }
+    });
+    try {
+      const opened = await startPayHereCheckout(
+        { checkout_url: "https://sandbox.payhere.lk/pay/checkout", merchant_id: "m1" },
+        { first_name: "Sam", email: "sam@example.com" }
+      );
+      expect(opened).toBe(true);
+      expect(scripts[0]?.src).toBe("https://www.payhere.lk/lib/payhere.js");
+      expect(startCheckout).toHaveBeenCalledWith(
+        expect.objectContaining({ sandbox: true, merchant_id: "m1", first_name: "Sam" })
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
