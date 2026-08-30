@@ -287,6 +287,33 @@ describe("CheckoutPage payment method", () => {
     expect(screen.getAllByText(/Confirming your payment/i).length).toBeGreaterThan(0);
   });
 
+  it("shows the same summary card for pay online (both methods available) and pays from it", async () => {
+    vi.mocked(venues.detail).mockResolvedValue(cashVenue as never);
+    vi.mocked(bookings.checkout).mockResolvedValue(onlineResult as never);
+
+    renderPage();
+    const onlineOption = await screen.findByTestId("method-online");
+    await userEvent.click(onlineOption);
+
+    // The summary card (venue/court/date/time/rate/total) renders for pay
+    // online exactly like pay at venue — with a Pay now button.
+    expect(await screen.findByRole("button", { name: /Pay now/i })).toBeInTheDocument();
+    expect(screen.getByText(/Court 1/)).toBeInTheDocument();
+    expect(screen.getByText("Total")).toBeInTheDocument();
+    expect(screen.getByText(/PayHere opens in this page/i)).toBeInTheDocument();
+    expect(bookings.checkout).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole("button", { name: /Pay now/i }));
+    await waitFor(() => expect(bookings.checkout).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(startPayHereCheckout).toHaveBeenCalledWith(
+        expect.objectContaining({ hash: "abc" }),
+        expect.objectContaining({ first_name: "Test" })
+      )
+    );
+    expect(screen.getAllByText(/Confirming your payment/i).length).toBeGreaterThan(0);
+  });
+
   it("swaps to the shared confirmation card when the webhook confirms the paid booking (onsite, no redirect)", async () => {
     vi.mocked(venues.detail).mockResolvedValue(onlineVenue as never);
     vi.mocked(bookings.checkout).mockResolvedValue(onlineResult as never);

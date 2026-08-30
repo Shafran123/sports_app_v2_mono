@@ -155,8 +155,9 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
       setVerifyOpen(true);
       return;
     }
-    // When both methods are available, wait for the player to pick one.
-    if (!chosen && cashAvailable && onlineAvailable) return;
+    // When both methods are available, the player picks one; the summary
+    // card's button then drives the checkout (no auto-fire).
+    if (cashAvailable && onlineAvailable) return;
     // With nothing enabled there is nothing to offer — the fail-closed card
     // renders and no request fires (ADR-0015).
     if (!onlineAvailable && !cashAvailable) return;
@@ -220,10 +221,28 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
   };
 
   const handlePay = () => {
-    if (!result || paying) return;
+    if (!result || paying || !result.payment_params) return;
+    openPayHere(result.payment_params);
+  };
+
+  // Pay-online from the summary card (both-methods venue): run the checkout
+  // if the hold is not yet minted, then open the PayHere overlay in-page.
+  const handleOnlinePay = () => {
+    if (checkout.isPending || paying || paymentPending) return;
+    if (result?.payment_params) {
+      openPayHere(result.payment_params);
+      return;
+    }
+    checkout.mutate(undefined, {
+      onSuccess: (res) => {
+        if (res?.payment_params) openPayHere(res.payment_params);
+      }
+    });
+  };
+
+  const openPayHere = (params: Record<string, unknown>) => {
     setPaying(true);
-    if (!result.payment_params) return;
-    void startPayHereCheckout(result.payment_params, {
+    void startPayHereCheckout(params, {
       first_name: user?.name,
       last_name: user?.name,
       email: user?.email,
@@ -232,7 +251,7 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
     }).then((onsite) => {
       if (onsite) {
         // The overlay opened in-page: the confirmation lands via the webhook
-        // poll above — no redirect, no page navigation.
+        // poll — no redirect, no page navigation.
         setPaymentPending(true);
       } else {
         // Script failed to load: the hidden-form redirect fallback fired and
@@ -502,7 +521,7 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
               />
             </div>
 
-            {effectiveMethod === "cash" && (
+            {effectiveMethod === "cash" || effectiveMethod === "payhere" ? (
               <>
                 <Card className="mt-6 overflow-hidden">
                   <CardContent className="px-6 pt-8">
@@ -543,28 +562,55 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
                         Total includes {venueTaxRate}% Venue Tax and the platform tax.
                       </p>
                     )}
-                    <Button
-                      size="lg"
-                      loading={checkout.isPending}
-                      onClick={() => {
-                        if (checkout.isPending) return;
-                        checkout.mutate();
-                      }}
-                      className="mt-4 w-full"
-                    >
-                      Confirm booking
-                    </Button>
+                    {effectiveMethod === "cash" ? (
+                      <Button
+                        size="lg"
+                        loading={checkout.isPending}
+                        onClick={() => {
+                          if (checkout.isPending) return;
+                          checkout.mutate();
+                        }}
+                        className="mt-4 w-full"
+                      >
+                        Confirm booking
+                      </Button>
+                    ) : paymentPending ? (
+                      <div className="mt-4 w-full rounded-2xl bg-surface px-6 py-4 text-center">
+                        <p className="font-semibold text-ink">Confirming your payment…</p>
+                        <p className="mt-1 text-sm text-ink-2">
+                          We&apos;re waiting for PayHere&apos;s confirmation. This page updates
+                          automatically — no need to do anything.
+                        </p>
+                      </div>
+                    ) : (
+                      <Button
+                        size="lg"
+                        loading={paying}
+                        onClick={handleOnlinePay}
+                        className="mt-4 w-full"
+                      >
+                        {payLabel}
+                      </Button>
+                    )}
                   </div>
                 </Card>
 
-                <div className="mt-6 rounded-3xl border border-border bg-surface p-4 text-sm text-ink-2">
-                  <Banknote className="mr-1 inline h-4 w-4" />
-                  {onlineAvailable
-                    ? "You chose pay-at-venue — your slot is confirmed immediately and you pay in cash at the venue."
-                    : "Online payment is unavailable here — you'll pay at the venue in cash once you confirm below."}
-                </div>
+                {effectiveMethod === "cash" ? (
+                  <div className="mt-6 rounded-3xl border border-border bg-surface p-4 text-sm text-ink-2">
+                    <Banknote className="mr-1 inline h-4 w-4" />
+                    {onlineAvailable
+                      ? "You chose pay-at-venue — your slot is confirmed immediately and you pay in cash at the venue."
+                      : "Online payment is unavailable here — you'll pay at the venue in cash once you confirm below."}
+                  </div>
+                ) : (
+                  <p className="mt-5 flex flex-wrap items-center gap-2 text-sm text-ink-2">
+                    <ShieldCheck className="h-4 w-4 shrink-0" />
+                    PayHere opens in this page — you never leave the site (sandbox).
+                    <Badge variant="warning">Sandbox</Badge>
+                  </p>
+                )}
               </>
-            )}
+            ) : null}
           </>
         )}
 
