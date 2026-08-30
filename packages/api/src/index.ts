@@ -60,7 +60,7 @@ import type { OwnerAgreement, OwnerPlan, VenueBrand, WidgetInstanceInput, SiteRe
 export { TOKEN_KEY, SITE_CUSTOMER_TOKEN_KEY, SITE_GOOGLE_PENDING_KEY, SITE_TOTP_PENDING_KEY, SITE_AUTH_ERROR_KEY, persistSiteToken, isOwnerSurface } from "./client";
 export { toApiFailure, getClient, setClient, createClient, type ApiFailure } from "./client";
 export { parseData, parseList, parsePaginated } from "./parse";
-export { submitPayHere, PAYHERE_CHECKOUT_URL, type PayHereUserFields } from "./payhere";
+export { submitPayHere, startPayHereCheckout, PAYHERE_CHECKOUT_URL, type PayHereUserFields } from "./payhere";
 
 import { getClient } from "./client";
 import { parseData, parseList, parsePaginated } from "./parse";

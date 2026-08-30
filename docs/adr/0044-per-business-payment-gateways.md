@@ -19,6 +19,7 @@ Payment methods move from per-venue (`accepts_cash`) and per-platform (env keys)
 - The admin `payhere_enabled` flag remains as a global emergency kill switch for all PayHere flows.
 - Widget checkout uses PayHere **Onsite Checkout** (payhere.js in-page modal iframe, sandbox-supported) per ADR-0029; a sandbox spike validates nested-iframe behavior first, with redirect as the documented fallback. Note: the embedding domain must be approved by PayHere (up to 24h).
   - **Implemented (2026-08-30)**: shipped the redirect fallback — hidden-form POST with `return_url` pointed back at the widget's own embed URL; Onsite Checkout (payhere.js) remains the fast-follow pending the sandbox spike's nested-iframe verdict.
+  - **Onsite Checkout shipped for the site/marketplace checkout page (2026-08-30)**: `startPayHereCheckout` (payhere.js, `PayHere.startCheckout`) keeps the player in-page; the confirmation lands via the notify-webhook poll and reuses the pay-at-venue confirmation card. The widget embed keeps the redirect fallback (nested iframe).
 - Walk-in quick-book gains a **Payment Link** (backend-minted checkout URL sent by SMS via SMSGo) and a `card` recorded channel; walk-ins book `confirmed` at creation, payment `pending` until the link is paid.
 - Owners can **cancel & refund** their own PayHere bookings from the console (platform cancellation tiers, owner credentials); standalone refunds are deferred.
 - Admin gets a read-only per-Business summary: config state + collection sums, never the secrets.

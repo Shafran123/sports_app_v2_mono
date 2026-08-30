@@ -1,6 +1,15 @@
 /** PayHere checkout endpoints. Prefer the server-provided checkout_url when present. */
 export const PAYHERE_CHECKOUT_URL = "https://sandbox.payhere.lk/pay/checkout";
 
+const SANDBOX_SCRIPT = "https://sandbox.payhere.lk/lib/payhere.js";
+const LIVE_SCRIPT = "https://www.payhere.lk/lib/payhere.js";
+
+declare global {
+  interface Window {
+    PayHere?: { startCheckout: (payment: Record<string, unknown>) => void };
+  }
+}
+
 export interface PayHereUserFields {
   first_name?: string | null;
   last_name?: string | null;
@@ -54,4 +63,58 @@ export function submitPayHere(
 
   document.body.appendChild(form);
   form.submit();
+}
+
+let payhereScriptPromise: Promise<boolean> | null = null;
+
+// Load PayHere's onsite-checkout script once. The sandbox build is only used
+// while the checkout_url points at sandbox.payhere.lk; the live build for
+// production. Resolves true when window.PayHere.startCheckout is available.
+function loadPayHereScript(sandbox: boolean): Promise<boolean> {
+  if (payhereScriptPromise) return payhereScriptPromise;
+  payhereScriptPromise = new Promise((resolve) => {
+    if (typeof window === "undefined") return resolve(false);
+    if (window.PayHere?.startCheckout) return resolve(true);
+    const script = document.createElement("script");
+    script.src = sandbox ? SANDBOX_SCRIPT : LIVE_SCRIPT;
+    script.async = true;
+    script.onload = () => resolve(Boolean(window.PayHere?.startCheckout));
+    script.onerror = () => resolve(false);
+    document.head.appendChild(script);
+  });
+  return payhereScriptPromise;
+}
+
+/**
+ * Onsite Checkout: open PayHere's payment overlay in-page, so the customer
+ * never leaves the site to pay. Resolves true when the overlay started;
+ * when the script cannot load it falls back to the hidden-form redirect and
+ * resolves false. The server's payment_params carry the hash/return_url, so
+ * no checkout state is rebuilt client-side.
+ */
+export async function startPayHereCheckout(
+  paymentParams: Record<string, unknown>,
+  user?: PayHereUserFields | null
+): Promise<boolean> {
+  const checkoutUrl =
+    typeof paymentParams.checkout_url === "string" && paymentParams.checkout_url
+      ? paymentParams.checkout_url
+      : PAYHERE_CHECKOUT_URL;
+  const sandbox = checkoutUrl.includes("sandbox");
+  const loaded = await loadPayHereScript(sandbox);
+  if (!loaded) {
+    submitPayHere(paymentParams, user);
+    return false;
+  }
+  const { first_name, last_name } = splitName(user?.first_name);
+  window.PayHere?.startCheckout({
+    ...paymentParams,
+    sandbox,
+    first_name: first_name || user?.first_name || "",
+    last_name: last_name || user?.last_name || "",
+    email: user?.email || "",
+    phone: user?.phone || "",
+    city: user?.city || ""
+  });
+  return true;
 }

@@ -10,7 +10,7 @@ import { Badge, Button, Card, CardContent, CountdownPill, ErrorState, Skeleton }
 import { formatDateLong, formatDuration, formatLkr, formatTime12, getRecaptchaToken, uuidV4 } from "@myslot/utils";
 import { useAuth } from "@/context/auth";
 import { currentHostname, isSiteHost } from "@/lib/site-host";
-import { submitPayHere } from "@myslot/api";
+import { submitPayHere, startPayHereCheckout } from "@myslot/api";
 import { VerifyPhoneModal } from "@/features/verify-phone/verify-phone-modal";
 import { WidgetIdentity } from "@/features/widget/widget-identity";
 import type { VenueOffer } from "@myslot/types";
@@ -80,6 +80,8 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
   const [method, setMethod] = React.useState<PaymentMethod>("payhere");
   const [chosen, setChosen] = React.useState(false);
   const [checkoutKey, setCheckoutKey] = React.useState(() => uuidV4());
+  const [paying, setPaying] = React.useState(false);
+  const [paymentPending, setPaymentPending] = React.useState(false);
 
   // The global kill switch forces cash only; otherwise the Business's own
   // config decides what the checkout offers.
@@ -108,6 +110,40 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
     }
   });
 
+  // Onsite Checkout (ADR-0044 fast-follow): PayHere opens in-page, so the
+  // confirmation arrives via the notify webhook instead of a redirect back.
+  // While the payment is in flight we poll the player's bookings for this
+  // venue and swap to the confirmation card (same component as pay-at-venue)
+  // the moment the booking exists. This also recovers a redirect return: the
+  // same slot/venue/time resolves to the paid booking, never a re-checkout.
+  const slotKey = React.useMemo(
+    () => `checkout-slot:${venueId}:${courtId}:${startAt}:${endAt}`,
+    [venueId, courtId, startAt, endAt]
+  );
+  const [slotQueryKey, setSlotQueryKey] = React.useState(slotKey);
+  const paidBookingQuery = useQuery({
+    queryKey: ["checkout-paid", slotQueryKey],
+    queryFn: async () => {
+      const list = await bookings.list("upcoming", { venue_id: venueId });
+      return list.find(
+        (b) => b.court_id === courtId && b.start_at === startAt && b.end_at === endAt
+      );
+    },
+    enabled: !!user && !!courtId,
+    refetchInterval: paymentPending ? 2000 : false
+  });
+  const paidBooking = paidBookingQuery.data;
+
+  React.useEffect(() => {
+    if (!paidBooking || !paymentPending) return;
+    setPaymentPending(false);
+  }, [paidBooking, paymentPending]);
+
+  const result = checkout.data;
+  const isCash = !!result?.booking;
+  const [secondsLeft, setSecondsLeft] = React.useState(0);
+  const [expired, setExpired] = React.useState(false);
+
   React.useEffect(() => {
     if (incomplete || venueQuery.isLoading || !flags) return;
     // A guest has no account to verify against — the sign-in gate renders
@@ -125,17 +161,17 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
     // A cash booking is created server-side when it is confirmed, so it must
     // never auto-fire: it needs an explicit confirmation of the summary.
     if (effectiveMethod === "cash") return;
+    // Recovery: when a paid booking already exists for this slot (a PayHere
+    // return, or the webhook beat the client), show the confirmation card and
+    // never mint a second checkout on the same slot. Wait for the recovery
+    // query to settle before firing.
+    if (paidBookingQuery.isLoading || paidBookingQuery.isFetching) return;
+    if (paidBookingQuery.data) return;
     if (checkout.isPending) return;
     if (checkout.data || checkout.error) return;
     void checkout.mutate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [incomplete, venueQuery.isLoading, flags, chosen, cashAvailable, method, checkoutKey, verified, onlineAvailable, requiresVerification, effectiveMethod, user]);
-
-  const result = checkout.data;
-  const isCash = !!result?.booking;
-  const [secondsLeft, setSecondsLeft] = React.useState(0);
-  const [expired, setExpired] = React.useState(false);
-  const [paying, setPaying] = React.useState(false);
+  }, [incomplete, venueQuery.isLoading, flags, chosen, cashAvailable, method, checkoutKey, verified, onlineAvailable, requiresVerification, effectiveMethod, user, paidBookingQuery.isLoading, paidBookingQuery.isFetching, paidBookingQuery.data]);
 
   React.useEffect(() => {
     if (!result || isCash || expired) return;
@@ -185,16 +221,26 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
     if (!result || paying) return;
     setPaying(true);
     if (!result.payment_params) return;
-    submitPayHere(result.payment_params, {
+    void startPayHereCheckout(result.payment_params, {
       first_name: user?.name,
       last_name: user?.name,
       email: user?.email,
       phone: user?.phone,
       city: user?.city
+    }).then((onsite) => {
+      if (onsite) {
+        // The overlay opened in-page: the confirmation lands via the webhook
+        // poll above — no redirect, no page navigation.
+        setPaymentPending(true);
+      } else {
+        // Script failed to load: the hidden-form redirect fallback fired and
+        // the page navigates away — the confirmation shows on the return.
+        setPaying(false);
+      }
     });
   };
 
-  const payLabel = paying ? "Redirecting to PayHere…" : "Pay now";
+  const payLabel = paying && !paymentPending ? "Opening PayHere…" : "Pay now";
 
   if (incomplete) {
     return (
@@ -273,51 +319,34 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
   }
 
   if (isCash && result?.booking) {
-    const bookingStatus = result.booking.status;
-    const confirmed = bookingStatus === "confirmed";
     return (
-      <main className="mx-auto max-w-3xl px-4 pb-32 pt-8 md:pb-14">
-        <h1 className="font-display text-2xl font-extrabold tracking-tight text-ink md:text-3xl">
-          {confirmed ? "Booking confirmed" : "Booking pending"}
-        </h1>
-        <Card className="mt-6 overflow-hidden">
-          <CardContent className="px-6 py-8 text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary-light text-primary">
-              {confirmed ? <Banknote className="h-7 w-7" /> : <Clock className="h-7 w-7" />}
-            </div>
-            <h2 className="mt-4 font-display text-xl font-extrabold text-ink">
-              {confirmed ? "Pay on arrival" : "Awaiting confirmation"}
-            </h2>
-            <p className="mt-1 text-sm text-ink-2">
-              {confirmed ? (
-                <>
-                  Your slot is locked in. Pay{" "}
-                  <span className="font-semibold text-ink">{formatLkr(result.amount)}</span> at the
-                  venue.
-                </>
-              ) : (
-                <>
-                  The venue is confirming your slot — pay{" "}
-                  <span className="font-semibold text-ink">{formatLkr(result.amount)}</span> at the
-                  venue when you arrive. We&apos;ll email you the moment it&apos;s confirmed.
-                </>
-              )}
-            </p>
-            <dl className="mx-auto mt-5 max-w-sm space-y-2 text-left text-sm">
-              <DetailRow label="Venue" value={venueName || "—"} />
-              <DetailRow label="Court" value={courtName || "Court"} />
-              <DetailRow label="Date" value={formatDateLong(startAt)} />
-              <DetailRow
-                label="Time"
-                value={`${formatTime12(startAt)} – ${formatTime12(endAt)}`}
-              />
-            </dl>
-            <Button size="lg" className="mt-6 w-full" onClick={() => router.push(`/bookings/${result.booking!.id}`)}>
-              {confirmed ? "View booking & QR code" : "View booking & confirmation"}
-            </Button>
-          </CardContent>
-        </Card>
-      </main>
+      <BookingConfirmationCard
+        booking={result.booking}
+        amount={result.amount}
+        method="cash"
+        venueName={venueName}
+        courtName={courtName}
+        startAt={startAt}
+        endAt={endAt}
+      />
+    );
+  }
+
+  // PayHere confirmation (Onsite Checkout / webhook poll or a redirect return):
+  // the same card component as pay-at-venue, so "Pay online" never strands the
+  // customer on a second redirect — the paid booking resolves in place.
+  const showPaidBooking = paidBooking && (effectiveMethod === "payhere" || paymentPending);
+  if (showPaidBooking) {
+    return (
+      <BookingConfirmationCard
+        booking={paidBooking!}
+        amount={paidBooking!.total_price}
+        method="payhere"
+        venueName={venueName}
+        courtName={courtName}
+        startAt={startAt}
+        endAt={endAt}
+      />
     );
   }
 
@@ -596,15 +625,25 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
               You saved {formatLkr(savings)} — {formatLkr(baseTotal ?? 0)} originally
             </p>
           )}
-          <Button
-            size="lg"
-            loading={paying}
-            disabled={expired}
-            onClick={handlePay}
-            className="mt-4 hidden w-full md:inline-flex"
-          >
-            {payLabel}
-          </Button>
+          {paymentPending ? (
+            <div className="mt-4 w-full rounded-2xl bg-surface px-6 py-4 text-center">
+              <p className="font-semibold text-ink">Confirming your payment…</p>
+              <p className="mt-1 text-sm text-ink-2">
+                We&apos;re waiting for PayHere&apos;s confirmation. This page updates automatically —
+                no need to do anything.
+              </p>
+            </div>
+          ) : (
+            <Button
+              size="lg"
+              loading={paying}
+              disabled={expired}
+              onClick={handlePay}
+              className="mt-4 hidden w-full md:inline-flex"
+            >
+              {payLabel}
+            </Button>
+          )}
         </div>
       </Card>
 
@@ -623,7 +662,7 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
 
       <p className="mt-5 flex flex-wrap items-center gap-2 text-sm text-ink-2">
         <ShieldCheck className="h-4 w-4 shrink-0" />
-        You&apos;ll be redirected to PayHere to complete payment (sandbox).
+        PayHere opens in this page — you never leave the site (sandbox).
         <Badge variant="warning">Sandbox</Badge>
       </p>
 
@@ -635,11 +674,97 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
               {formatLkr(result.amount)}
             </p>
           </div>
-          <Button size="lg" loading={paying} disabled={expired} onClick={handlePay} className="min-w-44 flex-1">
-            {payLabel}
-          </Button>
+          {paymentPending ? (
+            <div className="min-w-0 flex-1 text-right">
+              <p className="text-xs font-semibold text-ink">Confirming your payment…</p>
+            </div>
+          ) : (
+            <Button size="lg" loading={paying} disabled={expired} onClick={handlePay} className="min-w-44 flex-1">
+              {payLabel}
+            </Button>
+          )}
         </div>
       </div>
+    </main>
+  );
+}
+
+// The shared post-booking confirmation card — used identically by pay-at-venue
+// and pay-online (the paid booking resolves in place after Onsite Checkout).
+function BookingConfirmationCard({
+  booking,
+  amount,
+  method,
+  venueName,
+  courtName,
+  startAt,
+  endAt
+}: {
+  booking: { id: string; status: string };
+  amount: number;
+  method: "cash" | "payhere";
+  venueName: string;
+  courtName: string;
+  startAt: string;
+  endAt: string;
+}) {
+  const router = useRouter();
+  const confirmed = booking.status === "confirmed";
+  const online = method === "payhere";
+  return (
+    <main className="mx-auto max-w-3xl px-4 pb-32 pt-8 md:pb-14">
+      <h1 className="font-display text-2xl font-extrabold tracking-tight text-ink md:text-3xl">
+        {confirmed ? "Booking confirmed" : "Booking pending"}
+      </h1>
+      <Card className="mt-6 overflow-hidden">
+        <CardContent className="px-6 py-8 text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary-light text-primary">
+            {confirmed ? <Banknote className="h-7 w-7" /> : <Clock className="h-7 w-7" />}
+          </div>
+          <h2 className="mt-4 font-display text-xl font-extrabold text-ink">
+            {confirmed
+              ? online
+                ? "Payment received"
+                : "Pay on arrival"
+              : "Awaiting confirmation"}
+          </h2>
+          <p className="mt-1 text-sm text-ink-2">
+            {confirmed ? (
+              online ? (
+                <>
+                  Your slot is locked in. We&apos;ve emailed your confirmation — show the QR code at
+                  check-in.
+                </>
+              ) : (
+                <>
+                  Your slot is locked in. Pay{" "}
+                  <span className="font-semibold text-ink">{formatLkr(amount)}</span> at the venue.
+                </>
+              )
+            ) : (
+              <>
+                The venue is confirming your slot — pay{" "}
+                <span className="font-semibold text-ink">{formatLkr(amount)}</span>
+                {online ? " online." : " at the venue when you arrive."} We&apos;ll email you the
+                moment it&apos;s confirmed.
+              </>
+            )}
+          </p>
+          <dl className="mx-auto mt-5 max-w-sm space-y-2 text-left text-sm">
+            <DetailRow label="Venue" value={venueName || "—"} />
+            <DetailRow label="Court" value={courtName || "Court"} />
+            <DetailRow label="Date" value={formatDateLong(startAt)} />
+            <DetailRow label="Time" value={`${formatTime12(startAt)} – ${formatTime12(endAt)}`} />
+          </dl>
+          <Button
+            size="lg"
+            className="mt-6 w-full"
+            onClick={() => router.push(`/bookings/${booking.id}`)}
+          >
+            {confirmed ? "View booking & QR code" : "View booking & confirmation"}
+          </Button>
+        </CardContent>
+      </Card>
     </main>
   );
 }

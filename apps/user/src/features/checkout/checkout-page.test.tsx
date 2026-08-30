@@ -91,6 +91,7 @@ vi.mock("@myslot/api", () => ({
   },
   isOwnerSurface: () => isSiteHostMock(),
   submitPayHere: vi.fn(),
+  startPayHereCheckout: vi.fn(async () => true),
   toApiFailure: (e: { code?: string; message?: string }) => ({
     status: e?.code === "VERIFIED_PHONE_REQUIRED" ? 409 : 0,
     code: e?.code ?? "UNKNOWN",
@@ -100,7 +101,7 @@ vi.mock("@myslot/api", () => ({
   setClient: vi.fn()
 }));
 
-import { venues, bookings, featureFlags, submitPayHere } from "@myslot/api";
+import { venues, bookings, featureFlags, startPayHereCheckout } from "@myslot/api";
 
 const onlineVenue = {
   id: "v1", name: "Smash Arena", status: "approved", description: null,
@@ -123,7 +124,7 @@ const cashOnlyVenue = {
 
 const onlineResult = {
   hold_id: "h1", idempotency_key: "ik", amount: 1500, currency: "LKR",
-  expires_at: "2026-08-22T05:00:00.000Z", payment_params: { hash: "abc" }
+  expires_at: "2099-01-01T00:00:00.000Z", payment_params: { hash: "abc" }
 };
 
 const cashResult = {
@@ -159,6 +160,7 @@ function renderPage() {
 beforeEach(() => {
   vi.resetAllMocks();
   vi.mocked(venues.detail).mockResolvedValue(onlineVenue as never);
+  vi.mocked(bookings.list).mockResolvedValue([] as never);
   setUserMock.mockImplementation((u: Record<string, unknown>) => {
     ctxUser = { ...ctxUser, ...u };
   });
@@ -264,7 +266,69 @@ describe("CheckoutPage payment method", () => {
     await userEvent.click(cashOption);
     await userEvent.click(await screen.findByRole("button", { name: /Confirm booking/i }));
     await waitFor(() => expect(screen.getByText("Pay on arrival")).toBeInTheDocument());
-    expect(submitPayHere).not.toHaveBeenCalled();
+    expect(startPayHereCheckout).not.toHaveBeenCalled();
+  });
+
+  it("opens the PayHere overlay in-page for pay online — no redirect fallback", async () => {
+    vi.mocked(venues.detail).mockResolvedValue(onlineVenue as never);
+    vi.mocked(bookings.checkout).mockResolvedValue(onlineResult as never);
+
+    renderPage();
+    await waitFor(() => expect(screen.getAllByText(/Total/).length).toBeGreaterThan(0));
+
+    await userEvent.click(screen.getAllByRole("button", { name: /Pay now/i })[0]!);
+
+    await waitFor(() =>
+      expect(startPayHereCheckout).toHaveBeenCalledWith(
+        expect.objectContaining({ hash: "abc" }),
+        expect.objectContaining({ first_name: "Test" })
+      )
+    );
+    expect(screen.getAllByText(/Confirming your payment/i).length).toBeGreaterThan(0);
+  });
+
+  it("swaps to the shared confirmation card when the webhook confirms the paid booking (onsite, no redirect)", async () => {
+    vi.mocked(venues.detail).mockResolvedValue(onlineVenue as never);
+    vi.mocked(bookings.checkout).mockResolvedValue(onlineResult as never);
+    // First the recovery check sees no booking; after "Pay now" the poll
+    // finds the paid booking (the webhook confirmed it server-side).
+    vi.mocked(bookings.list)
+      .mockResolvedValueOnce([] as never)
+      .mockResolvedValue([
+        {
+          id: "b-paid", court_id: "court-1", user_id: "u1",
+          start_at: "2026-08-22T04:30:00.000Z", end_at: "2026-08-22T05:30:00.000Z",
+          status: "confirmed", payment_method: "payhere", total_price: 1500
+        }
+      ] as never);
+
+    renderPage();
+    await waitFor(() => expect(screen.getAllByText(/Total/).length).toBeGreaterThan(0));
+    await userEvent.click(screen.getAllByRole("button", { name: /Pay now/i })[0]!);
+
+    // The same card component as pay-at-venue, with pay-online copy.
+    expect(await screen.findByText("Booking confirmed", undefined, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.getByText("Payment received")).toBeInTheDocument();
+    expect(screen.getByText(/show the QR code at check-in/i)).toBeInTheDocument();
+    expect(screen.getByText(/View booking & QR code/i)).toBeInTheDocument();
+    expect(startPayHereCheckout).toHaveBeenCalledTimes(1);
+  });
+
+  it("recovers a redirect return: an existing paid booking for the slot shows the confirmation card instead of re-checkout", async () => {
+    vi.mocked(venues.detail).mockResolvedValue(onlineVenue as never);
+    vi.mocked(bookings.checkout).mockResolvedValue(onlineResult as never);
+    vi.mocked(bookings.list).mockResolvedValue([
+      {
+        id: "b-returned", court_id: "court-1", user_id: "u1",
+        start_at: "2026-08-22T04:30:00.000Z", end_at: "2026-08-22T05:30:00.000Z",
+        status: "confirmed", payment_method: "payhere", total_price: 1500
+      }
+    ] as never);
+
+    renderPage();
+
+    expect(await screen.findByText("Payment received")).toBeInTheDocument();
+    expect(bookings.checkout).not.toHaveBeenCalled();
   });
 });
 
