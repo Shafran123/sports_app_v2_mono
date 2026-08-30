@@ -11,7 +11,7 @@
 // creates once phone AND email are verified (ADR-0033: the gate sits at the
 // confirm step, not before the picker).
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { auth as authApi, toApiFailure, featureFlags, siteCustomerAuth, persistSiteToken, SITE_GOOGLE_PENDING_KEY, SITE_TOTP_PENDING_KEY, SITE_AUTH_ERROR_KEY } from "@myslot/api";
 import type { SiteAuthChallenge, SiteAuthResult } from "@myslot/types";
@@ -171,6 +171,26 @@ export function WidgetIdentity({
     setPhone((v) => v || user.phone || "");
     setDetailsEmail((v) => v || user.email || "");
   }, [user]);
+
+  // A fully set-up customer (name + verified phone + verified email) has
+  // nothing to do on the details step — skip it and continue straight to the
+  // booking. Covers every sign-in path (email/password, Google, challenge
+  // confirm) and a restored session that mounts already signed in. Resets
+  // when the user switches accounts.
+  const detailsSkippedRef = useRef(false);
+  useEffect(() => {
+    if (!user) {
+      detailsSkippedRef.current = false;
+      return;
+    }
+    if (detailsSkippedRef.current) return;
+    const hasName = Boolean(name.trim() || user.name);
+    const complete = hasName && !!user.phone_verified_at && !!user.email_verified_at;
+    if (!complete) return;
+    detailsSkippedRef.current = true;
+    onDone();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, name]);
 
   // ---- Sign-in / register ----
 

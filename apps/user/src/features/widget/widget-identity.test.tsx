@@ -312,7 +312,8 @@ describe("WidgetIdentity", () => {
   it("prefills the details step with the signed-in customer's name when the session starts null (regression: name asked again after login)", async () => {
     // Site-mode sign-in: the component mounts signed OUT (user null), then
     // the login response carries the stored customer — with a name already in
-    // the DB. The details step must prefill it, not ask for it again.
+    // the DB but an email still unverified. The details step must prefill the
+    // name, not ask for it again.
     loginMock.mockResolvedValue({
       token: "sc-token",
       expires_at: "2026-09-22T10:00:00.000Z",
@@ -322,7 +323,7 @@ describe("WidgetIdentity", () => {
         email: "pam@site.test",
         name: "Pam Silva",
         phone: "+94771234000",
-        email_verified_at: "2026-08-22T10:00:00.000Z",
+        email_verified_at: null,
         phone_verified_at: "2026-08-22T10:05:00.000Z"
       }
     });
@@ -336,6 +337,56 @@ describe("WidgetIdentity", () => {
       expect(screen.getByRole("heading", { name: /complete your booking details/i })).toBeInTheDocument();
     });
     expect(screen.getByPlaceholderText("Your name")).toHaveValue("Pam Silva");
+  });
+
+  it("skips the details step entirely when the signed-in customer is fully set up (name + verified phone + verified email)", async () => {
+    // The reported bug: after login with nothing missing, the step still
+    // showed. A complete customer must continue straight to the booking.
+    const onDone = vi.fn();
+    loginMock.mockResolvedValue({
+      token: "sc-token",
+      expires_at: "2026-09-22T10:00:00.000Z",
+      customer: {
+        id: "sc-1",
+        business_id: "biz-1",
+        email: "pam@site.test",
+        name: "Shafran Naizer",
+        phone: "+94771234000",
+        email_verified_at: "2026-08-22T10:00:00.000Z",
+        phone_verified_at: "2026-08-22T10:05:00.000Z"
+      }
+    });
+    wrap(<WidgetIdentity siteHostname="courtgroup.lk" siteName="Court Group" onDone={onDone} />);
+
+    await userEvent.type(screen.getByPlaceholderText("you@example.com"), "pam@site.test");
+    await userEvent.type(screen.getByPlaceholderText("Password"), "password-1");
+    await userEvent.click(screen.getByRole("button", { name: /sign in/i }));
+
+    await waitFor(() => {
+      expect(onDone).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("skips the details step for a restored complete session on mount", async () => {
+    // A returning Site Customer (session already in storage) mounts signed in
+    // with every field present — the step must never appear.
+    ctxUser = {
+      id: "sc-1",
+      role: "player",
+      name: "Shafran Naizer",
+      email: "pam@site.test",
+      phone: "+94771234000",
+      city: null,
+      phone_verified_at: "2026-08-22T10:00:00.000Z",
+      email_verified_at: "2026-08-22T10:05:00.000Z",
+      onboarding_state: "grandfathered"
+    };
+    const onDone = vi.fn();
+    wrap(<WidgetIdentity siteHostname="courtgroup.lk" siteName="Court Group" onDone={onDone} />);
+
+    await waitFor(() => {
+      expect(onDone).toHaveBeenCalledTimes(1);
+    });
   });
 
   it("brands the sign-in copy to the Business on a live site (ADR-0030)", () => {
