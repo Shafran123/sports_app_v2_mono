@@ -252,8 +252,11 @@ function OwnerPayments() {
                 variant="primary"
                 size="sm"
                 loading={saveCreds.isPending}
-                disabled={!showForm || !merchantId || !merchantSecret || !appId || !appSecret}
-                onClick={() => saveCreds.mutate()}
+                disabled={showForm && (!merchantId || !merchantSecret || !appId || !appSecret)}
+                onClick={() => {
+                  if (!showForm) setShowForm(true);
+                  else saveCreds.mutate();
+                }}
               >
                 {showForm ? "Save credentials" : "Add credentials"}
               </Button>
