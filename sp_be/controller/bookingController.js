@@ -289,7 +289,9 @@ exports.checkout = async (req, res) => {
 
     const holdOverlaps = await client.query(
       `select 1 from holds
-       where court_id = $1 and expires_at > now() and user_id <> $4
+       where court_id = $1 and expires_at > now()
+         and user_id is distinct from $4
+         and site_customer_id is distinct from $4
          and tstzrange(start_at, end_at) && tstzrange($2, $3)
        limit 1`,
       [court_id, start, end, req.user.id]
@@ -347,9 +349,11 @@ exports.checkout = async (req, res) => {
 
     // Hold abuse caps: a player may hold at most 3 slots, and never two
     // overlapping holds on the same court (even their own — prevents
-    // self-squatting until expiry).
+    // self-squatting until expiry). Site Customers hold as their
+    // site_customer_id (ADR-0030); the identity OR covers both ownership forms.
     const { rows: activeHoldCount } = await client.query(
-      `select count(*)::int as n from holds where user_id = $1 and expires_at > now()`,
+      `select count(*)::int as n from holds
+       where (user_id = $1 or site_customer_id = $1) and expires_at > now()`,
       [req.user.id]
     );
     if (activeHoldCount[0].n >= HOLD_LIMIT()) {
@@ -359,7 +363,8 @@ exports.checkout = async (req, res) => {
 
     const ownHoldOverlap = await client.query(
       `select 1 from holds
-       where court_id = $1 and expires_at > now() and user_id = $2
+       where court_id = $1 and expires_at > now()
+         and (user_id = $2 or site_customer_id = $2)
          and tstzrange(start_at, end_at) && tstzrange($3, $4)
        limit 1`,
       [court_id, req.user.id, start, end]
@@ -372,19 +377,23 @@ exports.checkout = async (req, res) => {
     // Insert is guarded so the cap holds even under concurrent checkouts:
     // the subquery re-checks both limits inside the same statement that
     // writes the hold, so two racing requests cannot both succeed.
+    const userId = siteCustomer ? null : req.user.id;
+    const siteCustomerId = siteCustomer ? siteCustomer.id : null;
     const { rows: holdRows } = await client.query(
-      `insert into holds (court_id, user_id, start_at, end_at, expires_at, idempotency_key, player_phone, tax_rate, tax_amount, venue_tax_rate, venue_tax_amount, subtotal_amount, discount_amount)
-       select $1, $2, $3, $4, now() + ($5 || ' minutes')::interval, $6, $7, $8, $9, $10, $11, $12, $13
+      `insert into holds (court_id, user_id, site_customer_id, start_at, end_at, expires_at, idempotency_key, player_phone, tax_rate, tax_amount, venue_tax_rate, venue_tax_amount, subtotal_amount, discount_amount)
+       select $1, $2, $3, $4, $5, now() + ($6 || ' minutes')::interval, $7, $8, $9, $10, $11, $12, $13, $14
        where (
-         (select count(*) from holds h where h.user_id = $2 and h.expires_at > now()) < $14
+         (select count(*) from holds h
+          where (h.user_id = $2 or h.site_customer_id = $2) and h.expires_at > now()) < $15
          and not exists (
            select 1 from holds h
-           where h.court_id = $1 and h.expires_at > now() and h.user_id = $2
-             and tstzrange(h.start_at, h.end_at) && tstzrange($3, $4)
+           where h.court_id = $1 and h.expires_at > now()
+             and (h.user_id = $2 or h.site_customer_id = $2)
+             and tstzrange(h.start_at, h.end_at) && tstzrange($4, $5)
          )
        )
        returning id, expires_at`,
-      [court_id, req.user.id, start, end, String(holdMinutes), idempotency_key, req.user.phone, split.platformRate, split.platformTax, split.venueRate, split.venueTax, pricing.subtotal, pricing.discount, HOLD_LIMIT()]
+      [court_id, userId, siteCustomerId, start, end, String(holdMinutes), idempotency_key, req.user.phone, split.platformRate, split.platformTax, split.venueRate, split.venueTax, pricing.subtotal, pricing.discount, HOLD_LIMIT()]
     );
 
     if (holdRows.length === 0) {
@@ -394,9 +403,9 @@ exports.checkout = async (req, res) => {
     const hold = holdRows[0];
 
     await client.query(
-      `insert into payments (user_id, payhere_payment_id, amount, tax_rate, tax_amount, venue_tax_rate, venue_tax_amount, currency, status, payment_method, gateway_business_id)
-       values ($1, $2, $3, $4, $5, $6, $7, 'LKR', 'pending', 'payhere', $8)`,
-      [req.user.id, hold.id, amount, split.platformRate, split.platformTax, split.venueRate, split.venueTax, court.business_id]
+      `insert into payments (user_id, site_customer_id, payhere_payment_id, amount, tax_rate, tax_amount, venue_tax_rate, venue_tax_amount, currency, status, payment_method, gateway_business_id)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, 'LKR', 'pending', 'payhere', $9)`,
+      [userId, siteCustomerId, hold.id, amount, split.platformRate, split.platformTax, split.venueRate, split.venueTax, court.business_id]
     );
 
     await client.query('commit');

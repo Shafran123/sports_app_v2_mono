@@ -6,9 +6,10 @@
 const request = require('supertest');
 const app = require('../app');
 const pool = require('../db');
+const crypto = require('crypto');
 const siteCustomers = require('../services/siteCustomers');
-const { enableSms } = require('./helpers/flags');
-const { enableBusinessCash } = require('./helpers/methods');
+const { enableSms, enableLegacyFlags } = require('./helpers/flags');
+const { enableBusinessCash, enableBusinessPayhere } = require('./helpers/methods');
 
 let BUSINESS_A;
 let BUSINESS_B;
@@ -61,6 +62,7 @@ describe('site customer auth (ADR-0030, ticket 01)', () => {
     process.env.MAILGUN_API_KEY = 'test-key';
     process.env.MAILGUN_DOMAIN = 'mg.example.com';
     await enableSms();
+    await enableLegacyFlags();
     posted = vi.fn(async (_url, opts) => ({ ok: true, status: 200, text: async () => '', json: async () => ({ success: true }) }));
     vi.stubGlobal('fetch', posted);
 
@@ -359,6 +361,96 @@ describe('site customer auth (ADR-0030, ticket 01)', () => {
       });
     expect(noHost.status).toBe(403);
     expect(noHost.body.error.code).toBe('SITE_HOST_REQUIRED');
+  });
+
+  it('site-customer PayHere checkout holds and completes under the customer identity (regression: holds_user_id_fkey)', async () => {
+    // ADR-0030/0044: a PayHere checkout from a widget/site is made by a Site
+    // Customer, whose id lives in site_customers — the hold and the paid
+    // booking must carry site_customer_id, never a users FK violation.
+    await enableBusinessPayhere(`siteauth-owner-a-${rand}`, true);
+    const venue = await request(app)
+      .post('/api/v1/venues')
+      .set('Authorization', `Bearer ${await tokenFor(`siteauth-owner-a-${rand}`)}`)
+      .send({
+        name: `PayHere Court House ${rand}`,
+        address: '2 Auth Rd',
+        city: 'Colombo',
+        sports: ['badminton'],
+        courts: [{ name: 'PayHere Court', sport: 'badminton', price_per_slot: 900, slot_duration_min: 60, capacity: 4, is_indoor: true }],
+        hours: Array.from({ length: 7 }, (_, d) => ({ day_of_week: d, open_time: '06:00', close_time: '23:00' }))
+      });
+    expect(venue.status, JSON.stringify(venue.body)).toBe(201);
+    await request(app).post(`/api/v1/admin/venues/${venue.body.data.id}/approve`).set('Authorization', `Bearer ${await tokenFor('siteauth-admin')}`);
+    const { rows: courtRows } = await pool.query(`select id from courts where venue_id = $1`, [venue.body.data.id]);
+
+    const reg = await registerAt('site-customer.test', `ph-booker-${rand}@abc.test`);
+    expect(reg.status).toBe(201);
+    const token = reg.body.data.token;
+    await request(app).post('/api/v1/site-auth/verify-phone/send').set('Authorization', `Bearer ${token}`).send({ phone: '+94 77 777 0002' });
+    const phoneCode = codeFromSms('94777770002');
+    await request(app).post('/api/v1/site-auth/verify-phone/confirm').set('Authorization', `Bearer ${token}`).send({ phone: '+94 77 777 0002', code: phoneCode });
+    await request(app).post('/api/v1/site-auth/verify-email/send').set('Authorization', `Bearer ${token}`).send({ email: `ph-booker-${rand}@abc.test` });
+    const emailCode = codeFromEmail(`ph-booker-${rand}@abc.test`);
+    await request(app).post('/api/v1/site-auth/verify-email/confirm').set('Authorization', `Bearer ${token}`).send({ email: `ph-booker-${rand}@abc.test`, code: emailCode });
+
+    const idempotency = `sc-payhere-${Date.now()}`;
+    const checkout = await request(app)
+      .post('/api/v1/bookings/checkout')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        court_id: courtRows[0].id,
+        start_at: `${colomboDate(2)}T18:00:00+05:30`,
+        end_at: `${colomboDate(2)}T19:00:00+05:30`,
+        payment_method: 'payhere',
+        site_hostname: 'site-customer.test',
+        idempotency_key: idempotency
+      });
+    expect(checkout.status, JSON.stringify(checkout.body)).toBe(201);
+    expect(checkout.body.data.hold_id).toBeTruthy();
+
+    const { rows: hold } = await pool.query(
+      `select user_id, site_customer_id from holds where id = $1`,
+      [checkout.body.data.hold_id]
+    );
+    expect(hold[0].user_id).toBeNull();
+    expect(hold[0].site_customer_id).toBe(reg.body.data.customer.id);
+
+    // Complete via the PayHere notify webhook: the booking must land under the
+    // customer identity, and the payment must flip to paid.
+    const amount = checkout.body.data.amount;
+    const secretMd5 = crypto.createHash('md5').update('test-merchant-secret').digest('hex').toUpperCase();
+    const md5sig = crypto
+      .createHash('md5')
+      .update(`TEST_MERCHANT_ID${checkout.body.data.hold_id}${amount}LKR2${secretMd5}`)
+      .digest('hex')
+      .toUpperCase();
+    const notify = await request(app)
+      .post('/api/v1/payments/payhere/notify')
+      .type('form')
+      .send({
+        merchant_id: 'TEST_MERCHANT_ID',
+        order_id: checkout.body.data.hold_id,
+        payment_id: 'pay_site_customer_1',
+        payhere_amount: String(amount),
+        payhere_currency: 'LKR',
+        status_code: '2',
+        method: 'TEST',
+        status_message: 'Successfully completed',
+        md5sig
+      });
+    expect(notify.status, JSON.stringify(notify.body)).toBe(200);
+
+    const { rows: booking } = await pool.query(
+      `select b.user_id, b.site_customer_id, p.status
+       from bookings b
+       join payments p on p.booking_id = b.id
+       where b.idempotency_key = $1`,
+      [idempotency]
+    );
+    expect(booking.length).toBe(1);
+    expect(booking[0].user_id).toBeNull();
+    expect(booking[0].site_customer_id).toBe(reg.body.data.customer.id);
+    expect(booking[0].status).toBe('paid');
   });
 
   it('serves the Business customers directory with booking aggregates (ADR-0030, ticket 05)', async () => {

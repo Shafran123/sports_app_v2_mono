@@ -124,10 +124,13 @@ exports.handleNotify = async (req, res) => {
       const hold = holdRows[0];
 
       const { rows: courtRows } = await client.query(
-        `select c.price_per_slot, u.name as player_name, coalesce(h.player_phone, u.phone) as player_phone
+        `select c.price_per_slot,
+                coalesce(u.name, sc.name) as player_name,
+                coalesce(h.player_phone, u.phone, sc.phone) as player_phone
          from courts c
          join holds h on h.id = $2
-         join users u on u.id = h.user_id
+         left join users u on u.id = h.user_id
+         left join site_customers sc on sc.id = h.site_customer_id
          where c.id = $1`,
         [hold.court_id, hold.id]
       );
@@ -152,10 +155,10 @@ exports.handleNotify = async (req, res) => {
       try {
         await client.query('savepoint booking_insert');
         const inserted = await client.query(
-          `insert into bookings (court_id, user_id, start_at, end_at, price_per_slot, total_price, tax_rate, tax_amount, venue_tax_rate, venue_tax_amount, status, payment_method, player_name, player_phone, qr_token, idempotency_key, subtotal_amount, discount_amount, confirmed_at)
-           values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'payhere', $12, $13, $14, $15, $16, $17, $18)
+          `insert into bookings (court_id, user_id, site_customer_id, start_at, end_at, price_per_slot, total_price, tax_rate, tax_amount, venue_tax_rate, venue_tax_amount, status, payment_method, player_name, player_phone, qr_token, idempotency_key, subtotal_amount, discount_amount, confirmed_at)
+           values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'payhere', $13, $14, $15, $16, $17, $18, $19)
            returning *`,
-          [hold.court_id, hold.user_id, hold.start_at, hold.end_at, pricePerSlot, payment.amount, payment.tax_rate, payment.tax_amount, payment.venue_tax_rate, payment.venue_tax_amount, bookingStatus, playerName, playerPhone, mintQrToken(), hold.idempotency_key, hold.subtotal_amount, hold.discount_amount, bookingStatus === 'confirmed' ? new Date() : null]
+          [hold.court_id, hold.user_id, hold.site_customer_id, hold.start_at, hold.end_at, pricePerSlot, payment.amount, payment.tax_rate, payment.tax_amount, payment.venue_tax_rate, payment.venue_tax_amount, bookingStatus, playerName, playerPhone, mintQrToken(), hold.idempotency_key, hold.subtotal_amount, hold.discount_amount, bookingStatus === 'confirmed' ? new Date() : null]
         );
         booking = inserted.rows[0];
       } catch (error) {
