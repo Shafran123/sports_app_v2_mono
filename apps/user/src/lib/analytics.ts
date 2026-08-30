@@ -7,10 +7,9 @@ let analytics: Analytics | null = null;
 
 /**
  * Analytics is opt-in per deployment. Without a measurement ID the Firebase
- * modules are never initialized and every call is a no-op — dev builds, CI,
- * and tests never touch Firebase. On top of that, analytics only ever runs
- * after the visitor records an explicit Accept (Analytics Consent, ADR-0043):
- * until then this module is inert.
+ * modules are never initialized and every call is a no-op. On top of that,
+ * analytics only ever runs after the visitor records an explicit Accept
+ * (Analytics Consent, ADR-0043): until then this module is inert.
  */
 export function isAnalyticsEnabled(): boolean {
   return Boolean(process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID);
@@ -55,8 +54,8 @@ export function trackCta(cta: string): void {
 
 // Initialize eagerly once consent is granted (so GA4's automatic page_view
 // and session tracking start immediately), and on load if a returning visitor
-// already accepted. SSR-safe: this module also runs on the server, where the
-// consent store is inert and window is undefined.
+// already accepted. SSR-safe: the consent store is inert and window is
+// undefined on the server.
 if (typeof window !== "undefined") {
   if (isAnalyticsEnabled() && consentAccepted()) {
     client();

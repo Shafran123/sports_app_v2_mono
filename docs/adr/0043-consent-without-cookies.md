@@ -1,0 +1,5 @@
+# Analytics Consent recorded in local storage, never a cookie
+
+The platform deliberately uses no cookies anywhere — sessions are bearer tokens in local storage (ADR-0014, ADR-0030) — so a "cookie consent" feature would be consent to nothing if it only covered cookies. We decided the consent feature records the visitor's Accept/Reject choice in local storage per origin, gates analytics (GA4) initialization behind an explicit Accept, is versioned so policy changes re-prompt, and names the concept Analytics Consent rather than cookie consent. The reCAPTCHA `_GRECAPTCHA` cookie is treated as out of scope for this consent (it is set by Google, not the platform, and only on first-party surfaces).
+
+A future reader might expect a consent cookie; there is deliberately none, because the platform's no-cookie posture is what the consent feature preserves.

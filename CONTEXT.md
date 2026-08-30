@@ -79,13 +79,29 @@ _Avoid_: legal pages, terms page, privacy page
 The platform's own legal and help pages on the marketing site — Privacy Policy, Terms & Conditions, and FAQ — served from the landing app at `/privacy`, `/terms`, and `/faq`, and linked from the landing footer. Distinct from **Site Policies**, which are per-Business legal text on a **Dedicated Site**.
 _Avoid_: legal pages (bare), site policies (the per-Business ones)
 
+**Analytics Consent**:
+A visitor's recorded choice — Accept or Reject — on whether analytics may run for their visit, captured before any analytics initialize and withdrawable afterwards. Recorded per origin in local storage (the platform sets no cookies, so no cookie is stored); versioned so a change to the privacy policy re-prompts visitors who previously chose. Covers analytics only; nothing else on the platform is consent-gated. Distinct from **Site Policies** and **Platform Legal Pages**, which are legal text rather than recorded choices.
+_Avoid_: cookie banner, cookie acceptance, tracking consent
+
+**Anti-bot Check**:
+An invisible risk-score evaluation applied to **Dedicated Site** sign-ins, registrations, and bookings, and to the owner-lead form. A low score escalates the submission to an email-OTP challenge or rejects it rather than hard-blocking the visitor. It never runs inside the **Booking Widget** iframe — the widget is a third-party frame where the evaluation breaks, so it relies on its verified-phone/email gate and rate limits instead.
+_Avoid_: captcha (the checkbox kind), reCAPTCHA (the vendor name)
+
 **Marketplace Listing**:
 A per-venue, Owner-controlled state deciding whether an approved Venue appears and can be booked on the marketplace (`myslot.lk`). **Defaults off once the Business's Dedicated Site is live** — the Venue then sells only on the site; the Owner may per-venue opt back on to sell dual-channel (site + marketplace in parallel). Venues without a live site keep their marketplace listing by default. Distinct from Venue visibility (private vs public), which governs marketplace *discovery* rather than the site.
 _Avoid_: marketplace sell-on, web listing
 
 **Site Customer**:
-A person with an account inside exactly one Business's tenant — the audience of that Business's **Dedicated Site** and **Booking Widgets**. Accounts are created and verified per Business: the same person who is a Site Customer at one Business holds a separate, independent account (own verification, own history) at another, with no data shared across Businesses. Distinct from the **Player**, whose account is platform-wide. Signs in with email+password or Google; on Google sign-in the backend verifies the Firebase ID token itself, resolves the Business from the site hostname (never from the client), and merges by `google_sub` then by email before creating — so one human holds one Site Customer row per Business. Distinct from the **Venue Owner**, whose Google-facing identity is a platform account that owners never sign in with on customer surfaces.
+A person with an account inside exactly one Business's tenant — the audience of that Business's **Dedicated Site** and **Booking Widgets**. Accounts are created and verified per Business: the same person who is a Site Customer at one Business holds a separate, independent account (own verification, own history) at another, with no data shared across Businesses. Distinct from the **Player**, whose account is platform-wide. Signs in with email+password or Google; on Google sign-in the backend verifies the Firebase ID token itself, resolves the Business from the site hostname (never from the client), and merges by `google_sub` then by email before creating — so one human holds one Site Customer row per Business. Distinct from the **Venue Owner**, whose Google-facing identity is a platform account that owners never sign in with on customer surfaces. A Site Customer may additionally hold a **Second Factor** on their account; that factor binds to the Site Customer, not to any particular surface — it challenges at sign-in on both the Dedicated Site and the Booking Widget alike.
 _Avoid_: account, tenant user, business user
+
+**Second Factor**:
+An optional second proof of identity a **Site Customer** enables on their account — a time-based one-time password from an authenticator app — required at every sign-in (email+password and Google alike) once enabled. Voluntary by default; a **Business** may require it for its own Site Customers, and any Site Customer may always enable it themselves. Distinct from **Verified Phone** and **Verified Email**, which are booking-gate attributes rather than sign-in factors. The factor is verified server-side by the platform (never by Firebase); losing it is recovered by the Business's **Venue Owner** or an **Admin**, which also revokes the Site Customer's active sessions.
+_Avoid_: 2FA, MFA, two-step verification, TOTP (the mechanism)
+
+**Backup Code**:
+One of a fixed set of single-use codes issued when a **Site Customer** enables a **Second Factor**, shown once at enrollment, used to sign in or to disable the factor when the authenticator app is unavailable. Each code is consumed by a single use and the set is regenerable.
+_Avoid_: recovery code, one-time password, reset code
 
 **Site Domain Request**:
 The owner-initiated, admin-workflow request that provisions a Business's **Site Hostname**. States: requested → approved → dns-pending → verifying → live, or rejected. The owner submits the hostname they want (a `myslot.lk` subdomain or their own host); staff approve, hand over the DNS record to add, and the system verifies it — automated polling plus an owner "I've added it" re-check. Staff-only manual steps (auth-provider authorized domain, hosting-domain configuration) are a checklist inside the request. Rejection carries a reason and the owner may edit and re-request. The owner watches live status in their console; every state change also goes out as an **Email Notification**.

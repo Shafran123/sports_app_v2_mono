@@ -1,0 +1,5 @@
+# Booking Widget iframes never run an Anti-bot Check
+
+The Booking Widget renders inside a cross-origin iframe on arbitrary third-party business pages. Google reCAPTCHA is unreliable there — Google's own docs document the cross-origin frame failures, the `_GRECAPTCHA` cookie becomes a third-party cookie (blocked under Safari ITP, Firefox TCP, and third-party-cookie-blocking Chrome), and a token minted in the iframe reports the iframe's origin as its hostname, so server-side hostname validation cannot see the embedding site. We decided the widget stays free of reCAPTCHA and relies on its existing human-signal gate (verified phone + verified email, server-enforced) and rate limits. Anti-bot applies only to first-party surfaces: the Dedicated Site and the platform's own forms.
+
+This is a boundary decision: someone will later try to "fix" the widget by adding reCAPTCHA and hit the iframe wall. If widget-side anti-bot is ever wanted, the documented alternatives are reCAPTCHA run on the parent page with the token passed in via postMessage, or a service built for cross-origin iframes (e.g. Cloudflare Turnstile) — not Google reCAPTCHA inside the frame.

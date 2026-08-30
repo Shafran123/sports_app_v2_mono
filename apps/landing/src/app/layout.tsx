@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Plus_Jakarta_Sans, Sora } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
+import { ConsentBanner } from "@/components/consent-banner";
 import { DEFAULT_BRAND_NAME } from "@myslot/utils";
 
 const plusJakarta = Plus_Jakarta_Sans({
@@ -42,7 +43,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className={`${plusJakarta.variable} ${sora.variable} antialiased`}>
-        <Providers>{children}</Providers>
+        <Providers>
+          {children}
+          <ConsentBanner />
+        </Providers>
       </body>
     </html>
   );

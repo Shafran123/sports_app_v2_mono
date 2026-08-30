@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { BrandLockup } from "@myslot/ui";
+import { BrandLockup, openConsentManager } from "@myslot/ui";
 import { contact, copy } from "@/lib/copy";
 import { useBrandName } from "@/hooks/use-brand-name";
 
@@ -50,6 +50,15 @@ export function Footer() {
       <p className="border-t border-border py-4 text-center text-xs text-ink-3">
         © {new Date().getFullYear()} {brand} · {contact.address}
       </p>
+      <div className="flex justify-center border-t border-border py-3">
+        <button
+          type="button"
+          onClick={openConsentManager}
+          className="text-xs font-medium text-ink-3 underline-offset-2 hover:underline"
+        >
+          Manage consent
+        </button>
+      </div>
     </footer>
   );
 }

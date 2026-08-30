@@ -1,5 +1,5 @@
 // Anti-bot Check (tickets 04-06): the recaptcha verification service and the
-// requireCaptcha middleware — valid/missing/invalid/expired/wrong-action/
+//  middleware — valid/missing/invalid/expired/wrong-action/
 // wrong-hostname tokens, escalate-vs-reject on the score, the widget iframe
 // (siteOnly) exemption, and the owner-lead gate.
 
