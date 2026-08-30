@@ -51,8 +51,8 @@ export function SiteAccountPanel({ business, onDark = false }: { business: Busin
               : "flex h-9 w-9 items-center justify-center rounded-full border border-border bg-surface text-ink-2 transition-colors hover:text-ink sm:gap-2 sm:px-3 sm:py-2 sm:text-sm sm:font-semibold"
           }
         >
-          <User className="h-4 w-4" />
-          <span className="hidden sm:inline max-w-28 truncate">{signedInLabel}</span>
+          <User className="h-4 w-4 shrink-0" />
+          <span className="hidden sm:inline truncate">{signedInLabel}</span>
         </button>
         <button
           type="button"

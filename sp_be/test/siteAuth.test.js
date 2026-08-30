@@ -229,8 +229,11 @@ describe('site customer auth (ADR-0030, ticket 01)', () => {
     expect(google.body.data.customer.id).toBe(reg.body.data.customer.id);
     // Google's verified claim satisfies the Verified Email on link.
     expect(google.body.data.customer.email_verified_at).toBeTruthy();
-    const { rows } = await pool.query(`select google_sub from site_customers where id = $1`, [reg.body.data.customer.id]);
+    const { rows } = await pool.query(`select google_sub, name from site_customers where id = $1`, [reg.body.data.customer.id]);
     expect(rows[0].google_sub).toBe(`gsub-${rand}`);
+    // The full name the customer registered with is never clobbered by
+    // Google's display name (regression: name = coalesce(name, $2)).
+    expect(rows[0].name).toBe('Site Pam');
   });
 
   it('rejects an unverifiable or missing Google ID token', async () => {

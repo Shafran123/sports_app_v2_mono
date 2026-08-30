@@ -386,7 +386,7 @@ async function googleUpsert({ site_hostname, id_token }) {
   if (customer) {
     const updated = await pool.query(
       `update site_customers
-       set name = coalesce($2, name), email = $3,
+       set name = coalesce(name, $2), email = $3,
            email_verified_at = coalesce(email_verified_at, $4), updated_at = now()
        where id = $1 returning *`,
       [customer.id, name || null, email, emailVerified ? new Date() : null]
@@ -400,7 +400,7 @@ async function googleUpsert({ site_hostname, id_token }) {
     if (byEmail.rows[0]) {
       const linked = await pool.query(
         `update site_customers
-         set google_sub = $2, name = coalesce($3, name),
+         set google_sub = $2, name = coalesce(name, $3),
              email_verified_at = coalesce(email_verified_at, $4), updated_at = now()
          where id = $1 returning *`,
         [byEmail.rows[0].id, sub, name || null, emailVerified ? new Date() : null]
