@@ -13,7 +13,7 @@ The Venue Owner's public brand and portfolio — the entity that owns the **Busi
 _Avoid_: brand (bare), company, organization, storefront
 
 **Business PayHere Credentials**:
-The four PayHere fields a Venue Owner supplies for their Business's PayHere **Payment Method** — merchant ID, merchant secret, app ID, app secret (the app pair drives refunds' OAuth). They are the Business's own gateway identity: money lands in the Business's PayHere account, never the platform's. Tenant data: stored on the Business's Payment Method row, the two secrets encrypted at rest while the IDs stay plaintext (they are not secret). Distinct from **Platform Secrets** (what the platform runs on) and from the platform gateway's keys (used only for Events and legacy refunds).
+The four PayHere fields a Venue Owner supplies for their Business's PayHere **Payment Method** — merchant ID, merchant secret, app ID, app secret (the app pair drives refunds' OAuth). They are the Business's own gateway identity: money lands in the Business's PayHere account, never the platform's. Tenant-scoped: one set per Business, held in Google Secret Manager as a per-Business secret (a new save is a new secret version) — never in Postgres or the deployment env. The merchant/app IDs are not secret and also sit on the Business's Payment Method row (they drive configuration state and UI hints). Distinct from **Platform Secrets** (what the platform runs on) and from the platform gateway's keys (used only for Events and legacy refunds).
 _Avoid_: payhere keys, gateway credentials (bare)
 
 **Widget Instance**:
@@ -84,7 +84,7 @@ The platform's own legal and help pages on the marketing site — Privacy Policy
 _Avoid_: legal pages (bare), site policies (the per-Business ones)
 
 **Platform Secret**:
-An operator secret the platform itself runs on — platform PayHere keys, the encryption master key, Mailgun, SMSGo, OTP HMAC, Supabase service-role key, Firebase service account. Managed outside the repo (Google Secret Manager) and injected at boot; never tenant data, never the per-Business **Business PayHere Credentials**.
+An operator secret the platform itself runs on — platform PayHere keys, Mailgun, SMSGo, OTP HMAC, Supabase service-role key, Firebase service account. Held in the deployment's env configuration (Railway), never the repo; distinct from the per-Business **Business PayHere Credentials**, which are tenant-scoped and live in Google Secret Manager.
 _Avoid_: env var (bare), credentials (ambiguous)
 
 **Analytics Consent**:

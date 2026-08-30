@@ -25,3 +25,7 @@ Spawned from grilling session 2026-08-30 (ADR-0046). Do not implement per-tenant
 ## Comments
 
 Implemented 2026-08-30 in commit `6a4fef8`. Agent-able work complete; ticket 03 (human-run GCP/Railway cutover) remains open.
+
+## Status (2026-08-30, superseded by ADR-0047)
+
+SUPERSEDED: the platform-secret move was reversed by the product owner — platform secrets stay in the deployment env, unchanged. GSM is repurposed to hold the per-Business PayHere credentials instead (one secret per Business). The boot-fetch mechanism, MASTER_ENCRYPTION_KEY requirement, and the 11 GSM platform shells built by this ticket set were reverted/deleted; `config/platformSecrets.js`, `test/platformSecrets.test.js`, `utils/encryption.js`, `test/encryption.test.js` are gone, `env.js` REQUIRED is restored, and `SECRET_MANAGER_CREDENTIALS` now only enables the per-Business credential store (ADR-0047, `services/secretManager.js`).

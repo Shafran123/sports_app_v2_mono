@@ -1,5 +1,4 @@
 const pool = require('../../db');
-const { encryptSecret } = require('../../utils/encryption');
 
 // ADR-0044: payment methods are per Business, not per venue. Tests that used
 // per-venue accepts_cash now enable the owner's Business payment methods.
@@ -39,22 +38,20 @@ async function enableBusinessCash(ownerUid, enabled = true) {
 }
 
 // PayHere: enabled + configured (the checkout gate requires credentials).
-// The merchant secret is stored encrypted exactly like production.
+// The secrets live in Secret Manager in production (ADR-0047); tests have no
+// Secret Manager, so resolution falls back to the platform env keys and the
+// row only carries the non-secret merchant/app IDs.
 async function enableBusinessPayhere(ownerUid, enabled = true) {
   await businessIdFor(ownerUid);
-  const merchantSecretEnc = encryptSecret('test-merchant-secret');
-  const appSecretEnc = encryptSecret('test-app-secret');
   await pool.query(
     `update business_payment_methods m set
        enabled = $2,
        merchant_id = coalesce(m.merchant_id, 'TEST_MERCHANT_ID'),
-       merchant_secret_enc = coalesce(m.merchant_secret_enc, $3),
        app_id = coalesce(m.app_id, 'TEST_APP_ID'),
-       app_secret_enc = coalesce(m.app_secret_enc, $4),
        updated_at = now()
      from businesses b, users u
      where m.business_id = b.id and b.owner_id = u.id and u.firebase_uid = $1 and m.method = 'payhere'`,
-    [ownerUid, enabled, merchantSecretEnc, appSecretEnc]
+    [ownerUid, enabled]
   );
 }
 

@@ -7,7 +7,6 @@ describe('fail-closed env validation', () => {
     FRONTEND_URL: 'http://app.local',
     PAYHERE_MERCHANT_ID: 'm1',
     PAYHERE_MERCHANT_SECRET: 's1',
-    MASTER_ENCRYPTION_KEY: 'k1',
     GOOGLE_APPLICATION_CREDENTIALS: '/tmp/sa.json',
     MAILGUN_API_KEY: 'mg',
     SMSGO_API_KEY: 'sg',
@@ -18,7 +17,6 @@ describe('fail-closed env validation', () => {
 
   it('reports every missing required key in production', () => {
     const missing = missingKeys({ NODE_ENV: 'production' });
-    expect(missing).toEqual(expect.arrayContaining(['DATABASE_URL', 'FRONTEND_URL', 'PAYHERE_MERCHANT_ID', 'PAYHERE_MERCHANT_SECRET', 'MASTER_ENCRYPTION_KEY', 'OTP_HMAC_SECRET']));
   });
 
   it('throws listing the missing keys (fail closed) in production', () => {

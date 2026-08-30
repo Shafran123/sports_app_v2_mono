@@ -19,3 +19,6 @@
 - [ ] Encryption service shared; TOTP tests still green
 - [ ] Cache read-through with TTL + invalidation hook; unit tests for miss/expiry/invalidation
 - [ ] README documents Doppler onboarding for new devs
+## Status (2026-08-30, superseded by ADR-0047)
+
+SUPERSEDED: no Doppler, no master key — per-Business PayHere credentials live in Google Secret Manager (one secret per Business, ADR-0047); the owner save/remove endpoints and resolution path in `services/businessPaymentMethods.js` were reworked accordingly.

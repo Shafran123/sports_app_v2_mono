@@ -1,32 +1,17 @@
 require('dotenv').config();
 
-// Resolve Platform Secrets from Google Secret Manager (ADR-0046) before config
-// validation, so REQUIRED checks see the injected values. Direct env still
-// wins per secret (local override); without SECRET_MANAGER_CREDENTIALS this is
-// a no-op and every secret is read from env.
-const { loadPlatformSecrets } = require('./config/platformSecrets');
+const { validate } = require('./config/env');
+validate();
 
-loadPlatformSecrets()
-  .then(({ injected, skipped }) => {
-    if (injected.length > 0) {
-      console.log(`Resolved ${injected.length} platform secret(s) from Google Secret Manager: ${injected.join(', ')}`);
-    }
-    if (skipped.length > 0) {
-      console.log(`Using ${skipped.length} platform secret(s) supplied directly in env: ${skipped.join(', ')}`);
-    }
+// Apply pending migrations at boot so deploys/restarts roll out schema + seed
+// changes automatically (no manual db:setup). Fails fast — a backend that
+// can't migrate must not serve against a stale schema. The HTTP server only
+// starts AFTER migrations complete: a request landing mid-migration would
+// hit half-swapped constraints (e.g. a payments insert under the new check
+// while the code still speaks the old value).
+const { runMigrations } = require('./scripts/migrate');
 
-    const { validate } = require('./config/env');
-    validate();
-
-    // Apply pending migrations at boot so deploys/restarts roll out schema + seed
-    // changes automatically (no manual db:setup). Fails fast — a backend that
-    // can't migrate must not serve against a stale schema. The HTTP server only
-    // starts AFTER migrations complete: a request landing mid-migration would
-    // hit half-swapped constraints (e.g. a payments insert under the new check
-    // while the code still speaks the old value).
-    const { runMigrations } = require('./scripts/migrate');
-    return runMigrations();
-  })
+runMigrations()
   .then(() => {
     const app = require('./app');
     const logger = require('./utils/logger');

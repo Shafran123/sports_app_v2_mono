@@ -1,13 +1,16 @@
-// Per-Business payment methods (ADR-0044): rows in business_payment_methods,
-// PayHere secrets encrypted at rest (utils/encryption), decrypted through an
-// in-memory cache with a short TTL so IPN verification and checkout-param
-// signing never block on decryption or the secrets manager. The cache is
-// invalidated on owner save/remove.
+// Per-Business payment methods (ADR-0044): rows in business_payment_methods
+// hold only the non-secret config — enabled flags and the merchant/app IDs.
+// The two secrets (merchant_secret, app_secret) live in Google Secret
+// Manager, one secret per Business (ADR-0047), resolved through an in-memory
+// cache with a short TTL so IPN verification and checkout-param signing
+// never block on the manager per request. The cache is invalidated on owner
+// save/remove. Without SECRET_MANAGER_CREDENTIALS (local dev, tests) the
+// platform env keys stand in for the business credentials.
 
 const pool = require('../db');
 const axios = require('axios');
 const logger = require('../utils/logger');
-const { encryptSecret, decryptSecret } = require('../utils/encryption');
+const secretManager = require('./secretManager');
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const cache = new Map(); // business_id -> { expires_at, creds }
@@ -118,11 +121,17 @@ async function setMethodEnabled(businessId, method, enabled) {
 }
 
 // Save the owner's PayHere credentials. The app pair is validated first; the
-// two secrets are encrypted at rest and never returned or logged.
+// secrets go to Google Secret Manager (one secret per Business), never the
+// DB — the row only keeps the non-secret IDs.
 async function savePayhereCredentials(businessId, { merchant_id, merchant_secret, app_id, app_secret }) {
   if (!merchant_id || !merchant_secret || !app_id || !app_secret) {
     const err = new Error('Merchant ID, merchant secret, app ID and app secret are all required');
     err.code = 'PAYHERE_CREDENTIALS_VALIDATION';
+    throw err;
+  }
+  if (!secretManager.isConfigured()) {
+    const err = new Error('Configure Google Secret Manager (SECRET_MANAGER_CREDENTIALS) to store PayHere credentials');
+    err.code = 'PAYHERE_SECRET_MANAGER_REQUIRED';
     throw err;
   }
   const appValid = await validateAppPair(app_id, app_secret);
@@ -131,22 +140,21 @@ async function savePayhereCredentials(businessId, { merchant_id, merchant_secret
     err.code = 'PAYHERE_APP_CREDENTIALS_INVALID';
     throw err;
   }
+  await secretManager.putCredentials(businessId, { merchant_id, merchant_secret, app_id, app_secret });
   await pool.query(
-    `insert into business_payment_methods (business_id, method, enabled, merchant_id, merchant_secret_enc, app_id, app_secret_enc)
-     values ($1, 'payhere', false, $2, $3, $4, $5)
+    `insert into business_payment_methods (business_id, method, enabled, merchant_id, app_id)
+     values ($1, 'payhere', false, $2, $3)
      on conflict (business_id, method) do update set
        merchant_id = excluded.merchant_id,
-       merchant_secret_enc = excluded.merchant_secret_enc,
        app_id = excluded.app_id,
-       app_secret_enc = excluded.app_secret_enc,
        updated_at = now()`,
-    [businessId, merchant_id.trim(), encryptSecret(merchant_secret), app_id.trim(), encryptSecret(app_secret)]
+    [businessId, merchant_id.trim(), app_id.trim()]
   );
   invalidateCredentials(businessId);
 }
 
-// "Remove keys" (Q14): deletes the stored credentials outright and flips
-// PayHere off — a separate action from merely disabling.
+// "Remove keys" (Q14): deletes the GSM secret outright and flips PayHere off
+// — a separate action from merely disabling.
 async function removePayhereCredentials(businessId) {
   const { rows } = await pool.query(
     `select enabled from business_payment_methods
@@ -161,10 +169,12 @@ async function removePayhereCredentials(businessId) {
     err.code = 'AT_LEAST_ONE_METHOD_REQUIRED';
     throw err;
   }
+  if (secretManager.isConfigured()) {
+    await secretManager.deleteCredentials(businessId);
+  }
   await pool.query(
     `update business_payment_methods set
-       enabled = false, merchant_id = null, merchant_secret_enc = null,
-       app_id = null, app_secret_enc = null, updated_at = now()
+       enabled = false, merchant_id = null, app_id = null, updated_at = now()
      where business_id = $1 and method = 'payhere'`,
     [businessId]
   );
@@ -180,24 +190,30 @@ function invalidateCredentials(businessId) {
 async function resolvePayhereCredentials(businessId) {
   const hit = cache.get(businessId);
   if (hit && hit.expires_at > Date.now()) return hit.creds;
-  const { rows } = await pool.query(
-    `select merchant_id, merchant_secret_enc, app_id, app_secret_enc
-     from business_payment_methods
-     where business_id = $1 and method = 'payhere'`,
-    [businessId]
-  );
   let creds = null;
-  if (rows.length > 0 && rows[0].merchant_id) {
-    creds = {
-      merchantId: rows[0].merchant_id,
-      merchantSecret: decryptSecret(rows[0].merchant_secret_enc),
-      appId: rows[0].app_id,
-      appSecret: decryptSecret(rows[0].app_secret_enc)
-    };
-    if (!creds.merchantSecret || !creds.appSecret) {
-      logger.error(`Business ${businessId}: payhere credentials stored but undecryptable`);
+  if (secretManager.isConfigured()) {
+    try {
+      creds = await secretManager.getCredentials(businessId);
+    } catch (error) {
+      // Transient manager failure: fail-closed for this request but cache
+      // nothing, so the next call retries instead of serving a stale "no
+      // credentials" verdict for the TTL.
+      logger.error(`Business ${businessId}: payhere credentials unavailable from Secret Manager: ${error.message}`);
+      return null;
+    }
+    if (creds && (!creds.merchantId || !creds.merchantSecret)) {
+      logger.error(`Business ${businessId}: payhere credentials stored but malformed`);
       creds = null;
     }
+  } else {
+    // No Secret Manager (local dev, tests): the platform env keys stand in
+    // for the business credentials — the same values checkout/IPN tests sign
+    // with (setupFiles.mjs). Production always configures GSM, so this path
+    // never resolves real business credentials to the platform gateway.
+    creds = {
+      merchantId: process.env.PAYHERE_MERCHANT_ID,
+      merchantSecret: process.env.PAYHERE_MERCHANT_SECRET
+    };
   }
   cache.set(businessId, { expires_at: Date.now() + CACHE_TTL_MS, creds });
   return creds;

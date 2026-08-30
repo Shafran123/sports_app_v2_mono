@@ -16,3 +16,6 @@
 - [ ] Endpoints with the guard, validation, and encryption semantics above
 - [ ] Auth: owner-only mutations; 403 otherwise
 - [ ] Tests: toggle guard, invalid app creds rejected, remove-keys semantics, no plaintext in responses
+## Status (2026-08-30, amended by ADR-0047)
+
+"Encryption semantics" no longer apply — save/remove now round-trip Google Secret Manager (per-Business secret) and the row stores only the non-secret IDs; without SECRET_MANAGER_CREDENTIALS the save/remove endpoints fail with PAYHERE_SECRET_MANAGER_REQUIRED.

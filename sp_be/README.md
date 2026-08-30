@@ -31,27 +31,36 @@ Express.js API for the sports venue booking marketplace (MySlot.LK).
 
 See `.env.example`. Key variables: `DATABASE_URL`, `GOOGLE_APPLICATION_CREDENTIALS`
 (Firebase service account path), `PAYHERE_MERCHANT_ID`, `PAYHERE_MERCHANT_SECRET`,
-`PAYHERE_AUTHORIZATION` (for refunds), `MASTER_ENCRYPTION_KEY` (encrypts per-Business
-PayHere credentials at rest — required in every non-test environment), `PAYHERE_NOTIFY_URL`,
+`PAYHERE_AUTHORIZATION` (for refunds), `PAYHERE_NOTIFY_URL`,
 `RESEND_API_KEY`, `FROM_EMAIL`, `FRONTEND_URL`, `JWT_SECRET` (test tokens only),
 `FCM_ENABLED` (optional).
 
-## Secrets (Google Secret Manager, ADR-0046)
+## Secrets (Google Secret Manager, ADR-0047)
 
-In production the **Platform Secrets** — platform PayHere keys, `MASTER_ENCRYPTION_KEY`,
-Mailgun, SMSGo, OTP HMAC, Supabase service-role key, Firebase service account — are
-resolved from **GCP Secret Manager** (`myslot-preprod`) once at boot, before config
-validation, and injected into `process.env`. Direct env values always win (per-secret
-local override).
+The **platform secrets** — platform PayHere keys, Mailgun, SMSGo, OTP HMAC,
+Supabase service-role key, Firebase service account — stay in the deployment env
+(`.env` locally, Railway env vars), unchanged.
 
-- Enabled by `SECRET_MANAGER_CREDENTIALS` (base64 service-account JSON, `secretAccessor`
-  role only). Deliberately its **own** var — `GOOGLE_APPLICATION_CREDENTIALS` is consumed
-  by firebase-admin. Unset ⇒ no-op, all secrets read from env (local dev / tests).
-- `FIREBASE_SERVICE_ACCOUNT` is stored in GSM **base64-encoded** (the value the env var
-  used to hold).
-- Fail-closed: if GSM is configured but a platform secret can't be resolved, boot aborts.
-- Per-Business PayHere credentials are **tenant data** (encrypted in Postgres) and never
-  pass through this mechanism; `MASTER_ENCRYPTION_KEY` is the only key they depend on.
+The **per-Business PayHere credentials** a Venue Owner supplies for their own
+gateway (merchant secret, app secret) live in **GCP Secret Manager**
+(`myslot-preprod`): one secret per Business named `business-payhere-<businessId>`,
+payload the four PayHere fields as JSON. The DB keeps only the non-secret IDs
+(`merchant_id`, `app_id`), so no credential material ever rides in Postgres,
+backups, or test copies.
+
+- Enabled by `SECRET_MANAGER_CREDENTIALS` (base64 or raw service-account JSON).
+  Deliberately its **own** var — `GOOGLE_APPLICATION_CREDENTIALS` is consumed by
+  firebase-admin. Project id from `SECRET_MANAGER_PROJECT` (default
+  `myslot-preprod`).
+- Saving credentials adds a new secret version (rotation without redeploy);
+  "remove keys" deletes the secret. The owner save/remove endpoints refuse to
+  run without `SECRET_MANAGER_CREDENTIALS`.
+- Without `SECRET_MANAGER_CREDENTIALS` (local dev, tests) credential resolution
+  falls back to the platform env PayHere keys — checkout and webhook tests run
+  against those, and production never takes this path.
+- Credentials resolve through a 5-minute in-memory cache (invalidated on owner
+  save/remove) so IPN verification and checkout signing never block on GSM per
+  request; a GSM outage fails the request closed.
 
 ## Booking Engine
 

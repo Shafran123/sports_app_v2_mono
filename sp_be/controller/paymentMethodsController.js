@@ -13,7 +13,7 @@ const {
   savePayhereCredentials,
   removePayhereCredentials
 } = require('../services/businessPaymentMethods');
-const { maskLast4 } = require('../utils/encryption');
+const { maskLast4 } = require('../utils/format');
 
 async function requireBusiness(req, res) {
   const business = await businessService.getByOwnerId(req.user.id);

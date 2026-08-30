@@ -22,3 +22,7 @@
 ## Comments
 
 Spawned from grilling session 2026-08-30 (ADR-0046). Human-in-the-loop: needs access to GCP `myslot-preprod` and the Railway project.
+
+## Status (2026-08-30, superseded by ADR-0047)
+
+SUPERSEDED: the platform-secret cutover never happened — the 11 GSM platform shells were DELETED (no versions were ever uploaded). The remaining cutover work is now: owner save flow writes per-Business secrets (already working end-to-end in dev — business `2c640e5f-ee54-4edc-a26d-36df2917a036` was backfilled to `business-payhere-2c640e5f-ee54-4edc-a26d-36df2917a036`), then add `SECRET_MANAGER_CREDENTIALS` (base64 of `~/.config/myslot/sm-secret-reader.json`) to Railway env and re-verify an owner save + checkout + IPN on the deployed backend. SA `sm-secret-reader` now holds `roles/secretmanager.admin` on the project.

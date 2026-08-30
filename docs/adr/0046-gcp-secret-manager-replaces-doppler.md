@@ -1,6 +1,8 @@
 # 0046 — Google Secret Manager replaces Doppler as the backend secrets manager
 
-**Status:** accepted
+**Status:** superseded by [ADR-0047](./0047-business-payhere-credentials-in-secret-manager.md)
+
+This ADR was accepted and implemented, then reversed. It moved the **platform** operator secrets into Google Secret Manager at boot. The product owner rejected that: platform secrets must stay in the deployment env, unchanged. The GSM investment was kept but redirected: per-Business PayHere credentials move into GSM as per-Business secrets (ADR-0047), the opposite of this ADR's "tenant data stays in Postgres" ruling. Everything below is retained as the record of what was built and then reverted.
 
 ## Context
 

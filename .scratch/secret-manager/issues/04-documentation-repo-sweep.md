@@ -23,3 +23,7 @@ Spawned from grilling session 2026-08-30 (ADR-0046).
 ## Comments
 
 Implemented 2026-08-30 in commit `6a4fef8`. Agent-able work complete; ticket 03 (human-run GCP/Railway cutover) remains open.
+
+## Status (2026-08-30, superseded by ADR-0047)
+
+SUPERSEDED: ADR-0046 is marked superseded by ADR-0047 (per-Business creds in GSM, platform env unchanged); ADR-0044 amended; CONTEXT.md **Business PayHere Credentials** / **Platform Secret** re-termed; `.env.example` + `sp_be/README.md` rewritten. No further sweep needed.

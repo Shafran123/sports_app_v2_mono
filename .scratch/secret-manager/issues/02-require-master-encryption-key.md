@@ -24,3 +24,7 @@ Spawned from grilling session 2026-08-30 (ADR-0046).
 ## Comments
 
 Implemented 2026-08-30 in commit `6a4fef8`. Agent-able work complete; ticket 03 (human-run GCP/Railway cutover) remains open.
+
+## Status (2026-08-30, superseded by ADR-0047)
+
+SUPERSEDED: no master key exists anymore — per-Business PayHere credentials live in Google Secret Manager as plaintext payloads per Business (ADR-0047); nothing is encrypted at rest in the DB and `MASTER_ENCRYPTION_KEY` was removed from REQUIRED and everywhere else. siteTotp kept its own key chain throughout.
