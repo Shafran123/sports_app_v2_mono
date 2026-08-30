@@ -46,15 +46,19 @@ on conflict (business_id, method) do nothing;
 
 -- ---------------------------------------------------------------------------
 -- 2) Values: retire `online` in favour of `payhere`; add `card`.
+--    Order matters: the OLD constraint only allows (online, cash), so the
+--    value update must run AFTER the old constraint is dropped and BEFORE
+--    the new one is added — otherwise real 'online' rows violate it.
 -- ---------------------------------------------------------------------------
+alter table bookings drop constraint if exists bookings_payment_method_check;
+alter table payments drop constraint if exists payments_payment_method_check;
+
 update bookings set payment_method = 'payhere' where payment_method = 'online';
 update payments set payment_method = 'payhere' where payment_method = 'online';
 
-alter table bookings drop constraint if exists bookings_payment_method_check;
 alter table bookings add constraint bookings_payment_method_check
   check (payment_method in ('cash', 'payhere'));
 
-alter table payments drop constraint if exists payments_payment_method_check;
 alter table payments add constraint payments_payment_method_check
   check (payment_method in ('cash', 'payhere', 'card'));
 
