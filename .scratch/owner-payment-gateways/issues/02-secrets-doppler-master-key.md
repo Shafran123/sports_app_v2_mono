@@ -1,5 +1,9 @@
 # 02 — Secrets: Doppler + master key + credential cache
 
+**Status:** wontfix
+
+> **Superseded 2026-08-30** — Doppler is replaced by Google Secret Manager (ADR-0046). The master-key + credential-cache parts are already shipped via the main effort (ADR-0044, commit `a007043`). The remaining secrets work now lives in `.scratch/secret-manager/` (tickets 01–04). Do not implement as written.
+
 **What to build:** the secrets layer that ADR-0044's credential storage depends on — no secrets in the repo, all backend env in Doppler, per-owner PayHere secrets encrypted at rest, and IPN verification never blocking on the secrets manager.
 
 - **Doppler setup**: project with production/staging/preview environments; move all backend env (DATABASE_URL, PAYHERE_*, MAILGUN_*, SMSGO_*, OTP_HMAC_SECRET, JWT_SECRET, SUPABASE_*, Firebase cred) out of `.env`/Railway config; wire Doppler into Railway (nixpacks) via the Doppler integration or run script. Document onboarding in `sp_be/README.md`.

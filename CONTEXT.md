@@ -12,6 +12,10 @@ _Avoid_: product name, brand (bare)
 The Venue Owner's public brand and portfolio — the entity that owns the **Business Brand** and the Booking Widget Instances. Every Venue belongs to a Business, and a Business is owned by exactly one Venue Owner; a Business aggregates all of that Owner's Venues. Distinct from the **Venue Owner** (the account that manages it) and from the platform **Brand Name** (the platform's own display name).
 _Avoid_: brand (bare), company, organization, storefront
 
+**Business PayHere Credentials**:
+The four PayHere fields a Venue Owner supplies for their Business's PayHere **Payment Method** — merchant ID, merchant secret, app ID, app secret (the app pair drives refunds' OAuth). They are the Business's own gateway identity: money lands in the Business's PayHere account, never the platform's. Tenant data: stored on the Business's Payment Method row, the two secrets encrypted at rest while the IDs stay plaintext (they are not secret). Distinct from **Platform Secrets** (what the platform runs on) and from the platform gateway's keys (used only for Events and legacy refunds).
+_Avoid_: payhere keys, gateway credentials (bare)
+
 **Widget Instance**:
 One embeddable booking surface published by a **Business** — carries its own **Embed Key**, a **Default Venue**, a "let customers choose venue" toggle, an allowed-domains list, and an enabled state. A Business may publish several Instances (e.g. one per Venue, or one per marketing page), each pinned to a different Default Venue. Every Instance renders the Business's Brand tokens. Distinct from the Booking Widget capability (the Instance is one deployment of it).
 _Avoid_: widget (bare)
@@ -78,6 +82,10 @@ _Avoid_: legal pages, terms page, privacy page
 **Platform Legal Pages**:
 The platform's own legal and help pages on the marketing site — Privacy Policy, Terms & Conditions, and FAQ — served from the landing app at `/privacy`, `/terms`, and `/faq`, and linked from the landing footer. Distinct from **Site Policies**, which are per-Business legal text on a **Dedicated Site**.
 _Avoid_: legal pages (bare), site policies (the per-Business ones)
+
+**Platform Secret**:
+An operator secret the platform itself runs on — platform PayHere keys, the encryption master key, Mailgun, SMSGo, OTP HMAC, Supabase service-role key, Firebase service account. Managed outside the repo (Google Secret Manager) and injected at boot; never tenant data, never the per-Business **Business PayHere Credentials**.
+_Avoid_: env var (bare), credentials (ambiguous)
 
 **Analytics Consent**:
 A visitor's recorded choice — Accept or Reject — on whether analytics may run for their visit, captured before any analytics initialize and withdrawable afterwards. Recorded per origin in local storage (the platform sets no cookies, so no cookie is stored); versioned so a change to the privacy policy re-prompts visitors who previously chose. Covers analytics only; nothing else on the platform is consent-gated. Distinct from **Site Policies** and **Platform Legal Pages**, which are legal text rather than recorded choices.

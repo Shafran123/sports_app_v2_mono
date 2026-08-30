@@ -31,8 +31,27 @@ Express.js API for the sports venue booking marketplace (MySlot.LK).
 
 See `.env.example`. Key variables: `DATABASE_URL`, `GOOGLE_APPLICATION_CREDENTIALS`
 (Firebase service account path), `PAYHERE_MERCHANT_ID`, `PAYHERE_MERCHANT_SECRET`,
-`PAYHERE_AUTHORIZATION` (for refunds), `PAYHERE_NOTIFY_URL`, `RESEND_API_KEY`,
-`FROM_EMAIL`, `FRONTEND_URL`, `JWT_SECRET` (test tokens only), `FCM_ENABLED` (optional).
+`PAYHERE_AUTHORIZATION` (for refunds), `MASTER_ENCRYPTION_KEY` (encrypts per-Business
+PayHere credentials at rest — required in every non-test environment), `PAYHERE_NOTIFY_URL`,
+`RESEND_API_KEY`, `FROM_EMAIL`, `FRONTEND_URL`, `JWT_SECRET` (test tokens only),
+`FCM_ENABLED` (optional).
+
+## Secrets (Google Secret Manager, ADR-0046)
+
+In production the **Platform Secrets** — platform PayHere keys, `MASTER_ENCRYPTION_KEY`,
+Mailgun, SMSGo, OTP HMAC, Supabase service-role key, Firebase service account — are
+resolved from **GCP Secret Manager** (`myslot-preprod`) once at boot, before config
+validation, and injected into `process.env`. Direct env values always win (per-secret
+local override).
+
+- Enabled by `SECRET_MANAGER_CREDENTIALS` (base64 service-account JSON, `secretAccessor`
+  role only). Deliberately its **own** var — `GOOGLE_APPLICATION_CREDENTIALS` is consumed
+  by firebase-admin. Unset ⇒ no-op, all secrets read from env (local dev / tests).
+- `FIREBASE_SERVICE_ACCOUNT` is stored in GSM **base64-encoded** (the value the env var
+  used to hold).
+- Fail-closed: if GSM is configured but a platform secret can't be resolved, boot aborts.
+- Per-Business PayHere credentials are **tenant data** (encrypted in Postgres) and never
+  pass through this mechanism; `MASTER_ENCRYPTION_KEY` is the only key they depend on.
 
 ## Booking Engine
 

@@ -6,15 +6,12 @@
 
 const crypto = require('node:crypto');
 
-// Master key from MASTER_ENCRYPTION_KEY (a Doppler secret, never the repo),
-// falling back down the existing secret chain for dev/tests.
+// Master key from MASTER_ENCRYPTION_KEY (a Platform Secret in Google Secret
+// Manager, ADR-0046 — required at boot, no fallback). Tests use a fixed dev
+// key so the suite never depends on process env. siteTotp keeps its own key
+// chain unchanged (existing stored TOTP secrets must keep decrypting).
 function encryptionKey() {
-  const raw =
-    process.env.MASTER_ENCRYPTION_KEY ||
-    process.env.TOTP_ENCRYPTION_KEY ||
-    process.env.OTP_HMAC_SECRET ||
-    process.env.JWT_SECRET ||
-    'payment-cred-dev-key';
+  const raw = process.env.NODE_ENV === 'test' ? 'payment-cred-test-dev-key' : process.env.MASTER_ENCRYPTION_KEY;
   return crypto.createHash('sha256').update(raw).digest();
 }
 
