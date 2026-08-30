@@ -20,3 +20,7 @@
 ## Comments
 
 Spawned from grilling session 2026-08-30 (ADR-0046).
+
+## Comments
+
+Implemented 2026-08-30 in commit `6a4fef8`. Agent-able work complete; ticket 03 (human-run GCP/Railway cutover) remains open.
