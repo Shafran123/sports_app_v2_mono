@@ -119,6 +119,17 @@ export const BrandSchema = z.object({
 });
 export type VenueBrand = z.infer<typeof BrandSchema>;
 
+/* ---------- Payment methods (ADR-0044) ---------- */
+
+// The per-Business payment summary a public venue payload carries (checkout
+// gate mirror). Never carries secrets.
+export const PaymentMethodsSummarySchema = z.object({
+  cash_enabled: z.boolean().optional(),
+  payhere_enabled: z.boolean().optional(),
+  payhere_configured: z.boolean().optional()
+});
+export type PaymentMethodsSummary = z.infer<typeof PaymentMethodsSummarySchema>;
+
 export const VenueSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -135,14 +146,15 @@ export const VenueSchema = z.object({
   cancellation_policy: z.string().nullable(),
   min_price: z.number().nullable().optional(),
   max_price: z.number().nullable().optional(),
-  accepts_cash: z.boolean().optional(),
   venue_tax_rate: z.number().optional(),
   advance_days: z.number().optional(),
   cancel_cutoff_hours: z.number().optional(),
   sports: z.array(z.string()).optional(),
   visibility: z.enum(["public", "private"]).optional(),
   slug: z.string().nullable().optional(),
-  brand: BrandSchema.optional()
+  brand: BrandSchema.optional(),
+  // ADR-0044: the venue's Business payment methods (checkout gate mirror).
+  payment_methods: PaymentMethodsSummarySchema.optional()
 });
 export type Venue = z.infer<typeof VenueSchema>;
 
@@ -552,6 +564,56 @@ export const BookingSettingsSchema = z.object({
 });
 export type BookingSettings = z.infer<typeof BookingSettingsSchema>;
 
+/* ---------- Payment methods (ADR-0044) ---------- */
+
+// Per-Business payment configuration: the enabled methods a Booking may be
+// paid with + whether PayHere has working credentials. Never carries secrets.
+export const PaymentMethodsSchema = z.object({
+  cash: z.object({
+    enabled: z.boolean()
+  }),
+  payhere: z.object({
+    enabled: z.boolean(),
+    configured: z.boolean(),
+    app_last4: z.string().nullable().optional(),
+    state: z
+      .enum(["not_configured", "awaiting_first_transaction", "configured"])
+      .optional()
+  })
+});
+export type PaymentMethods = z.infer<typeof PaymentMethodsSchema>;
+
+export const PayhereCredentialsInputSchema = z.object({
+  merchant_id: z.string(),
+  merchant_secret: z.string(),
+  app_id: z.string(),
+  app_secret: z.string()
+});
+export type PayhereCredentialsInput = z.infer<typeof PayhereCredentialsInputSchema>;
+
+export const AdminPaymentSummarySchema = z.object({
+  businesses: z.array(
+    z.object({
+      business_id: z.string(),
+      business_name: z.string(),
+      cash_enabled: z.boolean(),
+      payhere_enabled: z.boolean(),
+      payhere_configured: z.boolean(),
+      app_id_last4: z.string().nullable().optional()
+    })
+  ),
+  collection: z.array(
+    z.object({
+      business_id: z.string(),
+      day: z.string(),
+      payhere_payments: z.number(),
+      payhere_revenue_net: z.number(),
+      payhere_tax: z.number()
+    })
+  )
+});
+export type AdminPaymentSummary = z.infer<typeof AdminPaymentSummarySchema>;
+
 export const CheckoutResultSchema = z.object({
   hold_id: z.string().optional(),
   idempotency_key: z.string().optional(),
@@ -569,9 +631,20 @@ export const ManualBookingInputSchema = z.object({
   end_at: z.string(),
   player_name: z.string().optional(),
   player_phone: z.string().optional(),
-  amount: z.number().optional()
+  amount: z.number().optional(),
+  // ADR-0044 (ticket 11): how the owner collects a walk-in payment —
+  // cash (default), card (terminal, recorded channel), or payment_link.
+  paid_by: z.enum(["cash", "card", "payment_link"]).optional()
 });
 export type ManualBookingInput = z.infer<typeof ManualBookingInputSchema>;
+
+// The manual-booking result may carry a payment_link when paid_by is
+// payment_link (ADR-0044, ticket 11) — sent by SMS by the server, but also
+// returned so the owner can copy it (e.g. WhatsApp).
+export const ManualBookingResultSchema = BookingSchema.extend({
+  payment_link: z.string().optional()
+});
+export type ManualBookingResult = z.infer<typeof ManualBookingResultSchema>;
 
 /* ---------- Events ---------- */
 
@@ -732,7 +805,10 @@ export const AdminReportsSchema = z.object({
     })
   ),
   payment_split: z.object({
-    online: z.object({ bookings: z.number(), revenue: z.number() }),
+    // `online` remains accepted for pre-migration API payloads; the server
+    // now sends `payhere` (ADR-0044).
+    payhere: z.object({ bookings: z.number(), revenue: z.number() }).optional(),
+    online: z.object({ bookings: z.number(), revenue: z.number() }).optional(),
     cash: z.object({ bookings: z.number(), revenue: z.number() })
   }),
   events: z.object({ registrations: z.number(), revenue: z.number() })

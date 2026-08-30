@@ -93,7 +93,8 @@ const baseConfig = {
   amenities: [],
   rules: null,
   cancellation_policy: null,
-  accepts_cash: true,
+  // ADR-0044: the widget's methods come from the Business config.
+  payment_methods: { cash_enabled: true, payhere_enabled: false, payhere_configured: false },
   venue_tax_rate: 0,
   advance_days: 14,
   cancel_cutoff_hours: 2,

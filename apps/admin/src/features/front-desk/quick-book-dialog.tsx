@@ -21,7 +21,9 @@ import { useManualBooking } from "@/features/admin-calendar/use-manual-booking";
 // Front-desk quick book mirrors the player flow (ADR-0033): pick a duration
 // first, then tap the start time and a contiguous run of slots is selected.
 // A walk-in can then override the amount (offers / negotiated price) before
-// confirming.
+// confirming. ADR-0044 (ticket 11): how the owner collects is recorded —
+// cash (default), card at the terminal, or a PayHere payment link sent by SMS.
+type Collection = "cash" | "card" | "payment_link";
 export function QuickBookDialog({
   open,
   onOpenChange,
@@ -40,6 +42,8 @@ export function QuickBookDialog({
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [amount, setAmount] = useState("");
+  const [collection, setCollection] = useState<Collection>("cash");
+  const [link, setLink] = useState("");
 
   useEffect(() => {
     if (open) {
@@ -51,6 +55,8 @@ export function QuickBookDialog({
       setName("");
       setPhone("");
       setAmount("");
+      setCollection("cash");
+      setLink("");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -115,10 +121,17 @@ export function QuickBookDialog({
         end_at: summary.endAt!,
         player_name: name.trim() || undefined,
         player_phone: phone.trim() || undefined,
-        amount: Number(amount)
+        amount: Number(amount),
+        paid_by: collection
       },
       {
-        onSuccess: () => {
+        onSuccess: (result) => {
+          // ADR-0044: a payment link is SMSed to the guest; surface it here
+          // too so the owner can share it (e.g. WhatsApp) if the SMS fails.
+          if (result?.payment_link) {
+            setLink(result.payment_link);
+            return;
+          }
           onOpenChange(false);
         }
       }
@@ -249,49 +262,93 @@ export function QuickBookDialog({
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <label htmlFor="qb-name" className="text-xs font-semibold uppercase tracking-wide text-ink-3">
-                Player name (optional)
-              </label>
-              <Input id="qb-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Walk-in" />
+          {link ? (
+            <div className="space-y-3 rounded-2xl border border-success/40 bg-success-light/40 px-4 py-3">
+              <p className="text-sm font-medium text-success">Payment link sent by SMS — share it if needed</p>
+              <div className="flex gap-2">
+                <Input readOnly value={link} aria-label="Payment link" className="font-mono text-xs" />
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    void navigator.clipboard?.writeText(link);
+                  }}
+                >
+                  Copy
+                </Button>
+              </div>
+              <Button size="sm" onClick={() => onOpenChange(false)}>
+                Done
+              </Button>
             </div>
-            <div className="space-y-1.5">
-              <label htmlFor="qb-phone" className="text-xs font-semibold uppercase tracking-wide text-ink-3">
-                Phone (optional)
-              </label>
-              <Input id="qb-phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="07X XXX XXXX" />
-              {phone.trim() && (
-                <p className="text-xs text-ink-3">Their bill link will be sent by SMS.</p>
+          ) : (
+            <>
+              <div className="space-y-1.5">
+                <label htmlFor="qb-collection" className="text-xs font-semibold uppercase tracking-wide text-ink-3">
+                  Collect payment
+                </label>
+                <SelectSheet id="qb-collection" value={collection} onChange={(e) => setCollection(e.target.value as Collection)}>
+                  <option value="cash">Cash at the venue</option>
+                  <option value="card">Paid by card (terminal)</option>
+                  <option value="payment_link">Send payment link (SMS)</option>
+                </SelectSheet>
+                {collection === "payment_link" && !phone.trim() && (
+                  <p className="text-xs text-ink-3">A payment link needs the player&apos;s phone — SMS delivers it.</p>
+                )}
+                {collection === "card" && (
+                  <p className="text-xs text-ink-3">Records the payment as collected by card — no gateway involved.</p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label htmlFor="qb-name" className="text-xs font-semibold uppercase tracking-wide text-ink-3">
+                    Player name (optional)
+                  </label>
+                  <Input id="qb-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Walk-in" />
+                </div>
+                <div className="space-y-1.5">
+                  <label htmlFor="qb-phone" className="text-xs font-semibold uppercase tracking-wide text-ink-3">
+                    Phone {collection === "payment_link" ? "(required)" : "(optional)"}
+                  </label>
+                  <Input id="qb-phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="07X XXX XXXX" />
+                  {phone.trim() && collection !== "payment_link" && (
+                    <p className="text-xs text-ink-3">Their bill link will be sent by SMS.</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label htmlFor="qb-amount" className="text-xs font-semibold uppercase tracking-wide text-ink-3">
+                  Amount (LKR)
+                </label>
+                <Input id="qb-amount" type="number" min={0} value={amount} onChange={(e) => setAmount(e.target.value)} />
+                {summary.total > 0 && Number(amount) !== summary.total && Number(amount) > 0 && (
+                  <p className="text-xs text-ink-3">
+                    Default slot price: {formatLkr(summary.total)}
+                    {Number(amount) < summary.total ? " (offer applied)" : ""}
+                  </p>
+                )}
+              </div>
+
+              {failure && (
+                <div className="rounded-2xl bg-error-light px-4 py-3 text-sm text-error">{failure.message}</div>
               )}
-            </div>
-          </div>
 
-          <div className="space-y-1.5">
-            <label htmlFor="qb-amount" className="text-xs font-semibold uppercase tracking-wide text-ink-3">
-              Amount (LKR)
-            </label>
-            <Input id="qb-amount" type="number" min={0} value={amount} onChange={(e) => setAmount(e.target.value)} />
-            {summary.total > 0 && Number(amount) !== summary.total && Number(amount) > 0 && (
-              <p className="text-xs text-ink-3">
-                Default slot price: {formatLkr(summary.total)}
-                {Number(amount) < summary.total ? " (offer applied)" : ""}
-              </p>
-            )}
-          </div>
-
-          {failure && (
-            <div className="rounded-2xl bg-error-light px-4 py-3 text-sm text-error">{failure.message}</div>
+              <div className="flex justify-end gap-2 pt-1">
+                <Button variant="secondary" onClick={() => onOpenChange(false)} disabled={manual.isPending}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={submit}
+                  loading={manual.isPending}
+                  disabled={!canSubmit || (collection === "payment_link" && !phone.trim())}
+                >
+                  Confirm booking
+                </Button>
+              </div>
+            </>
           )}
-
-          <div className="flex justify-end gap-2 pt-1">
-            <Button variant="secondary" onClick={() => onOpenChange(false)} disabled={manual.isPending}>
-              Cancel
-            </Button>
-            <Button onClick={submit} loading={manual.isPending} disabled={!canSubmit}>
-              Confirm booking
-            </Button>
-          </div>
         </div>
       </DialogContent>
     </Dialog>

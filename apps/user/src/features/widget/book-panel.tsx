@@ -12,7 +12,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import * as QRCode from "qrcode";
-import { bookings, toApiFailure } from "@myslot/api";
+import { bookings, submitPayHere, toApiFailure } from "@myslot/api";
 import { Button, Card, Dialog, DialogContent, ErrorState, Skeleton } from "@myslot/ui";
 import { cn, dayjs, formatDuration, formatLkr, formatTime12, toDateKey, uuidV4 } from "@myslot/utils";
 import type { CourtAvailability, Slot, WidgetConfig } from "@myslot/types";
@@ -31,6 +31,10 @@ import { WidgetIdentity } from "./widget-identity";
 
 type Stage = "pick" | "booked";
 
+// ADR-0044: what this widget's Business offers. `online` stays a legacy
+// alias on the wire; the widget always speaks `payhere` now.
+type WidgetPaymentMethod = "cash" | "payhere";
+
 export function BookPanel({ venue, instanceKey, siteHostname }: { venue: WidgetConfig; instanceKey?: string; siteHostname?: string | null }) {
   const { user, setUser, logout, loading } = useAuth();
   const [stage, setStage] = useState<Stage>("pick");
@@ -41,6 +45,8 @@ export function BookPanel({ venue, instanceKey, siteHostname }: { venue: WidgetC
   // The identity modal gates the confirm step for guests and unverified
   // users (ADR-0033); the picker itself is never locked.
   const [identityOpen, setIdentityOpen] = useState(false);
+  const [method, setMethod] = useState<WidgetPaymentMethod>("cash");
+  const [paying, setPaying] = useState(false);
 
   // Verified Email gate: a widget booking needs both a verified phone and a
   // verified email — the QR must reach an inbox (ticket 04). Checked at the
@@ -60,7 +66,7 @@ export function BookPanel({ venue, instanceKey, siteHostname }: { venue: WidgetC
         start_at: summary.startAt!,
         end_at: summary.endAt!,
         idempotency_key: checkoutKey,
-        payment_method: "cash",
+        payment_method: effectiveMethod,
         player_phone: user?.phone ?? undefined,
         widget_instance_key: instanceKey,
         // ADR-0030: on an owner's surface the booking carries the site
@@ -78,7 +84,23 @@ export function BookPanel({ venue, instanceKey, siteHostname }: { venue: WidgetC
   const handleConfirm = () => {
     if (checkout.isPending || checkout.data) return;
     checkout.mutate(undefined, {
-      onSuccess: () => setStage("booked")
+      onSuccess: (result) => {
+        // PayHere (ADR-0044): the checkout returns a hold + payment params —
+        // submit the hidden form so the customer pays. PayHere's redirect
+        // returns to the widget's embed URL, where the booking shows under
+        // "Your bookings" (the webhook confirms it server-side).
+        if (method === "payhere" && result?.payment_params) {
+          setPaying(true);
+          submitPayHere(result.payment_params, {
+            first_name: user?.name,
+            last_name: user?.name,
+            email: user?.email,
+            phone: user?.phone
+          });
+          return;
+        }
+        setStage("booked");
+      }
     });
   };
 
@@ -87,13 +109,31 @@ export function BookPanel({ venue, instanceKey, siteHostname }: { venue: WidgetC
   }
 
   const courts = availabilityQuery.data?.courts ?? [];
-  const acceptsCash = !!venue.accepts_cash;
+  const methods = venue.payment_methods;
+  const cashEnabled = !!methods?.cash_enabled;
+  const payhereEnabled = !!methods?.payhere_enabled && !!methods?.payhere_configured;
+  const anyMethod = cashEnabled || payhereEnabled;
+// ADR-0044: the effective method must be one the Business actually offers —
+// a stale selection (or the default) falls back to the other method so a
+// payhere-only Business never submits cash and vice versa.
+const effectiveMethod: WidgetPaymentMethod =
+  method === "payhere"
+    ? payhereEnabled
+      ? "payhere"
+      : cashEnabled
+        ? "cash"
+        : method
+    : cashEnabled
+      ? "cash"
+      : payhereEnabled
+        ? "payhere"
+        : method;
 
   return (
     <div className="space-y-4">
-      {!acceptsCash && (
+      {!anyMethod && (
         <div className="rounded-2xl border border-warning/40 bg-warning-light px-4 py-3 text-sm text-warning">
-          This venue doesn&apos;t accept pay-at-venue yet — online booking is coming soon.
+          This venue isn&apos;t accepting bookings right now — no payment method is enabled.
         </div>
       )}
 
@@ -212,10 +252,55 @@ export function BookPanel({ venue, instanceKey, siteHostname }: { venue: WidgetC
             <Button className="mt-4 w-full" size="lg" onClick={() => setIdentityOpen(true)}>
               Verify to confirm
             </Button>
-          ) : (
-            <Button className="mt-4 w-full" size="lg" disabled={!acceptsCash} loading={checkout.isPending} onClick={handleConfirm}>
-              {checkout.isPending ? "Booking…" : "Confirm booking — pay at venue"}
+          ) : !anyMethod ? (
+            <Button className="mt-4 w-full" size="lg" disabled>
+              Booking unavailable
             </Button>
+          ) : (
+            <>
+              {cashEnabled && payhereEnabled && (
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={effectiveMethod === "cash"}
+                    onClick={() => setMethod("cash")}
+                    className={`rounded-2xl border px-3 py-2 text-sm font-semibold transition-colors ${
+                      effectiveMethod === "cash"
+                        ? "border-primary bg-primary-light text-primary"
+                        : "border-border bg-surface text-ink hover:border-ink-3"
+                    }`}
+                  >
+                    Pay at venue
+                  </button>
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={effectiveMethod === "payhere"}
+                    onClick={() => setMethod("payhere")}
+                    className={`rounded-2xl border px-3 py-2 text-sm font-semibold transition-colors ${
+                      effectiveMethod === "payhere"
+                        ? "border-primary bg-primary-light text-primary"
+                        : "border-border bg-surface text-ink hover:border-ink-3"
+                    }`}
+                  >
+                    Pay online
+                  </button>
+                </div>
+              )}
+              <Button
+                className="mt-4 w-full"
+                size="lg"
+                loading={checkout.isPending || paying}
+                onClick={handleConfirm}
+              >
+                {paying
+                  ? "Redirecting to PayHere…"
+                  : effectiveMethod === "payhere"
+                    ? "Confirm booking — pay online"
+                    : "Confirm booking — pay at venue"}
+              </Button>
+            </>
           )}
         </div>
       )}

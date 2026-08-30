@@ -127,8 +127,8 @@ describe('booking read authorization & QR token disclosure', () => {
     const start = `2099-01-01T${String(hour).padStart(2, '0')}:00:00+05:30`;
     const end = `2099-01-01T${String(hour + 1).padStart(2, '0')}:00:00+05:30`;
     const { rows } = await pool.query(
-      `insert into bookings (court_id, user_id, start_at, end_at, price_per_slot, total_price, status, qr_token, idempotency_key)
-       values ($1, $2, $3, $4, 1000, 1000, 'confirmed', $5, $6)
+      `insert into bookings (court_id, user_id, start_at, end_at, price_per_slot, total_price, status, qr_token, idempotency_key, payment_method)
+       values ($1, $2, $3, $4, 1000, 1000, 'confirmed', $5, $6, 'cash')
        returning *`,
       [courtId, user.rows[0].id, start, end, qrToken, `sec-${qrToken}`]
     );

@@ -4,6 +4,7 @@ const app = require('../app');
 const pool = require('../db');
 const crypto = require('crypto');
 const { enableLegacyFlags } = require('./helpers/flags');
+const { enableBusinessPayhere } = require('./helpers/methods');
 
 const secret = new TextEncoder().encode('test-secret');
 const tokenFor = (uid) =>
@@ -89,6 +90,7 @@ describe('payment webhooks', () => {
       .post(`/api/v1/admin/venues/${VENUE_ID}/approve`)
       .set('Authorization', `Bearer ${await tokenFor('demo-admin-uid')}`);
 
+    await enableBusinessPayhere('demo-owner-uid', true);
     const courtRows = await pool.query(`select id from courts where venue_id = $1`, [VENUE_ID]);
     COURT_ID = courtRows.rows[0].id;
   });
@@ -238,8 +240,8 @@ describe('payment webhooks', () => {
     await pool.query(`update holds set expires_at = now() - interval '1 minute' where id = $1`, [hold.hold_id]);
 
     await pool.query(
-      `insert into bookings (court_id, user_id, start_at, end_at, price_per_slot, total_price, status, idempotency_key)
-       values ($1, $2, $3, $4, 1500, 1500, 'confirmed', 'wh-6-squatter')`,
+      `insert into bookings (court_id, user_id, start_at, end_at, price_per_slot, total_price, status, idempotency_key, payment_method, confirmed_at)
+       values ($1, $2, $3, $4, 1500, 1500, 'confirmed', 'wh-6-squatter', 'cash', now())`,
       [COURT_ID, PLAYER_ID, isoColombo(date, '12:00'), isoColombo(date, '13:00')]
     );
 

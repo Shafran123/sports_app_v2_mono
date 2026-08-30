@@ -7,6 +7,7 @@ const request = require('supertest');
 const app = require('../app');
 const pool = require('../db');
 const recaptcha = require('../services/recaptcha');
+const { enableBusinessCash } = require('./helpers/methods');
 
 let BUSINESS;
 let posted;
@@ -242,7 +243,6 @@ describe('anti-bot on dedicated site auth + checkout (ticket 05)', () => {
         name: 'Captcha Court House',
         address: '1 Captcha Rd',
         city: 'Colombo',
-        accepts_cash: true,
         sports: ['badminton'],
         courts: [{ name: 'Captcha Court', sport: 'badminton', price_per_slot: 900, slot_duration_min: 60, capacity: 4, is_indoor: true }],
         hours: Array.from({ length: 7 }, (_, d) => ({ day_of_week: d, open_time: '06:00', close_time: '23:00' }))
@@ -251,6 +251,8 @@ describe('anti-bot on dedicated site auth + checkout (ticket 05)', () => {
     await request(app).post(`/api/v1/admin/venues/${venue.body.data.id}/approve`).set('Authorization', `Bearer ${adminToken}`);
     const { rows } = await pool.query(`select id from courts where venue_id = $1`, [venue.body.data.id]);
     courtId = rows[0].id;
+    // ADR-0044: the site's cash checkout runs on the Business's cash method.
+    await enableBusinessCash(`captcha-owner-${rand}`, true);
   });
 
   afterAll(async () => {

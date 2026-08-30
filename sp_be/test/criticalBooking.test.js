@@ -3,6 +3,7 @@ const { SignJWT } = require('jose');
 const app = require('../app');
 const pool = require('../db');
 const { enableLegacyFlags } = require('./helpers/flags');
+const { enableBusinessPayhere } = require('./helpers/methods');
 const crypto = require('crypto');
 
 const secret = new TextEncoder().encode('test-secret');
@@ -86,6 +87,7 @@ describe('critical booking tests', () => {
       .post(`/api/v1/admin/venues/${VENUE_ID}/approve`)
       .set('Authorization', `Bearer ${await tokenFor('demo-admin-uid')}`);
 
+    await enableBusinessPayhere('demo-owner-uid', true);
     const courtRows = await pool.query(`select id from courts where venue_id = $1`, [VENUE_ID]);
     COURT_ID = courtRows.rows[0].id;
   });

@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   Building2,
   CalendarDays,
+  CreditCard,
   FileText,
   Globe,
   Inbox,
@@ -38,6 +39,7 @@ const OWNER_NAV = [
       { href: "/front-desk", label: "Front desk", icon: StoreIcon },
       { href: "/bookings", label: "Bookings", icon: CalendarDays },
       { href: "/booking-settings", label: "Booking settings", icon: Settings2 },
+      { href: "/payments", label: "Payments", icon: CreditCard },
       { href: "/venues", label: "Venues", icon: Building2 },
       { href: "/widget-and-site", label: "Widget & site", icon: Globe },
       { href: "/customers", label: "Customers", icon: Users },
@@ -68,6 +70,7 @@ const ADMIN_NAV = [
       { href: "/events", label: "Events", icon: Ticket },
       { href: "/sports", label: "Sports", icon: Trophy },
       { href: "/players", label: "Players", icon: Users },
+      { href: "/payments", label: "Payments", icon: CreditCard },
       { href: "/settings", label: "Settings & reports", icon: Settings }
     ]
   }

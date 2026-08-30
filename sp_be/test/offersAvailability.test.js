@@ -129,7 +129,7 @@ describe('offers reflect on player availability', () => {
       .set('Authorization', `Bearer ${ownerToken}`)
       .send({ kind: 'venue', discount_type: 'percent', percent: 20 });
 
-    const { rows } = await pool.query(`update venues set accepts_cash = true where id = $1 returning id`, [v]);
+    const { rows } = await pool.query(`select id from venues where id = $1`, [v]);
 
     const res = await request(app)
       .post('/api/v1/bookings/checkout')

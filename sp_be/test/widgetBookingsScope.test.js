@@ -39,8 +39,7 @@ describe('widget bookings scope — a fresh booking must appear in the widget li
     );
     COURT_ID = courtRows.rows[1]?.id || COURT_ID;
     await pool.query(
-      `insert into bookings (court_id, user_id, start_at, end_at, price_per_slot, total_price, status, idempotency_key)
-       values ($1, $2, $3, $4, 1500, 1500, 'confirmed', $5)`,
+      `insert into bookings (court_id, user_id, start_at, end_at, price_per_slot, total_price, status, idempotency_key, payment_method) values ($1, $2, $3, $4, 1500, 1500, 'confirmed', $5, 'cash')`,
       [COURT_ID, PLAYER_ID, start, end, `scope-${Date.now()}`]
     );
 
@@ -68,8 +67,7 @@ describe('widget bookings scope — a fresh booking must appear in the widget li
     const end = new Date(Date.now() + days * 24 * 3600 * 1000 + 3600 * 1000 + jitter * 60000).toISOString();
     if (otherCourt) {
       await pool.query(
-        `insert into bookings (court_id, user_id, start_at, end_at, price_per_slot, total_price, status, idempotency_key)
-         values ($1, $2, $3, $4, 1500, 1500, 'confirmed', $5)`,
+        `insert into bookings (court_id, user_id, start_at, end_at, price_per_slot, total_price, status, idempotency_key, payment_method) values ($1, $2, $3, $4, 1500, 1500, 'confirmed', $5, 'cash')`,
         [otherCourt.id, PLAYER_ID, start, end, `scope-other-${Date.now()}`]
       );
     }

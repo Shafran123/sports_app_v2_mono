@@ -41,7 +41,7 @@ A Venue that is bookable but not discoverable in marketplace discovery — absen
 _Avoid_: hidden listing, private listing, ghost venue
 
 **Booking Widget**:
-The embeddable booking interface a Venue Owner publishes on their own website (iframe) to sell their Venues' courts to their own audience. Delivered as one or more **Widget Instances** per **Business**, each keyed by its own **Embed Key** and pinned to a **Default Venue** — so one embed always books the intended Venue, or lets the customer choose from the Business's approved Venues; tied to a per-Instance domain allowlist (Owner self-serve) so it only renders where the Owner authorized it. Offered to any Business; required for a Private Venue (that Venue's only public surface). The widget signs the buyer in as a **Site Customer** of this Business — the same per-business customer base as the **Dedicated Site** (email + password or Google), never the platform **Player** base. A guest browses and selects slots freely; the sign-in or account-creation step happens at the confirm step, and a Site Customer must hold a **Verified Phone** and a **Verified Email** for the booking to be created; online payment optional per the Owner's choice, otherwise cash at the venue. The widget exposes the Business's full booking engine (all courts, availability, Variable Pricing, Offers, Closed Dates). When online payments land (P2), the widget uses **embedded checkout** (hosted payment fields inside the iframe), not a redirect, so the flow stays in the iframe and lands back on its success screen.
+The embeddable booking interface a Venue Owner publishes on their own website (iframe) to sell their Venues' courts to their own audience. Delivered as one or more **Widget Instances** per **Business**, each keyed by its own **Embed Key** and pinned to a **Default Venue** — so one embed always books the intended Venue, or lets the customer choose from the Business's approved Venues; tied to a per-Instance domain allowlist (Owner self-serve) so it only renders where the Owner authorized it. Offered to any Business; required for a Private Venue (that Venue's only public surface). The widget signs the buyer in as a **Site Customer** of this Business — the same per-business customer base as the **Dedicated Site** (email + password or Google), never the platform **Player** base. A guest browses and selects slots freely; the sign-in or account-creation step happens at the confirm step, and a Site Customer must hold a **Verified Phone** and a **Verified Email** for the booking to be created; payment is by the Business's configured **Payment Methods** — PayHere and/or cash at the venue. The widget exposes the Business's full booking engine (all courts, availability, Variable Pricing, Offers, Closed Dates). PayHere checkout in the widget uses **embedded checkout** (PayHere's Onsite Checkout modal inside the iframe), not a redirect, so the flow stays in the iframe and lands back on its success screen.
 _Note_: The widget renders the Business's brand with a persistent "Powered by MySlot.LK" attribution, and lets the signed-in Site Customer view and cancel their own bookings for that Venue from inside the embed.
 _Avoid_: embed widget, booking iframe, widget (bare)
 
@@ -89,6 +89,7 @@ _Avoid_: captcha (the checkbox kind), reCAPTCHA (the vendor name)
 
 **Marketplace Listing**:
 A per-venue, Owner-controlled state deciding whether an approved Venue appears and can be booked on the marketplace (`myslot.lk`). **Defaults off once the Business's Dedicated Site is live** — the Venue then sells only on the site; the Owner may per-venue opt back on to sell dual-channel (site + marketplace in parallel). Venues without a live site keep their marketplace listing by default. Distinct from Venue visibility (private vs public), which governs marketplace *discovery* rather than the site.
+_Note_: RETIRED with the marketplace (ADR-0045) — no customer-facing marketplace exists; the Venue sells on its own **Dedicated Site** and **Booking Widget** only.
 _Avoid_: marketplace sell-on, web listing
 
 **Site Customer**:
@@ -146,14 +147,14 @@ _Avoid_: pending booking, reservation
 **Booking**:
 A reservation of one or more consecutive Slots on a Court. Carries an ID and QR code. Lifecycle: **pending** (awaiting the owner's confirmation — only used when the Business has **Auto-confirm** off) → **confirmed** → **completed** (set on **Check-in**) — plus terminal states **cancelled_by_user**, **cancelled_by_owner**, **cancelled_by_admin**, **cancelled_auto** and **no_show**. A pending booking still holds its Slots; it can be self-cancelled without cutoff, and may be auto-cancelled by the Business's **Pending Auto-cancel** timer.
 _Avoid_: order, purchase
-_Note_: A booking has a payment method (online via PayHere, or cash collected at the venue) and a **Payment** status tracked independently of the booking status. See **Payment** below.
+_Note_: A booking has a payment method (PayHere, or cash collected at the venue) and a **Payment** status tracked independently of the booking status. See **Payment** below.
 
 **Auto-confirm**:
-A per-Business setting governing how new Bookings are confirmed. When on, a cash booking is **confirmed** at creation and an online booking the moment its payment lands; when off, every booking lands **pending** and the Venue Owner confirms it — cancelling a pending online-paid booking refunds it.
+A per-Business setting governing how new Bookings are confirmed. When on, a cash booking is **confirmed** at creation and a PayHere booking the moment its payment lands; when off, every booking lands **pending** and the Venue Owner confirms it — cancelling a pending PayHere-paid booking refunds it.
 _Avoid_: auto-accept (bare), auto-approve, auto-book
 
 **Pending Auto-cancel**:
-The Business-level setting — N hours before a pending Booking's start — after which a still-**pending** Booking is automatically cancelled (`cancelled_auto`), freeing its Slots. Distinct from the Player-facing **Cancel Cutoff** (the window in which the Player may self-cancel a confirmed booking); a pending Booking self-cancels freely. When the auto-cancel fires on an online-paid booking, the payment is refunded.
+The Business-level setting — N hours before a pending Booking's start — after which a still-**pending** Booking is automatically cancelled (`cancelled_auto`), freeing its Slots. Distinct from the Player-facing **Cancel Cutoff** (the window in which the Player may self-cancel a confirmed booking); a pending Booking self-cancels freely. When the auto-cancel fires on a PayHere-paid booking, the payment is refunded.
 _Avoid_: auto-expire, pending timeout, pending TTL
 
 **QR Token**:
@@ -162,12 +163,20 @@ _Avoid_: ticket number, booking ID (the Booking UUID is NOT the QR token)
 _Note_: For widget bookings the QR is also shown on the widget's success screen and sent by SMS/email to the verified phone/**Verified Email** inbox — a fresh widget Player may never open their own app, but must be able to check in. Phone-only bookings receive only a QR link by SMS, not a rendered QR, which is why the widget requires a Verified Email.
 
 **Payment**:
-A recorded transfer of money for a Booking or Event Registration. Online payments come from PayHere and begin **pending**; cash payments are created **due** when the Booking is created and the Venue Owner flips them to **paid** on collection. Statuses: **due** / **pending** / **paid** / **failed** / **refunded**.
+A recorded transfer of money for a Booking or Event Registration. PayHere payments flow through the Business's own PayHere gateway — its own merchant credentials, never the platform's — and begin **pending**; cash payments are created **due** when the Booking is created and the Venue Owner flips them to **paid** on collection. Statuses: **due** / **pending** / **paid** / **failed** / **refunded**.
 _Avoid_: payment intent (don't reuse for unpaid holds)
 
+**Payment Method**:
+One of the ways a Business collects money for a Booking — exactly **Cash** or **PayHere** — configured per Business, each independently enabled by the Venue Owner (at least one must be enabled). No provider/method two-level abstraction exists: a method IS the provider. A Booking records its method as `cash` or `payhere` (legacy `online` rows migrated to `payhere`). A PayHere method carries the Business's own merchant credentials (its merchant ID and secret, plus the app ID and app secret used for refunds — the secret held only server-side); Cash carries none. A Payment may additionally record `card` as its collection channel when the Owner takes a card-machine payment for a cash-method Booking at the venue — a recorded channel, not a Bookable Payment Method. Distinct from a single Payment's recorded method and from the platform-level payment kill switch.
+_Avoid_: payment provider (bare), gateway toggle, payment option
+
+**Payment Link**:
+A PayHere checkout URL minted by the backend for a **Walk-in Guest** booking — carrying the Business's own PayHere credentials — sent to the guest by SMS (via SMSGo) so they can pay by card; the standard notify webhook flips the Payment to paid. Distinct from a walk-in recorded as **card** (terminal collection, no link) and from the embedded Onsite Checkout used in the Booking Widget.
+_Avoid_: payment request, pay link, WhatsApp link
+
 **Cash Payment**:
-A Payment with method cash, created **due** at Booking creation and recorded **paid** by the Venue Owner when the player pays at the venue. It is the source of truth for "was this booking actually paid". Distinct from an online Payment; may be independent of the booking's **Auto-confirm** state — a cash booking can be confirmed before it is paid, and paid before it is confirmed.
-_Avoid_: COD (wrong shipping framing), walk-in payment (the walk-in may still book online)
+A Payment with method cash, created **due** at Booking creation and recorded **paid** by the Venue Owner when the player pays at the venue. It is the source of truth for "was this booking actually paid". Distinct from a PayHere Payment; may be independent of the booking's **Auto-confirm** state — a cash booking can be confirmed before it is paid, and paid before it is confirmed.
+_Avoid_: COD (wrong shipping framing), walk-in payment (the walk-in may still pay by **Payment Link** or card)
 
 **Check-in**:
 The act of a venue confirming a Booking on arrival by scanning its QR code and consuming the QR Token. Only the Venue Owner of the Venue the Booking was made on may check it in; the scan validates owner-side ownership as well as the Token. Sets the Booking to **completed**. Possible from booking creation until shortly after the slot ends; can happen early (walk-ins arrive before their slot).
@@ -177,7 +186,7 @@ _Avoid_: attendance
 A confirmed Booking whose slot passed without check-in or cancellation.
 
 **Cancellation**:
-Termination of a Booking before its slot. Recorded with the canceller so reporting can tell the actors apart: **cancelled_by_user** (Player-initiated, allowed only up to the Venue's **Cancel Cutoff**), **cancelled_by_owner**, **cancelled_by_admin**, or **cancelled_auto** (the **Pending Auto-cancel** timer). Online-paid bookings refund per the platform cancellation tiers — including when a pending online-paid booking is cancelled or auto-cancelled (full refund, no tier); cash bookings have nothing to refund. Rows cancelled before this status split were migrated to the legacy value **cancelled**, which nothing new writes.
+Termination of a Booking before its slot. Recorded with the canceller so reporting can tell the actors apart: **cancelled_by_user** (Player-initiated, allowed only up to the Venue's **Cancel Cutoff**), **cancelled_by_owner**, **cancelled_by_admin**, or **cancelled_auto** (the **Pending Auto-cancel** timer). PayHere-paid bookings refund per the platform cancellation tiers — including when a pending PayHere-paid booking is cancelled or auto-cancelled (full refund, no tier); cash bookings have nothing to refund. Rows cancelled before this status split were migrated to the legacy value **cancelled**, which nothing new writes.
 _Avoid_: refund (cancellation is the act; a refund is a separate consequence)
 
 **Cancel Cutoff**:
@@ -198,6 +207,7 @@ _Avoid_: event booking
 
 **Player**:
 An end user who browses, books, and registers on the platform's marketplace surface. Signs in with email+password or Google; on first sign-in — which a guest reaches when confirming a booking — completes a details step collecting name, a **Verified Phone**, and a **Verified Email** before the first booking. Both verification attributes gate booking creation on every surface. Platform-wide: a Player's account and history span the whole marketplace, distinct from a **Site Customer**, whose account is scoped to exactly one Business.
+_Note_: RETIRED with the marketplace (ADR-0045) — no new Player sign-ups or marketplace bookings; existing Players' bookings play out via email QR, and cancellation is owner/admin-assisted.
 _Avoid_: user, customer, member
 
 **Player Suspension**:
@@ -278,7 +288,7 @@ A percentage rate set by a Venue Owner for a specific Venue. Like Platform Tax, 
 _Avoid_: owner tax, venue tax rate
 
 **Booking Bill**:
-A computer-generated invoice PDF for a Booking, rendered with the **Business Brand** (logo, name, colors) and business contact details, itemized in a bordered table — per-slot lines when the court's price is uniform across the booking, else a single item line — with Subtotal, Offer discount, Platform Tax and Venue Tax (each with its rate %), and Total, stamped with a per-Business sequential **Invoice Number** when first emitted. Never carries the check-in QR (confirmation and reminder emails do that). Emailed exactly once to the Player when payment is confirmed — cash Bookings when the owner marks them paid, online Bookings at Check-in — and cancelled bookings never carry a bill. Walk-in Guest bills skip email; the customer's phone gets an SMS with a tokenized bill link to download it instead.
+A computer-generated invoice PDF for a Booking, rendered with the **Business Brand** (logo, name, colors) and business contact details, itemized in a bordered table — per-slot lines when the court's price is uniform across the booking, else a single item line — with Subtotal, Offer discount, Platform Tax and Venue Tax (each with its rate %), and Total, stamped with a per-Business sequential **Invoice Number** when first emitted. Never carries the check-in QR (confirmation and reminder emails do that). Emailed exactly once to the Player when payment is confirmed — cash Bookings when the owner marks them paid, PayHere Bookings at Check-in — and cancelled bookings never carry a bill. Walk-in Guest bills skip email; the customer's phone gets an SMS with a tokenized bill link to download it instead.
 _Avoid_: receipt (a receipt has no tax breakdown or invoice number), invoice slip, statement
 
 **Invoice Number**:

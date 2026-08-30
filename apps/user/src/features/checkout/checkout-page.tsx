@@ -16,7 +16,7 @@ import { WidgetIdentity } from "@/features/widget/widget-identity";
 import type { VenueOffer } from "@myslot/types";
 import { applyVenueOffer } from "@/features/venue-detail/selection";
 
-type PaymentMethod = "online" | "cash";
+type PaymentMethod = "payhere" | "cash";
 
 export function CheckoutPage({ venueId }: { venueId: string }) {
   const router = useRouter();
@@ -60,7 +60,13 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
     queryFn: () => venues.detail(venueId),
     enabled: !incomplete
   });
-  const acceptsCash = !!venueQuery.data?.accepts_cash;
+  // ADR-0044: what this venue's Business offers is decided per Business —
+  // the platform payhere_enabled flag stays as the global kill switch on top.
+  const payhereAvailable =
+    !!venueQuery.data?.payment_methods?.payhere_enabled &&
+    !!venueQuery.data?.payment_methods?.payhere_configured &&
+    payhereEnabled;
+  const cashAvailable = !!venueQuery.data?.payment_methods?.cash_enabled;
 
   // Display names come from the query params built at the venue page; fall
   // back to the venue/court fetch so the confirmation never shows "—".
@@ -71,13 +77,14 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
     "";
   const venueTaxRate = venueQuery.data?.venue_tax_rate ?? 0;
 
-  const [method, setMethod] = React.useState<PaymentMethod>("online");
+  const [method, setMethod] = React.useState<PaymentMethod>("payhere");
   const [chosen, setChosen] = React.useState(false);
   const [checkoutKey, setCheckoutKey] = React.useState(() => uuidV4());
 
-  // With online payments paused (payhere_enabled OFF) cash is the only option.
-  const onlineAvailable = payhereEnabled;
-  const effectiveMethod: PaymentMethod = onlineAvailable ? method : "cash";
+  // The global kill switch forces cash only; otherwise the Business's own
+  // config decides what the checkout offers.
+  const onlineAvailable = payhereAvailable;
+  const effectiveMethod: PaymentMethod = onlineAvailable ? method : cashAvailable ? "cash" : method;
 
   const checkout = useMutation({
     mutationFn: async () => {
@@ -110,12 +117,11 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
       setVerifyOpen(true);
       return;
     }
-    // For venues that accept cash with online still available, wait for the
-    // player to pick a method.
-    if (!chosen && acceptsCash && onlineAvailable) return;
-    // When online payments are paused and the venue has no cash option there
-    // is nothing to offer — the paused card renders and no request fires.
-    if (!onlineAvailable && !acceptsCash) return;
+    // When both methods are available, wait for the player to pick one.
+    if (!chosen && cashAvailable && onlineAvailable) return;
+    // With nothing enabled there is nothing to offer — the fail-closed card
+    // renders and no request fires (ADR-0015).
+    if (!onlineAvailable && !cashAvailable) return;
     // A cash booking is created server-side when it is confirmed, so it must
     // never auto-fire: it needs an explicit confirmation of the summary.
     if (effectiveMethod === "cash") return;
@@ -123,7 +129,7 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
     if (checkout.data || checkout.error) return;
     void checkout.mutate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [incomplete, venueQuery.isLoading, flags, chosen, acceptsCash, method, checkoutKey, verified, onlineAvailable, requiresVerification, effectiveMethod, user]);
+  }, [incomplete, venueQuery.isLoading, flags, chosen, cashAvailable, method, checkoutKey, verified, onlineAvailable, requiresVerification, effectiveMethod, user]);
 
   const result = checkout.data;
   const isCash = !!result?.booking;
@@ -166,7 +172,8 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
 
   const chooseMethod = (next: PaymentMethod) => {
     if (checkout.isPending) return;
-    if (!onlineAvailable && next === "online") return;
+    if (!onlineAvailable && next === "payhere") return;
+    if (!cashAvailable && next === "cash") return;
     if (next === method && chosen) return;
     setChosen(true);
     setMethod(next);
@@ -397,7 +404,7 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
   }
 
   if (!result) {
-    const pausedAndNoCash = !onlineAvailable && !acceptsCash;
+    const noMethodsAvailable = !onlineAvailable && !cashAvailable;
     return (
       <main className="mx-auto max-w-3xl px-4 pb-24 pt-8">
         <Link
@@ -428,15 +435,15 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
           </div>
         )}
 
-        {pausedAndNoCash ? (
+        {noMethodsAvailable ? (
           <Card className="mt-6 p-6">
-            <h2 className="font-semibold text-ink">Online payment is paused</h2>
+            <h2 className="font-semibold text-ink">No payment methods available</h2>
             <p className="mt-1 text-sm text-ink-2">
-              Pay-at-venue is temporarily unavailable at this venue. Choose a venue that offers
-              pay-at-venue, or check back soon.
+              This venue is not accepting bookings right now. Check back soon, or contact the venue
+              directly.
             </p>
             <Button variant="secondary" className="mt-4" onClick={() => router.push(venueHref)}>
-              Pick a different venue
+              Back to venue
             </Button>
           </Card>
         ) : (
@@ -446,17 +453,19 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
                 icon={<Wallet className="h-5 w-5" />}
                 title="Pay online"
                 subtitle={onlineAvailable ? "PayHere · instant confirmation" : "Temporarily unavailable"}
-                badge={onlineAvailable ? undefined : "Paused"}
-                active={onlineAvailable && method === "online"}
+                badge={onlineAvailable ? undefined : "Unavailable"}
+                active={onlineAvailable && method === "payhere"}
                 disabled={!onlineAvailable}
-                onClick={() => chooseMethod("online")}
+                onClick={() => chooseMethod("payhere")}
                 dataTestId="method-online"
               />
               <MethodCard
                 icon={<Banknote className="h-5 w-5" />}
                 title="Pay at venue"
-                subtitle="Cash on arrival"
+                subtitle={cashAvailable ? "Cash on arrival" : "Temporarily unavailable"}
+                badge={cashAvailable ? undefined : "Unavailable"}
                 active={effectiveMethod === "cash"}
+                disabled={!cashAvailable}
                 onClick={() => chooseMethod("cash")}
                 dataTestId="method-cash"
               />
@@ -521,7 +530,7 @@ export function CheckoutPage({ venueId }: { venueId: string }) {
                   <Banknote className="mr-1 inline h-4 w-4" />
                   {onlineAvailable
                     ? "You chose pay-at-venue — your slot is confirmed immediately and you pay in cash at the venue."
-                    : "Online payments are paused — you'll pay at the venue in cash once you confirm below."}
+                    : "Online payment is unavailable here — you'll pay at the venue in cash once you confirm below."}
                 </div>
               </>
             )}

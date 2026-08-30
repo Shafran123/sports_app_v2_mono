@@ -61,7 +61,7 @@ describe("SettingsPage flags tab", () => {
       series: [{ day: "2026-08-22", bookings: 1, revenue: 900, tax: 0 }],
       by_sport: [],
       by_venue: [],
-      payment_split: { online: { bookings: 0, revenue: 0 }, cash: { bookings: 1, revenue: 900 } },
+      payment_split: { payhere: { bookings: 0, revenue: 0 }, cash: { bookings: 1, revenue: 900 } },
       events: { registrations: 0, revenue: 0 }
     });
     configAuditMock.mockResolvedValue([]);

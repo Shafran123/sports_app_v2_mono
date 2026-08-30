@@ -150,8 +150,7 @@ describe('booking flow', () => {
     const date = colomboDate(4);
     const { rows } = await pool.query(`select id from users where firebase_uid = 'demo-player-uid'`);
     await pool.query(
-      `insert into bookings (court_id, user_id, start_at, end_at, price_per_slot, total_price, status)
-       values ($1, $2, $3, $4, 1500, 1500, 'confirmed')`,
+      `insert into bookings (court_id, user_id, start_at, end_at, price_per_slot, total_price, status, payment_method) values ($1, $2, $3, $4, 1500, 1500, 'confirmed', 'cash')`,
       [COURT_ID, rows[0].id, isoColombo(date, '08:00'), isoColombo(date, '09:00')]
     );
 

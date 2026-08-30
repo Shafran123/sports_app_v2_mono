@@ -96,7 +96,8 @@ describe("QuickBookDialog", () => {
       end_at: "2026-08-22T18:30:00+05:30",
       player_name: undefined,
       player_phone: undefined,
-      amount: 3000
+      amount: 3000,
+      paid_by: "cash"
     });
   });
 

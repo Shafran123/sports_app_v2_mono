@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const app = require('../app');
 const pool = require('../db');
 const { enableLegacyFlags } = require('./helpers/flags');
+const { enableBusinessCash, enableBusinessPayhere } = require('./helpers/methods');
 
 const secret = new TextEncoder().encode('test-secret');
 const tokenFor = (uid) =>
@@ -48,7 +49,6 @@ async function createVenue(name, venueTaxRate) {
       name,
       address: '1 Tax Ave',
       city: 'Colombo',
-      accepts_cash: true,
       venue_tax_rate: venueTaxRate,
       sports: ['badminton'],
       courts: [
@@ -88,6 +88,9 @@ describe('inclusive tax across every checkout path (ADR-0021)', () => {
     const { rows: taxedRows } = await pool.query(`select id from courts where venue_id = $1`, [TAXED_VENUE_ID]);
     const { rows: plainRows } = await pool.query(`select id from courts where venue_id = $1`, [PLAIN_VENUE_ID]);
     TAXED_COURT_ID = taxedRows[0].id;
+    // ADR-0044: the webhook/tax suite rides the Business's cash + PayHere.
+    await enableBusinessCash('demo-owner-uid', true);
+    await enableBusinessPayhere('demo-owner-uid', true);
     PLAIN_COURT_ID = plainRows[0].id;
   });
 

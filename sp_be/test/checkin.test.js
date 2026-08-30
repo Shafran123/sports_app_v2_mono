@@ -25,8 +25,8 @@ describe('check-in and manual bookings', () => {
       `select id from users where firebase_uid = 'demo-player-uid'`
     );
     const { rows } = await pool.query(
-      `insert into bookings (court_id, user_id, start_at, end_at, price_per_slot, total_price, status, idempotency_key)
-       values ($1, $2, $3, $4, 1500, 1500, 'confirmed', $5)
+      `insert into bookings (court_id, user_id, start_at, end_at, price_per_slot, total_price, status, idempotency_key, payment_method)
+       values ($1, $2, $3, $4, 1500, 1500, 'confirmed', $5, 'cash')
        returning *`,
       [COURT_ID, userRows[0].id, startAt, endAt, `ci-${Math.random().toString(36).slice(2)}`]
     );

@@ -1,3 +1,4 @@
+import { MarketplaceClosed } from "@/features/marketplace/marketplace-closed";
 import { HomePage } from "@/features/home/home-page";
 import { SiteHome } from "@/features/site/site-home";
 import { getSiteContext, isPlatformSubdomain, currentHost } from "@/lib/site-context";
@@ -16,8 +17,10 @@ export async function generateMetadata(): Promise<Metadata> {
   return {};
 }
 
+// Marketplace retirement (ADR-0045): the marketplace home is closed to
+// customers; site-hosted visitors still land on their venue's site home.
 export default async function Page() {
   const site = await getSiteContext();
   if (site) return <SiteHome config={site} />;
-  return <HomePage />;
+  return <MarketplaceClosed />;
 }

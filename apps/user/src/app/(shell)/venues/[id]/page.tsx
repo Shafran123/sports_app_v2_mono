@@ -1,6 +1,7 @@
-import { VenueDetailPage } from "@/features/venue-detail/venue-detail-page";
+import { MarketplaceClosed } from "@/features/marketplace/marketplace-closed";
 
-export default async function Page({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  return <VenueDetailPage venueId={id} />;
+// Marketplace retirement (ADR-0045): in-app venue details are closed; venues
+// sell on their own site/widget surfaces.
+export default async function Page() {
+  return <MarketplaceClosed />;
 }

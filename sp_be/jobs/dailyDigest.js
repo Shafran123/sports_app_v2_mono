@@ -98,7 +98,7 @@ async function buildDigest(day) {
   );
 
   const s = summary[0];
-  const online = split.find((r) => r.payment_method === 'online') || { bookings: 0 };
+  const online = split.find((r) => r.payment_method === 'payhere') || { bookings: 0 };
   const cash = split.find((r) => r.payment_method === 'cash') || { bookings: 0 };
 
   const rows = [

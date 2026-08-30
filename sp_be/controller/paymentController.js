@@ -6,25 +6,26 @@ const { mintQrToken } = require('../utils/tokens');
 const { publishBookingEvent } = require('../utils/publish');
 const notificationCatalog = require('../utils/notificationCatalog');
 const billService = require('../utils/billService');
+const { resolvePayhereCredentials } = require('../services/businessPaymentMethods');
+const { refundPayherePayment } = require('../services/payhereRefund');
+const { computeNotifySig } = require('../utils/payhere');
 
 // Fail-closed: config/env.js guarantees these exist outside NODE_ENV=test.
+// The PLATFORM gateway — events + legacy payments only (ADR-0044). A
+// business-scoped payment verifies with the Business's own merchant secret.
 const MERCHANT_ID = process.env.PAYHERE_MERCHANT_ID;
 const MERCHANT_SECRET = process.env.PAYHERE_MERCHANT_SECRET;
 
-function verifySignature(body) {
-  const secretMd5 = crypto
-    .createHash('md5')
-    .update(MERCHANT_SECRET)
-    .digest('hex')
-    .toUpperCase();
-  const expected = crypto
-    .createHash('md5')
-    .update(
-      `${body.merchant_id}${body.order_id}${body.payhere_amount}${body.payhere_currency}${body.status_code}${secretMd5}`
-    )
-    .digest('hex')
-    .toUpperCase();
-  return body.merchant_id === MERCHANT_ID && body.md5sig === expected;
+function verifySignature(body, merchantId, merchantSecret) {
+  const expected = computeNotifySig({
+    merchantId,
+    merchantSecret,
+    orderId: body.order_id,
+    amount: body.payhere_amount,
+    currency: body.payhere_currency,
+    statusCode: body.status_code
+  });
+  return body.merchant_id === merchantId && body.md5sig === expected;
 }
 
 exports.handleNotify = async (req, res) => {
@@ -32,7 +33,26 @@ exports.handleNotify = async (req, res) => {
   try {
     const body = req.body;
 
-    if (!verifySignature(body)) {
+    // Resolve the payment first so the signature is checked against the
+    // credentials that minted it (ADR-0044): a business-scoped payment never
+    // verifies with the platform secret, and vice versa.
+    const { rows: scopeRows } = await client.query(
+      `select gateway_business_id from payments where payhere_payment_id = $1`,
+      [body.order_id]
+    );
+    let merchantId = MERCHANT_ID;
+    let merchantSecret = MERCHANT_SECRET;
+    if (scopeRows.length > 0 && scopeRows[0].gateway_business_id) {
+      const creds = await resolvePayhereCredentials(scopeRows[0].gateway_business_id);
+      if (!creds) {
+        logger.error(`PayHere webhook for ${body.order_id}: business gateway not configured`);
+        return fail(res, 503, 'GATEWAY_NOT_CONFIGURED', 'Gateway credentials unavailable');
+      }
+      merchantId = creds.merchantId;
+      merchantSecret = creds.merchantSecret;
+    }
+
+    if (!verifySignature(body, merchantId, merchantSecret)) {
       logger.error('PayHere webhook rejected: invalid signature');
       return fail(res, 400, 'INVALID_SIGNATURE', 'Invalid signature');
     }
@@ -133,7 +153,7 @@ exports.handleNotify = async (req, res) => {
         await client.query('savepoint booking_insert');
         const inserted = await client.query(
           `insert into bookings (court_id, user_id, start_at, end_at, price_per_slot, total_price, tax_rate, tax_amount, venue_tax_rate, venue_tax_amount, status, payment_method, player_name, player_phone, qr_token, idempotency_key, subtotal_amount, discount_amount, confirmed_at)
-           values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'online', $12, $13, $14, $15, $16, $17, $18)
+           values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'payhere', $12, $13, $14, $15, $16, $17, $18)
            returning *`,
           [hold.court_id, hold.user_id, hold.start_at, hold.end_at, pricePerSlot, payment.amount, payment.tax_rate, payment.tax_amount, payment.venue_tax_rate, payment.venue_tax_amount, bookingStatus, playerName, playerPhone, mintQrToken(), hold.idempotency_key, hold.subtotal_amount, hold.discount_amount, bookingStatus === 'confirmed' ? new Date() : null]
         );
@@ -228,8 +248,34 @@ exports.adminRefund = async (req, res) => {
 
     const authorization = process.env.PAYHERE_AUTHORIZATION;
     if (!authorization) {
+      // The refund gateway isn't deployed (no authorization configured) — for
+      // both scopes. Skip the branch-level guards the test suite relies on.
       await client.query('rollback');
       return fail(res, 503, 'REFUND_GATEWAY_NOT_CONFIGURED', 'PayHere refund credentials are not configured');
+    }
+
+    // A business-scoped payment (ADR-0044): the money sits in the owner's
+    // PayHere account, so the refund goes through the Business's own
+    // app_id/app_secret — never the platform's gateway.
+    if (payment.gateway_business_id) {
+      // The status flip commits inside this transaction via the held client.
+      const refund = await refundPayherePayment(payment, client);
+      if (!refund.refunded) {
+        await client.query('rollback');
+        return fail(res, 502, 'REFUND_GATEWAY_ERROR', 'The payment gateway rejected the refund');
+      }
+      if (payment.booking_id) {
+        await client.query(
+          `update bookings set status = 'cancelled_by_admin', cancelled_at = now(), updated_at = now() where id = $1`,
+          [payment.booking_id]
+        );
+      }
+      await client.query('commit');
+      if (payment.booking_id) {
+        await publishBookingEvent('booking.cancelled', payment.booking_id);
+        await notificationCatalog.dispatchBooking('booking.cancelled.admin', payment.booking_id);
+      }
+      return ok(res, 200, { id: payment.id, status: 'refunded' });
     }
 
     const axios = require('axios');

@@ -105,11 +105,21 @@ import { venues, bookings, featureFlags, submitPayHere } from "@myslot/api";
 const onlineVenue = {
   id: "v1", name: "Smash Arena", status: "approved", description: null,
   address: "10 Marina Rd", city: "Colombo", phone: null, photos: [], amenities: [],
-  rules: null, cancellation_policy: null, accepts_cash: false,
+  rules: null, cancellation_policy: null,
+  // ADR-0044: methods are per Business — PayHere only, no cash.
+  payment_methods: { cash_enabled: false, payhere_enabled: true, payhere_configured: true },
   courts: [], sports: [], hours: []
 };
 
-const cashVenue = { ...onlineVenue, accepts_cash: true };
+const cashVenue = {
+  ...onlineVenue,
+  payment_methods: { cash_enabled: true, payhere_enabled: true, payhere_configured: true }
+};
+
+const cashOnlyVenue = {
+  ...onlineVenue,
+  payment_methods: { cash_enabled: true, payhere_enabled: false, payhere_configured: false }
+};
 
 const onlineResult = {
   hold_id: "h1", idempotency_key: "ik", amount: 1500, currency: "LKR",
@@ -216,7 +226,7 @@ describe("CheckoutPage payment method", () => {
     await waitFor(() => expect(screen.getAllByText(/Total/).length).toBeGreaterThan(0));
 
     expect(bookings.checkout).toHaveBeenCalledWith(
-      expect.objectContaining({ payment_method: "online" })
+      expect.objectContaining({ payment_method: "payhere" })
     );
   });
 
@@ -281,7 +291,7 @@ describe("CheckoutPage payhere_enabled OFF (payments paused)", () => {
     });
     const onlineCard = screen.getByTestId("method-online");
     expect(onlineCard).toBeDisabled();
-    expect(onlineCard).toHaveTextContent(/Paused/);
+    expect(onlineCard).toHaveTextContent(/Unavailable/);
     const cashCard = screen.getByTestId("method-cash");
     expect(cashCard).toHaveAttribute("aria-checked", "true");
 
@@ -297,13 +307,13 @@ describe("CheckoutPage payhere_enabled OFF (payments paused)", () => {
     );
   });
 
-  it("shows the paused message and never calls checkout for a venue without cash", async () => {
+  it("shows the no-methods message and never calls checkout for a venue without cash", async () => {
     pauseOnlinePayments();
     vi.mocked(venues.detail).mockResolvedValue(onlineVenue as never);
 
     renderPage();
 
-    expect(await screen.findByText(/Online payment is paused/i)).toBeInTheDocument();
+    expect(await screen.findByText(/No payment methods available/i)).toBeInTheDocument();
     expect(bookings.checkout).not.toHaveBeenCalled();
   });
 
@@ -424,7 +434,7 @@ describe("CheckoutPage on insecure contexts", () => {
 
     await waitFor(() => expect(bookings.checkout).toHaveBeenCalled());
     expect(bookings.checkout).toHaveBeenCalledWith(
-      expect.objectContaining({ payment_method: "online" })
+      expect.objectContaining({ payment_method: "payhere" })
     );
   });
 });
@@ -506,7 +516,7 @@ describe("CheckoutPage verified-phone gate", () => {
 
     await waitFor(() => expect(bookings.checkout).toHaveBeenCalled());
     expect(bookings.checkout).toHaveBeenCalledWith(
-      expect.objectContaining({ payment_method: "online" })
+      expect.objectContaining({ payment_method: "payhere" })
     );
   });
 

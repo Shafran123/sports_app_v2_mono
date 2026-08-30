@@ -24,7 +24,6 @@ async function createVenue(ownerToken, name) {
       name,
       address: '9 Test Ave',
       city: 'Colombo',
-      accepts_cash: true,
       sports: ['badminton'],
       courts: [
         { name: 'Overview Court', sport: 'badminton', price_per_slot: 1500, slot_duration_min: 60, capacity: 4, is_indoor: true }

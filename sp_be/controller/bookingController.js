@@ -14,6 +14,7 @@ const { windowsForDay, effectiveAdvanceDays } = require('../services/venueEngine
 const pricingEngine = require('../services/pricingEngine');
 const { validateWidgetScope } = require('../services/widgetInstances');
 const siteDomains = require('../services/siteDomains');
+const businessPaymentMethods = require('../services/businessPaymentMethods');
 
 // Pending bookings hold their slot (ADR-0040): a booking awaiting the owner's
 // confirmation blocks double-booking just like a confirmed one.
@@ -87,10 +88,20 @@ exports.checkout = async (req, res) => {
       return fail(res, 409, 'VERIFIED_EMAIL_REQUIRED', 'Verify your email address before booking.');
     }
 
-    const paymentMethod = req.body.payment_method === 'cash' ? 'cash' : 'online';
-    if (paymentMethod === 'online' && !payhereEnabled) {
+    // Per-Business payment methods (ADR-0044): the venue's Business decides
+    // what a booking may be paid with. `online` is accepted as a legacy alias
+    // for `payhere` (pre-migration clients) but is never stored.
+    const paymentMethod = req.body.payment_method === 'cash' ? 'cash' : 'payhere';
+    if (paymentMethod === 'payhere' && !payhereEnabled) {
       return fail(res, 409, 'PAYMENT_UNAVAILABLE', 'Online payment is disabled. Choose pay-at-venue instead.');
     }
+
+    // Surface context: a widget instance key (constrains the court to the
+    // instance's scope) and a site hostname (validates the venue belongs to
+    // the Business's live site). Hoisted so the existing-hold replay path can
+    // point PayHere's return_url back at the widget embed.
+    const widgetInstanceKey = String(req.body.widget_instance_key || '').trim();
+    const siteHostname = String(req.body.site_hostname || '').trim();
 
     const start = new Date(start_at);
     const end = new Date(end_at);
@@ -107,6 +118,21 @@ exports.checkout = async (req, res) => {
       const listedTotal = await computeAmount(client, court_id, start, end);
       const split = await splitCourtTotal(client, court_id, listedTotal, taxRate);
       const user = req.user;
+      const { rows: holdBusinessRows } = await client.query(
+        `select v.business_id from holds h
+         join courts c on c.id = h.court_id
+         join venues v on v.id = c.venue_id
+         where h.id = $1`,
+        [hold.id]
+      );
+      const creds = await businessPaymentMethods.resolveCheckoutCreds(
+        holdBusinessRows.length ? holdBusinessRows[0].business_id : null
+      );
+      // Fail-closed (ADR-0015): never sign a hold with the platform gateway —
+      // a Business whose creds vanished between hold and replay blocks here.
+      if (!creds) {
+        return fail(res, 409, 'PAYMENT_UNAVAILABLE', 'Online payment is not available right now. Choose pay-at-venue instead.');
+      }
       return ok(res, 201, {
         hold_id: hold.id,
         idempotency_key,
@@ -120,13 +146,16 @@ exports.checkout = async (req, res) => {
           email: user.email,
           phone: user.phone,
           city: user.city,
-          baseUrl: requestBaseUrl()
+          baseUrl: requestBaseUrl(),
+          merchantId: creds.merchantId,
+          merchantSecret: creds.merchantSecret,
+          returnUrl: widgetReturnUrl(widgetInstanceKey)
         })
       });
     }
 
     const { rows: courtRows } = await client.query(
-      `select c.*, v.status as venue_status, v.accepts_cash, v.venue_tax_rate
+      `select c.*, v.status as venue_status, v.business_id, v.venue_tax_rate
        from courts c join venues v on v.id = c.venue_id
        where c.id = $1`,
       [court_id]
@@ -139,12 +168,25 @@ exports.checkout = async (req, res) => {
       return fail(res, 400, 'BOOKING_SLOT_UNAVAILABLE', 'This court is not bookable');
     }
 
+    // Payment-method gate (ADR-0044): a Business with no enabled method is
+    // fail-closed (ADR-0015) — it cannot sell anywhere until the owner turns
+    // something on.
+    const methods = await businessPaymentMethods.getMethodsSummary(court.business_id, client);
+    if (!methods.cash_enabled && !methods.payhere_enabled) {
+      return fail(res, 400, 'NO_PAYMENT_METHODS', 'This venue has no payment methods enabled');
+    }
+    if (paymentMethod === 'cash' && !methods.cash_enabled) {
+      return fail(res, 400, 'CASH_NOT_ACCEPTED', 'This venue does not accept pay-at-venue');
+    }
+    if (paymentMethod === 'payhere' && !(methods.payhere_enabled && methods.payhere_configured)) {
+      return fail(res, 409, 'PAYMENT_UNAVAILABLE', 'Online payment is not available here. Choose pay-at-venue instead.');
+    }
+
     // Widget bookings (ADR-0028 v1.5, ticket 05): a presented instance key
     // constrains the court to the instance's scope server-side — the venue
     // must be eligible for the instance's business and, when venue choice is
     // locked, equal the (effective) default venue. The scope degrades exactly
     // like the public config, so a stale default never dead-ends the embed.
-    const widgetInstanceKey = String(req.body.widget_instance_key || '').trim();
     if (widgetInstanceKey) {
       const scope = await validateWidgetScope(client, court.venue_id, widgetInstanceKey);
       if (scope.error) {
@@ -155,7 +197,6 @@ exports.checkout = async (req, res) => {
     // Dedicated Site bookings (ADR-0029): a presented site_hostname must be a
     // LIVE site of the court's own Business — one Business's site can never
     // book another Business's venue, and a dead/stale host never books.
-    const siteHostname = String(req.body.site_hostname || '').trim();
     if (siteHostname) {
       const siteScope = await siteDomains.validateSiteHostname(client, court.venue_id, siteHostname);
       if (siteScope.error) {
@@ -179,11 +220,10 @@ exports.checkout = async (req, res) => {
     }
 
     // Site Customer bookings (ADR-0030): an owner surface books as a
-    // per-Business customer. Cash-only for now — holds and the online
-    // gateway stay platform-side; the site never invents a payment rail.
-    // The customer must belong to the venue's own Business, evidenced by a
-    // valid site_context (site_hostname validated above, or the widget
-    // instance already scoped to it).
+    // per-Business customer. The customer must belong to the venue's own
+    // Business, evidenced by a valid site_context (site_hostname validated
+    // above, or the widget instance already scoped to it). Payments ride the
+    // Business's own gateways (ADR-0044) — no surface-level cash-only cap.
     const siteCustomer = req.user?.isSiteCustomer ? (req.siteCustomer || null) : null;
     if (siteCustomer) {
       let businessOk = false;
@@ -196,9 +236,6 @@ exports.checkout = async (req, res) => {
       }
       if (!businessOk) {
         return fail(res, 403, 'SITE_HOST_REQUIRED', 'This booking needs a valid site context for this venue');
-      }
-      if (req.body.payment_method !== 'cash') {
-        return fail(res, 409, 'PAYMENT_UNAVAILABLE', 'Online payment is not available on dedicated sites yet. Choose pay-at-venue instead.');
       }
     }
 
@@ -270,10 +307,6 @@ exports.checkout = async (req, res) => {
     const amount = split.total;
 
     if (paymentMethod === 'cash') {
-      if (!court.accepts_cash) {
-        return fail(res, 400, 'CASH_NOT_ACCEPTED', 'This venue does not accept pay-at-venue');
-      }
-
       const autoConfirm = await autoConfirmForVenue(client, court.venue_id);
       const bookingStatus = autoConfirm ? 'confirmed' : 'pending';
 
@@ -361,12 +394,18 @@ exports.checkout = async (req, res) => {
     const hold = holdRows[0];
 
     await client.query(
-      `insert into payments (user_id, payhere_payment_id, amount, tax_rate, tax_amount, venue_tax_rate, venue_tax_amount, currency, status)
-       values ($1, $2, $3, $4, $5, $6, $7, 'LKR', 'pending')`,
-      [req.user.id, hold.id, amount, split.platformRate, split.platformTax, split.venueRate, split.venueTax]
+      `insert into payments (user_id, payhere_payment_id, amount, tax_rate, tax_amount, venue_tax_rate, venue_tax_amount, currency, status, payment_method, gateway_business_id)
+       values ($1, $2, $3, $4, $5, $6, $7, 'LKR', 'pending', 'payhere', $8)`,
+      [req.user.id, hold.id, amount, split.platformRate, split.platformTax, split.venueRate, split.venueTax, court.business_id]
     );
 
     await client.query('commit');
+
+    const creds = await businessPaymentMethods.resolveCheckoutCreds(court.business_id);
+    if (!creds) {
+      logger.error(`Checkout ${hold.id}: business ${court.business_id} payhere creds unavailable after commit`);
+      return fail(res, 409, 'PAYMENT_UNAVAILABLE', 'Online payment is not available right now.');
+    }
 
     ok(res, 201, {
       hold_id: hold.id,
@@ -381,7 +420,10 @@ exports.checkout = async (req, res) => {
         email: req.user.email,
         phone: req.user.phone,
         city: req.user.city,
-        baseUrl: requestBaseUrl()
+        baseUrl: requestBaseUrl(),
+        merchantId: creds.merchantId,
+        merchantSecret: creds.merchantSecret,
+        returnUrl: widgetReturnUrl(widgetInstanceKey)
       })
     });
   } catch (error) {
@@ -395,6 +437,14 @@ exports.checkout = async (req, res) => {
     client.release();
   }
 };
+
+// A widget checkout's PayHere redirect returns to the widget's own embed URL
+// (the iframe lands back in the flow, where the customer's booking is listed
+// under "Your bookings") — never to the platform root.
+function widgetReturnUrl(instanceKey) {
+  if (!instanceKey) return null;
+  return `${requestBaseUrl()}/embed/${encodeURIComponent(String(instanceKey))}`;
+}
 
 async function computeAmount(client, courtId, start, end) {
   const { rows } = await client.query(

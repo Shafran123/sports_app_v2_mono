@@ -170,13 +170,13 @@ describe("bookings.checkout", () => {
   });
 
   it("venues.update and resubmit hit the owner endpoints", async () => {
-    const patch = vi.fn(async () => ({ data: { ...venueRow, status: "changes_requested", accepts_cash: true } }));
+    const patch = vi.fn(async () => ({ data: { ...venueRow, status: "changes_requested", venue_tax_rate: 5 } }));
     const post = vi.fn(async () => ({ data: { ...venueRow, status: "pending" } }));
     const client = { get: vi.fn(), post, patch } as unknown as AxiosInstance;
 
-    const updated = await venues.update("v1", { accepts_cash: true }, client);
-    expect(patch).toHaveBeenCalledWith("/venues/v1", { accepts_cash: true });
-    expect(updated.accepts_cash).toBe(true);
+    const updated = await venues.update("v1", { venue_tax_rate: 5 }, client);
+    expect(patch).toHaveBeenCalledWith("/venues/v1", { venue_tax_rate: 5 });
+    expect(updated.venue_tax_rate).toBe(5);
 
     const resubmitted = await venues.resubmit("v1", client);
     expect(post).toHaveBeenCalledWith("/venues/v1/resubmit");
@@ -323,7 +323,7 @@ describe("admin settings & reports", () => {
       series: [{ day: "2026-08-22", bookings: 2, revenue: 1200, tax: 144 }],
       by_sport: [{ slug: "badminton", name: "Badminton", bookings: 2, revenue: 1200 }],
       by_venue: [{ name: "Smash Arena", bookings: 2, revenue: 1200 }],
-      payment_split: { online: { bookings: 1, revenue: 600 }, cash: { bookings: 1, revenue: 600 } },
+      payment_split: { payhere: { bookings: 1, revenue: 600 }, cash: { bookings: 1, revenue: 600 } },
       events: { registrations: 3, revenue: 500 }
     }));
     const reports = await admin.reports(7, client);

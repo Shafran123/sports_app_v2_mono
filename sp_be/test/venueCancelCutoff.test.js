@@ -24,8 +24,8 @@ async function insertBooking(startAt, endAt) {
   // bookings_no_overlap exclusion constraint.
   const courtId = COURT_IDS[nextCourt++ % COURT_IDS.length];
   const { rows } = await pool.query(
-    `insert into bookings (court_id, user_id, start_at, end_at, price_per_slot, total_price, status, idempotency_key)
-     values ($1, $2, $3, $4, 1500, 1500, 'confirmed', $5)
+    `insert into bookings (court_id, user_id, start_at, end_at, price_per_slot, total_price, status, idempotency_key, payment_method)
+     values ($1, $2, $3, $4, 1500, 1500, 'confirmed', $5, 'cash')
      returning *`,
     [courtId, PLAYER_ID, startAt, endAt, `cutoff-${Math.random().toString(36).slice(2)}`]
   );

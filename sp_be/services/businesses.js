@@ -42,6 +42,8 @@ async function ownedBy(userId, businessId, client = pool) {
 
 // Ensure a Business exists for an owner (self-heal: venue creation and owner
 // provisioning both call this so a missing row can never dead-end the owner).
+// A brand-new Business also gets its payment-method rows (ADR-0044): both
+// born disabled — the owner enables them from the Payments page.
 async function ensureForOwner(ownerId, name, client = pool) {
   const existing = await getByOwnerId(ownerId, client);
   if (existing) return existing;
@@ -51,7 +53,15 @@ async function ensureForOwner(ownerId, name, client = pool) {
      returning *`,
     [ownerId, name || 'My Business']
   );
-  return rows[0];
+  const business = rows[0];
+  await client.query(
+    `insert into business_payment_methods (business_id, method, enabled) values
+       ($1, 'cash', false),
+       ($1, 'payhere', false)
+     on conflict (business_id, method) do nothing`,
+    [business.id]
+  );
+  return business;
 }
 
 // Validate + persist name/brand patches. brand is sanitized through the

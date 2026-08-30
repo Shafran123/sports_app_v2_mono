@@ -10,6 +10,7 @@ const dns = require('node:dns');
 const app = require('../app');
 const pool = require('../db');
 const siteDomains = require('../services/siteDomains');
+const { enableBusinessCash } = require('./helpers/methods');
 
 const secret = new TextEncoder().encode('test-secret');
 const tokenFor = (uid) =>
@@ -38,7 +39,6 @@ async function createVenue(token, name) {
       name,
       address: '9 Site Ave',
       city: 'Colombo',
-      accepts_cash: true,
       sports: ['badminton'],
       courts: [
         { name: 'Site Court', sport: 'badminton', price_per_slot: 1000, slot_duration_min: 60, capacity: 4, is_indoor: true }
@@ -76,6 +76,8 @@ describe('site domain request workflow (ADR-0029)', () => {
     PRIVATE_VENUE_ID = priv.body.data.id;
     const { rows } = await pool.query(`select id from courts where venue_id = $1`, [VENUE_ID]);
     COURT_ID = rows[0].id;
+    // ADR-0044: the site checkouts below pay cash — enable the Business method.
+    await enableBusinessCash('site-owner-uid', true);
 
     // Approve both venues; the second one is private — still on the site.
     await request(app).post(`/api/v1/admin/venues/${VENUE_ID}/approve`).set('Authorization', `Bearer ${ADMIN_TOKEN}`);

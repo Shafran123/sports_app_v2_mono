@@ -17,6 +17,7 @@ import {
   FeatureFlagsSchema,
   FlagAuditSchema,
   InvoiceSchema,
+  ManualBookingResultSchema,
   MyVenueSchema,
   NotificationSchema,
   NudgeResultSchema,
@@ -51,7 +52,9 @@ import {
   SiteAuthResultSchema,
   SiteCustomerSchema,
   SiteCustomerSummarySchema,
-  BookingSettingsSchema
+  BookingSettingsSchema,
+  PaymentMethodsSchema,
+  AdminPaymentSummarySchema
 } from "@myslot/types";
 import type { OwnerAgreement, OwnerPlan, VenueBrand, WidgetInstanceInput, SiteRequestInput } from "@myslot/types";
 export { TOKEN_KEY, SITE_CUSTOMER_TOKEN_KEY, SITE_GOOGLE_PENDING_KEY, SITE_TOTP_PENDING_KEY, SITE_AUTH_ERROR_KEY, persistSiteToken, isOwnerSurface } from "./client";
@@ -103,7 +106,6 @@ export const venues = {
       lng?: number;
       photos?: string[];
       amenities?: string[];
-      accepts_cash?: boolean;
       sports: string[];
       courts: Array<{ name: string; sport: string; price_per_slot: number; slot_duration_min?: number; capacity?: number; is_indoor?: boolean }>;
       hours: Array<{ day_of_week: number; open_time: string; close_time: string }>;
@@ -123,7 +125,6 @@ export const venues = {
       phone: string;
       photos: string[];
       amenities: string[];
-      accepts_cash: boolean;
       venue_tax_rate: number;
       cancel_cutoff_hours: number;
     }>,
@@ -183,7 +184,7 @@ export const bookings = {
       start_at: string;
       end_at: string;
       idempotency_key: string;
-      payment_method?: "online" | "cash";
+      payment_method?: "cash" | "payhere" | "online";
       player_phone?: string;
       widget_instance_key?: string;
       site_hostname?: string;
@@ -459,11 +460,19 @@ export const business = {
     return res.data as Blob;
   },
   async manualBooking(
-    input: { court_id: string; start_at: string; end_at: string; player_name?: string; player_phone?: string; amount?: number },
+    input: {
+      court_id: string;
+      start_at: string;
+      end_at: string;
+      player_name?: string;
+      player_phone?: string;
+      amount?: number;
+      paid_by?: "cash" | "card" | "payment_link";
+    },
     client: AxiosInstance = getClient()
   ) {
     const res = await client.post("/business/bookings/manual", input);
-    return parseData(BookingSchema, res.data.data ?? res.data);
+    return parseData(ManualBookingResultSchema, res.data.data ?? res.data);
   },
   async checkIn(bookingId: string, client: AxiosInstance = getClient()) {
     const res = await client.post(`/business/bookings/${bookingId}/check-in`);
@@ -499,6 +508,29 @@ export const business = {
   ) {
     const res = await client.put("/business/booking-settings", patch);
     return parseData(BookingSettingsSchema, res.data.data ?? res.data);
+  },
+  // Payments (ADR-0044): toggles + PayHere credentials, owner console.
+  async getPaymentMethods(client: AxiosInstance = getClient()) {
+    const res = await client.get("/business/payment-methods");
+    return parseData(PaymentMethodsSchema, res.data.data ?? res.data);
+  },
+  async updatePaymentMethods(
+    patch: { cash?: boolean; payhere?: boolean },
+    client: AxiosInstance = getClient()
+  ) {
+    const res = await client.put("/business/payment-methods", patch);
+    return parseData(PaymentMethodsSchema, res.data.data ?? res.data);
+  },
+  async savePayhereCredentials(
+    input: { merchant_id: string; merchant_secret: string; app_id: string; app_secret: string },
+    client: AxiosInstance = getClient()
+  ) {
+    const res = await client.put("/business/payment-methods/payhere/credentials", input);
+    return parseData(PaymentMethodsSchema, res.data.data ?? res.data);
+  },
+  async removePayhereCredentials(client: AxiosInstance = getClient()) {
+    const res = await client.delete("/business/payment-methods/payhere/credentials");
+    return parseData(PaymentMethodsSchema, res.data.data ?? res.data);
   },
   async updateVenueHours(
     venueId: string,
@@ -685,6 +717,12 @@ const PendingVenueSchema = VenueSchema.extend({
 });
 
 export const admin = {
+  // Admin read-only payment summary (ADR-0044, Q29/Q33): per-Business config
+  // state + PayHere collection sums, never secrets.
+  async paymentSummary(client: AxiosInstance = getClient()) {
+    const res = await client.get("/admin/payments/summary");
+    return parseData(AdminPaymentSummarySchema, res.data.data ?? res.data);
+  },
   async listPlayers(search = "", client: AxiosInstance = getClient()) {
     const res = await client.get("/admin/players", { params: search ? { search } : {} });
     return parseList(UserSchema, res.data.data ?? res.data);

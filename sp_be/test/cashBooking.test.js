@@ -3,6 +3,7 @@ const { SignJWT } = require('jose');
 const app = require('../app');
 const pool = require('../db');
 const { enableLegacyFlags } = require('./helpers/flags');
+const { enableBusinessCash, enableBusinessPayhere, setBusinessMethod } = require('./helpers/methods');
 
 const secret = new TextEncoder().encode('test-secret');
 const tokenFor = (uid) =>
@@ -35,7 +36,6 @@ async function createVenue(ownerToken, opts = {}) {
       name: opts.name || 'Cash Booking Venue',
       address: '3 Test Ave',
       city: 'Colombo',
-      accepts_cash: opts.accepts_cash ?? false,
       sports: ['badminton'],
       courts: [
         { name: 'Cash Court', sport: 'badminton', price_per_slot: 1500, slot_duration_min: 60, capacity: 4, is_indoor: true }
@@ -58,28 +58,31 @@ describe('cash bookings', () => {
     OWNER_TOKEN = await tokenFor('demo-owner-uid');
     ADMIN_TOKEN = await tokenFor('demo-admin-uid');
 
-    // online-only venue
-    const plain = await createVenue(OWNER_TOKEN, { name: 'Plain Venue', accepts_cash: false });
+    // ADR-0044: methods are per Business. Both venues share the owner's
+    // Business, which starts with cash OFF (the migration backfill only
+    // enables it for businesses whose venues opted in before).
+    const plain = await createVenue(OWNER_TOKEN, { name: 'Plain Venue' });
     VENUE_ID = plain.body.data.id;
     await approveVenue(ADMIN_TOKEN, VENUE_ID);
     const plainCourt = await pool.query(`select id from courts where venue_id = $1`, [VENUE_ID]);
     const { rows: plainRows } = plainCourt;
     PLAIN_COURT_ID = plainRows[0].id;
 
-    // cash-accepting venue
-    const cash = await createVenue(OWNER_TOKEN, { name: 'Cash Venue', accepts_cash: true });
+    const cash = await createVenue(OWNER_TOKEN, { name: 'Cash Venue' });
     CASH_VENUE_ID = cash.body.data.id;
     await approveVenue(ADMIN_TOKEN, CASH_VENUE_ID);
 
     const { rows } = await pool.query(`select id from courts where venue_id = $1`, [CASH_VENUE_ID]);
     CASH_COURT_ID = rows[0].id;
+
+    // The seed enables cash for the demo business; this suite starts from the
+    // OFF state to exercise the reject gate first (PayHere stays on so the
+    // fail-closed NO_PAYMENT_METHODS path doesn't pre-empt CASH_NOT_ACCEPTED).
+    await setBusinessMethod('demo-owner-uid', 'cash', false);
+    await enableBusinessPayhere('demo-owner-uid', true);
   });
 
-  it('persists the accepts_cash opt-in on venue creation', () => {
-    expect(CASH_VENUE_ID).toBeTruthy();
-  });
-
-  it('rejects cash checkout when the venue does not accept cash', async () => {
+  it('rejects cash checkout when the business has cash off', async () => {
     const date = colomboDate(2);
     const res = await request(app)
       .post('/api/v1/bookings/checkout')
@@ -97,6 +100,8 @@ describe('cash bookings', () => {
   });
 
   it('creates an instant confirmed cash booking with a QR token', async () => {
+    // ADR-0044: cash is a Business method — the owner turns it on here.
+    await enableBusinessCash('demo-owner-uid', true);
     const date = colomboDate(2);
     const res = await request(app)
       .post('/api/v1/bookings/checkout')
@@ -117,6 +122,9 @@ describe('cash bookings', () => {
   });
 
   it('still creates an online hold when payment_method is online (regression)', async () => {
+    // ADR-0044: the online path now runs on the Business's own gateway —
+    // enabled + configured here.
+    await enableBusinessPayhere('demo-owner-uid', true);
     const date = colomboDate(3);
     const res = await request(app)
       .post('/api/v1/bookings/checkout')

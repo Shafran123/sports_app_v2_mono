@@ -170,7 +170,6 @@ export function AdminVenuesPage() {
                     <p className="mt-0.5 text-sm text-ink-3">
                       {courtsFor(venue)} {courtsFor(venue) === 1 ? "court" : "courts"} ·{" "}
                       {venue.created_at ? `created ${formatDateLong(venue.created_at)}` : ""}
-                      {venue.accepts_cash ? " · accepts cash" : ""}
                     </p>
                   </div>
 

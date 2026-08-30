@@ -219,8 +219,8 @@ exports.registerForEvent = async (req, res) => {
     const registration = regRows[0];
 
     await client.query(
-      `insert into payments (user_id, event_registration_id, payhere_payment_id, amount, tax_rate, tax_amount, venue_tax_rate, venue_tax_amount, currency, status)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, 'LKR', 'pending')`,
+      `insert into payments (user_id, event_registration_id, payhere_payment_id, amount, tax_rate, tax_amount, venue_tax_rate, venue_tax_amount, currency, status, payment_method)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, 'LKR', 'pending', 'payhere')`,
       [req.user.id, registration.id, registration.id, taxed.total, taxed.platformRate, taxed.platformTax, taxed.venueRate, taxed.venueTax]
     );
 

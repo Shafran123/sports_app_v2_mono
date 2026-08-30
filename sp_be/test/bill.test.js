@@ -6,6 +6,7 @@ const pool = require('../db');
 const { bookingBillPdf, registrationBillPdf, emailBillForBooking, ensureInvoiceNumber } = require('../utils/billService');
 const smsService = require('../utils/smsService');
 const { resetFlagsToDefaults } = require('./helpers/flags');
+const { enableBusinessPayhere } = require('./helpers/methods');
 
 const secret = new TextEncoder().encode('test-secret');
 const tokenFor = (uid) =>
@@ -58,7 +59,6 @@ async function createVenue(name) {
       name,
       address: '6 Bill Ave',
       city: 'Colombo',
-      accepts_cash: true,
       sports: ['badminton'],
       courts: [
         { name: 'Bill Court', sport: 'badminton', price_per_slot: 1500, slot_duration_min: 60, capacity: 4, is_indoor: true }
@@ -83,6 +83,8 @@ describe('booking bills', () => {
     await request(app).post(`/api/v1/admin/venues/${venueId}/approve`).set('Authorization', `Bearer ${ADMIN_TOKEN}`);
     const { rows } = await pool.query(`select id from courts where venue_id = $1`, [venueId]);
     CASH_COURT_ID = rows[0].id;
+    // ADR-0044: this suite's online webhook test rides the Business gateway.
+    await enableBusinessPayhere('demo-owner-uid', true);
 
     const res = await request(app)
       .post('/api/v1/bookings/checkout')
@@ -244,7 +246,7 @@ describe('booking bills', () => {
     expect(notify.status).toBe(200);
 
     const { rows } = await pool.query(`select id, payment_method, status from bookings where idempotency_key = $1`, [idem]);
-    expect(rows[0].payment_method).toBe('online');
+    expect(rows[0].payment_method).toBe('payhere');
     expect(rows[0].status).toBe('confirmed');
 
     const spy = vi.spyOn(require('../utils/emailService'), 'sendEmail').mockResolvedValue({ success: true });

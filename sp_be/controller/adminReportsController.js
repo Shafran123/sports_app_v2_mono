@@ -83,7 +83,7 @@ exports.getReports = async (req, res) => {
       series,
       by_sport: bySport,
       by_venue: byVenue,
-      payment_split: { online: split.find((s) => s.payment_method === 'online') || { bookings: 0, revenue: 0 }, cash: split.find((s) => s.payment_method === 'cash') || { bookings: 0, revenue: 0 } },
+      payment_split: { payhere: split.find((s) => s.payment_method === 'payhere') || { bookings: 0, revenue: 0 }, cash: split.find((s) => s.payment_method === 'cash') || { bookings: 0, revenue: 0 } },
       events: events[0] ? { registrations: events[0].registrations, revenue: events[0].revenue } : { registrations: 0, revenue: 0 }
     });
   } catch (error) {

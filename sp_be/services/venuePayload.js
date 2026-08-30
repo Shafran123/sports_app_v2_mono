@@ -4,6 +4,7 @@
 // Widget config (one venue per eligible entry).
 
 const pool = require('../db');
+const businessPaymentMethods = require('./businessPaymentMethods');
 
 async function buildVenueDetail(venue, client = pool) {
   const [courtsRes, sportsRes, hoursRes] = await Promise.all([
@@ -32,8 +33,17 @@ async function buildVenueDetail(venue, client = pool) {
   // The venue row's owner identity is never public; all other fields
   // (slug, photos, brand-less presence) render on the storefront.
   const { owner_id, ...publicVenue } = venue;
+  // ADR-0044: the Business's payment methods ride every public venue payload
+  // so checkout surfaces know what to offer. Never secrets — just flags.
+  let payment_methods = { cash_enabled: false, payhere_enabled: false, payhere_configured: false };
+  try {
+    payment_methods = await businessPaymentMethods.getMethodsSummary(venue.business_id, client);
+  } catch {
+    // fail-open here: a methods read hiccup must not kill the storefront
+  }
   return {
     ...publicVenue,
+    payment_methods,
     courts: courtsRes.rows,
     sports: sportsRes.rows.map((s) => s.name),
     hours: hoursRes.rows

@@ -141,7 +141,6 @@ export function VenueDetailPage({ venueId }: { venueId: string }) {
   });
 
   const [photos, setPhotos] = useState<string[]>(venue?.photos ?? []);
-  const [acceptsCash, setAcceptsCash] = useState(Boolean(venue?.accepts_cash));
   const [venueTaxRate, setVenueTaxRate] = useState(String(venue?.venue_tax_rate ?? ""));
   const [cancelCutoff, setCancelCutoff] = useState(String(venue?.cancel_cutoff_hours ?? ""));
   const [savingSettings, setSavingSettings] = useState(false);
@@ -151,7 +150,6 @@ export function VenueDetailPage({ venueId }: { venueId: string }) {
   useEffect(() => {
     if (venue) {
       setPhotos(venue.photos ?? []);
-      setAcceptsCash(Boolean(venue.accepts_cash));
       setVenueTaxRate(venue.venue_tax_rate != null ? String(venue.venue_tax_rate) : "");
       setCancelCutoff(venue.cancel_cutoff_hours != null ? String(venue.cancel_cutoff_hours) : "");
     }
@@ -174,7 +172,6 @@ export function VenueDetailPage({ venueId }: { venueId: string }) {
       }
       await venues.update(venueId, {
         photos,
-        accepts_cash: acceptsCash,
         venue_tax_rate: taxRate,
         cancel_cutoff_hours: cutoff
       });
@@ -698,20 +695,14 @@ export function VenueDetailPage({ venueId }: { venueId: string }) {
         <TabsContent value="settings">
           <div className="space-y-4">
             <Card className="p-5 md:p-6">
-              <label className="flex items-start gap-3">
-                <Checkbox
-                  checked={acceptsCash}
-                  onChange={(e) => setAcceptsCash(e.target.checked)}
-                  className="mt-0.5"
-                />
-                <span>
-                  <span className="block font-semibold text-ink">Accept pay-at-venue (cash)</span>
-                  <span className="mt-0.5 block text-sm text-ink-2">
-                    Let players book now and pay in cash when they arrive. You record the payment
-                    from your console.
-                  </span>
-                </span>
-              </label>
+              <p className="font-semibold text-ink">Payment methods</p>
+              <p className="mt-0.5 text-sm text-ink-2">
+                Cash and PayHere are configured per business —{" "}
+                <Link href="/payments" className="font-semibold text-primary underline-offset-2 hover:underline">
+                  manage them on the Payments page
+                </Link>
+                . This venue&apos;s customers can pay by whatever the business has enabled.
+              </p>
             </Card>
 
             <Card className="p-5 md:p-6">

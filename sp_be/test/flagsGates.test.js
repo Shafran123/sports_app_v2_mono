@@ -4,6 +4,7 @@ const app = require('../app');
 const pool = require('../db');
 const { sendSms } = require('../utils/smsService');
 const { resetFlagsToDefaults } = require('./helpers/flags');
+const { enableBusinessCash, enableBusinessPayhere } = require('./helpers/methods');
 
 const secret = new TextEncoder().encode('test-secret');
 const tokenFor = (uid) =>
@@ -26,7 +27,7 @@ function isoColombo(dateStr, timeStr) {
   return `${dateStr}T${timeStr}:00+05:30`;
 }
 
-async function createVenue(name, acceptsCash) {
+async function createVenue(name) {
   const res = await request(app)
     .post('/api/v1/venues')
     .set('Authorization', `Bearer ${OWNER_TOKEN}`)
@@ -34,7 +35,6 @@ async function createVenue(name, acceptsCash) {
       name,
       address: '9 Gate Ave',
       city: 'Colombo',
-      accepts_cash: acceptsCash,
       sports: ['badminton'],
       courts: [
         { name: 'Gate Court', sport: 'badminton', price_per_slot: 1000, slot_duration_min: 60, capacity: 4, is_indoor: true }
@@ -72,8 +72,12 @@ describe('feature-flag gates (defaults OFF)', () => {
     OWNER_TOKEN = await tokenFor('demo-owner-uid');
     ADMIN_TOKEN = await tokenFor('demo-admin-uid');
 
-    const onlineVenue = await createVenue('Gate Online Venue', false);
-    const cashVenue = await createVenue('Gate Cash Venue', true);
+    // ADR-0044: methods are per Business — the owner's Business enables both
+    // cash and PayHere; the platform kill switch still gates online.
+    const onlineVenue = await createVenue('Gate Online Venue');
+    const cashVenue = await createVenue('Gate Cash Venue');
+    await enableBusinessCash('demo-owner-uid', true);
+    await enableBusinessPayhere('demo-owner-uid', true);
     await request(app).post(`/api/v1/admin/venues/${onlineVenue}/approve`).set('Authorization', `Bearer ${ADMIN_TOKEN}`);
     await request(app).post(`/api/v1/admin/venues/${cashVenue}/approve`).set('Authorization', `Bearer ${ADMIN_TOKEN}`);
 
@@ -194,7 +198,8 @@ describe('tax snapshots', () => {
     OWNER_TOKEN = await tokenFor('demo-owner-uid');
     ADMIN_TOKEN = await tokenFor('demo-admin-uid');
 
-    const venue = await createVenue('Tax Cash Venue', true);
+    const venue = await createVenue('Tax Cash Venue');
+    await enableBusinessCash('demo-owner-uid', true);
     await request(app).post(`/api/v1/admin/venues/${venue}/approve`).set('Authorization', `Bearer ${ADMIN_TOKEN}`);
     const { rows } = await pool.query(`select id from courts where venue_id = $1`, [venue]);
     CASH_COURT_ID = rows[0].id;

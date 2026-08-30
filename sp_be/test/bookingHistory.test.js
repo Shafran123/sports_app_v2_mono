@@ -22,8 +22,7 @@ function iso(daysFromNow, hoursFromNow = 0) {
 
 async function insertBooking(startAt, endAt, status = 'confirmed', idemKey = null) {
   const { rows } = await pool.query(
-    `insert into bookings (court_id, user_id, start_at, end_at, price_per_slot, total_price, status, idempotency_key)
-     values ($1, $2, $3, $4, 1500, 1500, $5, $6)
+    `insert into bookings (court_id, user_id, start_at, end_at, price_per_slot, total_price, status, idempotency_key, payment_method) values ($1, $2, $3, $4, 1500, 1500, $5, $6, 'cash')
      returning *`,
     [COURT_ID, PLAYER_ID, startAt, endAt, status, idemKey || `bk-${Math.random().toString(36).slice(2)}`]
   );

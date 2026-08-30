@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const app = require('../app');
 const pool = require('../db');
 const { enableLegacyFlags, resetFlagsToDefaults } = require('./helpers/flags');
+const { enableBusinessCash, enableBusinessPayhere } = require('./helpers/methods');
 
 const secret = new TextEncoder().encode('test-secret');
 const tokenFor = (uid) =>
@@ -28,7 +29,7 @@ function isoColombo(dateStr, timeStr) {
   return `${dateStr}T${timeStr}:00+05:30`;
 }
 
-async function createVenue(ownerToken, name, acceptsCash) {
+async function createVenue(ownerToken, name) {
   const res = await request(app)
     .post('/api/v1/venues')
     .set('Authorization', `Bearer ${ownerToken}`)
@@ -36,7 +37,6 @@ async function createVenue(ownerToken, name, acceptsCash) {
       name,
       address: '9 Verify Ave',
       city: 'Colombo',
-      accepts_cash: acceptsCash,
       sports: ['badminton'],
       courts: [
         { name: 'Verify Court', sport: 'badminton', price_per_slot: 1500, slot_duration_min: 60, capacity: 4, is_indoor: true }
@@ -82,6 +82,10 @@ describe('verified-phone booking gate', () => {
     COURT_ID = onlineRows[0].id;
     CASH_COURT_ID = cashRows[0].id;
     VENUE_ID = onlineVenue;
+    // ADR-0044: methods are per Business — both venues share the owner's
+    // business, which this suite enables for cash + PayHere.
+    await enableBusinessCash('demo-owner-uid', true);
+    await enableBusinessPayhere('demo-owner-uid', true);
     CASH_VENUE_ID = cashVenue;
   });
 

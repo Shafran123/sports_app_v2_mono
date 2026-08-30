@@ -399,7 +399,7 @@ function ReportCharts({ data }: { data: AdminReports }) {
           <PieChart>
             <Pie
               data={[
-                { name: "Online", value: data.payment_split.online.revenue, fill: "#176036" },
+                { name: "PayHere", value: data.payment_split.payhere?.revenue ?? 0, fill: "#176036" },
                 { name: "Cash", value: data.payment_split.cash.revenue, fill: "#d97706" }
               ]}
               dataKey="value"

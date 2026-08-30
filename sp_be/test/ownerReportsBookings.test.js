@@ -4,6 +4,7 @@ const app = require('../app');
 const pool = require('../db');
 const { buildDigest } = require('../jobs/dailyDigest');
 const { enableLegacyFlags, resetFlagsToDefaults } = require('./helpers/flags');
+const { enableBusinessCash } = require('./helpers/methods');
 
 const secret = new TextEncoder().encode('test-secret');
 const tokenFor = (uid) =>
@@ -33,7 +34,6 @@ async function createVenue(name) {
       name,
       address: '9 Report Rd',
       city: 'Colombo',
-      accepts_cash: true,
       venue_tax_rate: 10,
       sports: ['badminton'],
       courts: [
@@ -129,7 +129,6 @@ describe('owner reports, filtered bookings & tax split (T3-T5)', () => {
         name: 'Other Owners Club',
         address: '77 Other Rd',
         city: 'Kandy',
-        accepts_cash: true,
         sports: ['badminton'],
         courts: [{ name: 'Other Court', sport: 'badminton', price_per_slot: 500, slot_duration_min: 60, capacity: 4, is_indoor: true }],
         hours: Array.from({ length: 7 }, (_, d) => ({ day_of_week: d, open_time: '06:00', close_time: '22:00' }))
@@ -137,6 +136,8 @@ describe('owner reports, filtered bookings & tax split (T3-T5)', () => {
     expect(otherVenue.status).toBe(201);
     await request(app).post(`/api/v1/admin/venues/${otherVenue.body.data.id}/approve`).set('Authorization', `Bearer ${ADMIN_TOKEN}`);
     const { rows: otherCourtRows } = await pool.query(`select id from courts where venue_id = $1`, [otherVenue.body.data.id]);
+    // ADR-0044: the other owner's Business must enable cash for the booking.
+    await enableBusinessCash(OTHER_UID, true);
 
     const date = colomboDatePlus(1);
     const otherBooking = await request(app)

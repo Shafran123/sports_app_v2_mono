@@ -1,5 +1,6 @@
 const pool = require('../db');
 const logger = require('../utils/logger');
+const { refundPayherePayment } = require('./payhereRefund');
 
 async function getTiers() {
   const { rows } = await pool.query(
@@ -100,11 +101,20 @@ async function cancelBooking(client, bookingId, actorUserId, actorRole, siteCust
       `select * from payments where booking_id = $1 and status = 'paid' limit 1`,
       [bookingId]
     );
-    if (paymentRows.length > 0 && paymentRows[0].payment_method === 'online') {
-      await client.query(
-        `update payments set needs_manual_refund = true where id = $1`,
-        [paymentRows[0].id]
-      );
+    const payment = paymentRows[0];
+    if (payment && payment.payment_method === 'payhere') {
+      if (payment.gateway_business_id) {
+        // ADR-0044: the money sits in the owner's account — refund it through
+        // the Business's own credentials. Fire-and-forget: a failure marks
+        // needs_manual_refund for the admin to chase.
+        void refundPayherePayment(payment);
+      } else {
+        // Platform-scoped (legacy/events): refund stays a manual admin action.
+        await client.query(
+          `update payments set needs_manual_refund = true where id = $1`,
+          [payment.id]
+        );
+      }
     }
   }
 

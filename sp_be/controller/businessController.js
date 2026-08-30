@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const pool = require('../db');
 const { ok, fail } = require('../utils/response');
 const logger = require('../utils/logger');
@@ -5,12 +6,16 @@ const { publishBookingEvent } = require('../utils/publish');
 const notificationCatalog = require('../utils/notificationCatalog');
 const { stripBookingSecrets, stripBookingSecretsList } = require('../utils/scrub');
 const cancellationService = require('../services/cancellation');
-const { mintQrToken } = require('../utils/tokens');
+const { mintQrToken, requestBaseUrl } = require('../utils/tokens');
 const billService = require('../utils/billService');
 const { getTaxRate, applyInclusiveTax } = require('../utils/featureFlags');
 const { colomboDate, colomboTime } = require('../utils/colombo');
 const { windowsForDay } = require('../services/venueEngine');
 const pricingEngine = require('../services/pricingEngine');
+const businessPaymentMethods = require('../services/businessPaymentMethods');
+const smsService = require('../utils/smsService');
+const { buildCheckoutParams } = require('../utils/payhere');
+const { getFlag } = require('../utils/featureFlags');
 
 async function verifyOwnership(client, venueId, userId) {
   const { rows } = await client.query(
@@ -663,7 +668,7 @@ exports.reports = async (req, res) => {
       series,
       by_sport: bySport,
       by_venue: byVenue,
-      payment_split: { online: split.find((s) => s.payment_method === 'online') || { bookings: 0, revenue: 0 }, cash: split.find((s) => s.payment_method === 'cash') || { bookings: 0, revenue: 0 } },
+      payment_split: { payhere: split.find((s) => s.payment_method === 'payhere') || { bookings: 0, revenue: 0 }, cash: split.find((s) => s.payment_method === 'cash') || { bookings: 0, revenue: 0 } },
       events: events[0] ? { registrations: events[0].registrations, revenue: events[0].revenue } : { registrations: 0, revenue: 0 }
     });
   } catch (error) {
@@ -692,7 +697,7 @@ exports.overview = async (req, res) => {
             join venues v on v.id = c.venue_id
             where v.owner_id = $1 and b.status in ('pending', 'confirmed', 'completed') ${dayCondition}) as bookings_count,
          coalesce(sum(p.amount), 0)::int as revenue,
-         coalesce(sum(p.amount) filter (where p.payment_method = 'online'), 0)::int as online_revenue,
+         coalesce(sum(p.amount) filter (where p.payment_method = 'payhere'), 0)::int as online_revenue,
          coalesce(sum(p.amount) filter (where p.payment_method = 'cash'), 0)::int as cash_revenue
        from payments p
        join bookings b on b.id = p.booking_id
@@ -876,14 +881,16 @@ exports.checkIn = async (req, res) => {
 exports.createManualBooking = async (req, res) => {
   const client = await pool.connect();
   try {
-    const { court_id, start_at, end_at, player_name, player_phone, amount } = req.body;
+    // paid_by: 'cash' (default) | 'card' | 'payment_link' (ADR-0044, ticket 11)
+    const { court_id, start_at, end_at, player_name, player_phone, amount, paid_by } = req.body;
+    const collection = paid_by === 'card' ? 'card' : paid_by === 'payment_link' ? 'payment_link' : 'cash';
 
     if (!court_id || !start_at || !end_at) {
       return fail(res, 400, 'MANUAL_BOOKING_VALIDATION', 'court_id, start_at, and end_at are required');
     }
 
     const { rows: courtRows } = await client.query(
-      `select c.*, v.owner_id, v.venue_tax_rate from courts c join venues v on v.id = c.venue_id where c.id = $1`,
+      `select c.*, v.owner_id, v.business_id, v.venue_tax_rate from courts c join venues v on v.id = c.venue_id where c.id = $1`,
       [court_id]
     );
     if (courtRows.length === 0) {
@@ -892,6 +899,19 @@ exports.createManualBooking = async (req, res) => {
     const court = courtRows[0];
     if (court.owner_id !== req.user.id && req.user.role !== 'admin') {
       return fail(res, 403, 'FORBIDDEN', 'You do not manage this court');
+    }
+
+    // A Payment Link runs on the Business's own PayHere gateway (ADR-0044):
+    // gate it the same way checkout does — enabled AND configured AND the
+    // global kill switch (both must hold, exactly like online checkout).
+    if (collection === 'payment_link') {
+      const [payhereFlag, methods] = await Promise.all([
+        getFlag('payhere_enabled'),
+        businessPaymentMethods.getMethodsSummary(court.business_id, client)
+      ]);
+      if (!payhereFlag || !(methods.payhere_enabled && methods.payhere_configured)) {
+        return fail(res, 409, 'PAYMENT_UNAVAILABLE', 'PayHere is not enabled for this business — no payment link');
+      }
     }
 
     // Walk-ins use the same pricing engine as players: the server derives the
@@ -929,24 +949,87 @@ exports.createManualBooking = async (req, res) => {
       const split = applyInclusiveTax(total, platformRate, court.venue_tax_rate || 0);
       const { rows } = await client.query(
         `insert into bookings (court_id, user_id, start_at, end_at, price_per_slot, total_price, tax_rate, tax_amount, venue_tax_rate, venue_tax_amount, status, payment_method, player_name, player_phone, qr_token, idempotency_key, subtotal_amount, discount_amount, confirmed_at)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'confirmed', 'cash', $11, $12, $13, $14, $15, $16, now())
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'confirmed', $11, $12, $13, $14, $15, $16, $17, now())
          returning *`,
         [
           court_id, req.user.id, start_at, end_at,
-          pricing.slots[0]?.base_price ?? court.price_per_slot, total, split.platformRate, split.platformTax, split.venueRate, split.venueTax, player_name || null, player_phone || null,
+          pricing.slots[0]?.base_price ?? court.price_per_slot, total, split.platformRate, split.platformTax, split.venueRate, split.venueTax,
+          collection === 'payment_link' ? 'payhere' : 'cash',
+          player_name || null, player_phone || null,
           mintQrToken(),
           `manual-${Math.random().toString(36).slice(2)}`,
           pricing.subtotal, pricing.discount
         ]
       );
-      // Walk-ins are confirmed on the spot and their cash payment is born
-      // `due` (the owner takes the money when the player arrives).
+      // Walk-ins are confirmed on the spot (ADR-0040). Their payment row
+      // depends on how the owner collects (ADR-0044, ticket 11):
+      //   cash         -> born `due`, flipped to paid on collection
+      //   card         -> recorded `paid` via `card` channel (terminal swipe,
+      //                   no gateway webhook ever touches it)
+      //   payment_link -> born `pending` on the Business's gateway; the
+      //                   notify webhook flips it paid when the guest pays
       const manualBookingId = rows[0].id;
-      await client.query(
-        `insert into payments (user_id, booking_id, amount, tax_rate, tax_amount, venue_tax_rate, venue_tax_amount, currency, status, payment_method)
-         values ($1, $2, $3, $4, $5, $6, $7, 'LKR', 'due', 'cash')`,
-        [req.user.id, manualBookingId, total, split.platformRate, split.platformTax, split.venueRate, split.venueTax]
-      );
+      if (collection === 'card') {
+        await client.query(
+          `insert into payments (user_id, booking_id, amount, tax_rate, tax_amount, venue_tax_rate, venue_tax_amount, currency, status, payment_method, paid_at)
+           values ($1, $2, $3, $4, $5, $6, $7, 'LKR', 'paid', 'card', now())`,
+          [req.user.id, manualBookingId, total, split.platformRate, split.platformTax, split.venueRate, split.venueTax]
+        );
+      } else if (collection === 'payment_link') {
+        const linkId = crypto.randomUUID();
+        const creds = await businessPaymentMethods.resolveCheckoutCreds(court.business_id);
+        if (!creds) {
+          throw Object.assign(new Error('Business PayHere credentials unavailable'), { code: 'PAYHERE_NOT_CONFIGURED' });
+        }
+        await client.query(
+          `insert into payments (user_id, booking_id, amount, tax_rate, tax_amount, venue_tax_rate, venue_tax_amount, currency, status, payment_method, payhere_payment_id, gateway_business_id)
+           values ($1, $2, $3, $4, $5, $6, $7, 'LKR', 'pending', 'payhere', $8, $9)`,
+          [req.user.id, manualBookingId, total, split.platformRate, split.platformTax, split.venueRate, split.venueTax, linkId, court.business_id]
+        );
+        const linkParams = buildCheckoutParams({
+          orderId: linkId,
+          amount: total,
+          firstName: player_name || null,
+          phone: player_phone || null,
+          baseUrl: requestBaseUrl(),
+          merchantId: creds.merchantId,
+          merchantSecret: creds.merchantSecret
+        });
+        const checkoutUrl = `${linkParams.checkout_url}?` + new URLSearchParams({
+          merchant_id: linkParams.merchant_id,
+          order_id: linkParams.order_id,
+          items: linkParams.items,
+          currency: linkParams.currency,
+          amount: linkParams.amount,
+          first_name: linkParams.first_name,
+          email: linkParams.email,
+          phone: linkParams.phone,
+          city: linkParams.city,
+          country: linkParams.country,
+          notify_url: linkParams.notify_url,
+          return_url: linkParams.return_url,
+          cancel_url: linkParams.cancel_url,
+          hash: linkParams.hash
+        }).toString();
+        await client.query('commit');
+        const created = rows[0];
+        await publishBookingEvent('booking.created', created.id);
+        await notificationCatalog.dispatchBooking('booking.walkin_created', created.id);
+        // The Payment Link goes by SMS (Q22): the guest pays from their phone.
+        if (player_phone) {
+          void smsService.sendSms({
+            to: smsService.formatSriLankanPhone(player_phone),
+            message: `${'MySlot.LK'}: Pay ${total} LKR for your booking at ${court.name} — ${checkoutUrl}`
+          });
+        }
+        return ok(res, 201, { ...created, payment_link: checkoutUrl });
+      } else {
+        await client.query(
+          `insert into payments (user_id, booking_id, amount, tax_rate, tax_amount, venue_tax_rate, venue_tax_amount, currency, status, payment_method)
+           values ($1, $2, $3, $4, $5, $6, $7, 'LKR', 'due', 'cash')`,
+          [req.user.id, manualBookingId, total, split.platformRate, split.platformTax, split.venueRate, split.venueTax]
+        );
+      }
       await client.query('commit');
       const created = rows[0];
       await publishBookingEvent('booking.created', created.id);
@@ -956,6 +1039,9 @@ exports.createManualBooking = async (req, res) => {
       await client.query('rollback to savepoint manual_insert');
       if (error.code === '23505' || error.code === '23P01') {
         return fail(res, 409, 'BOOKING_SLOT_UNAVAILABLE', 'This slot is already taken');
+      }
+      if (error.code === 'PAYHERE_NOT_CONFIGURED') {
+        return fail(res, 409, 'PAYMENT_UNAVAILABLE', 'Online payment is not available right now.');
       }
       throw error;
     }

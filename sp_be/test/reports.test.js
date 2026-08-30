@@ -32,7 +32,6 @@ async function createVenue(name) {
       name,
       address: '12 Report Ave',
       city: 'Colombo',
-      accepts_cash: true,
       sports: ['badminton'],
       courts: [
         { name: 'Report Court', sport: 'badminton', price_per_slot: 900, slot_duration_min: 60, capacity: 4, is_indoor: true }
@@ -98,7 +97,7 @@ describe('admin reports & digest', () => {
 
     expect(data.by_venue.find((v) => v.name === 'Report Venue').revenue).toBe(900);
     expect(data.payment_split.cash.bookings).toBeGreaterThanOrEqual(1);
-    expect(data.payment_split.online.bookings).toBeGreaterThanOrEqual(0);
+    expect(data.payment_split.payhere.bookings).toBeGreaterThanOrEqual(0);
     expect(data.events.registrations).toBeGreaterThanOrEqual(0);
   });
 

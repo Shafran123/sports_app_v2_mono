@@ -95,8 +95,7 @@ describe('availability engine', () => {
     const date = colomboDate(6);
     const userId = await getUserId();
     await pool.query(
-      `insert into bookings (court_id, user_id, start_at, end_at, price_per_slot, total_price, status)
-       values ($1, $2, $3, $4, 1500, 1500, 'confirmed')`,
+      `insert into bookings (court_id, user_id, start_at, end_at, price_per_slot, total_price, status, payment_method) values ($1, $2, $3, $4, 1500, 1500, 'confirmed', 'cash')`,
       [COURT_ID, userId, isoColombo(date, '08:00'), isoColombo(date, '09:00')]
     );
 

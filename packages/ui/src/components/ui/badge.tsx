@@ -67,7 +67,9 @@ const STATUS_LABEL: Record<string, string> = {
   active: "Active",
   approved: "Approved",
   rejected: "Rejected",
-  online: "Online",
+  online: "PayHere",
+  payhere: "PayHere",
+  card: "Card",
   cash: "Cash"
 };
 

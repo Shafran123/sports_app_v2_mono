@@ -9,6 +9,7 @@ const crypto = require('node:crypto');
 const app = require('../app');
 const pool = require('../db');
 const { enableLegacyFlags, enableSms } = require('./helpers/flags');
+const { enableBusinessCash } = require('./helpers/methods');
 const smsService = require('../utils/smsService');
 const { slugify, mintWidgetKey, sanitizeBrand, sanitizeDomains, isHostAllowed } = require('../utils/widget');
 
@@ -50,7 +51,6 @@ async function createVenue(ownerToken, name) {
       name,
       address: '4 Widget Ave',
       city: 'Colombo',
-      accepts_cash: true,
       sports: ['badminton'],
       courts: [
         { name: 'Widget Court', sport: 'badminton', price_per_slot: 1200, slot_duration_min: 60, capacity: 4, is_indoor: true }
@@ -194,6 +194,8 @@ describe('private venues + business scoping (tickets 01, 02)', () => {
     SLUG = res.body.data.slug;
     const { rows } = await pool.query(`select id from courts where venue_id = $1`, [VENUE_ID]);
     COURSE_ID = rows[0].id;
+    // ADR-0044: the widget's cash checkout runs on the Business's cash method.
+    await enableBusinessCash('widget-owner-uid', true);
   });
 
   it('creates a venue with a slug and joins the owner business', async () => {

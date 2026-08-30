@@ -8,6 +8,7 @@ const app = require('../app');
 const pool = require('../db');
 const siteCustomers = require('../services/siteCustomers');
 const { enableSms } = require('./helpers/flags');
+const { enableBusinessCash } = require('./helpers/methods');
 
 let BUSINESS_A;
 let BUSINESS_B;
@@ -251,7 +252,6 @@ describe('site customer auth (ADR-0030, ticket 01)', () => {
         name: 'Site Auth Court House',
         address: '1 Auth Rd',
         city: 'Colombo',
-        accepts_cash: true,
         sports: ['badminton'],
         courts: [{ name: 'Auth Court', sport: 'badminton', price_per_slot: 900, slot_duration_min: 60, capacity: 4, is_indoor: true }],
         hours: Array.from({ length: 7 }, (_, d) => ({ day_of_week: d, open_time: '06:00', close_time: '23:00' }))
@@ -259,6 +259,8 @@ describe('site customer auth (ADR-0030, ticket 01)', () => {
     expect(venue.status).toBe(201);
     await request(app).post(`/api/v1/admin/venues/${venue.body.data.id}/approve`).set('Authorization', `Bearer ${await tokenFor('siteauth-admin')}`);
     const { rows: courtRows } = await pool.query(`select id from courts where venue_id = $1`, [venue.body.data.id]);
+    // ADR-0044: the site customer's cash checkout runs on the Business method.
+    await enableBusinessCash(`siteauth-owner-a-${rand}`, true);
 
     const reg = await registerAt('site-customer.test', `booker-${rand}@abc.test`);
     expect(reg.status).toBe(201);

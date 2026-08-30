@@ -5,6 +5,7 @@ const businessProfileController = require('../controller/businessProfileControll
 const widgetInstanceController = require('../controller/widgetInstanceController');
 const siteDomainController = require('../controller/siteDomainController');
 const siteAuthController = require('../controller/siteAuthController');
+const paymentMethodsController = require('../controller/paymentMethodsController');
 const { makeRateLimiter } = require('../middleware/rateLimit');
 
 const router = express.Router();
@@ -59,5 +60,10 @@ router.post('/qr-checkin', writeLimiter, businessController.qrCheckIn);
 router.post('/qr-lookup', writeLimiter, businessController.qrLookup);
 router.get('/booking-settings', businessProfileController.getBookingSettings);
 router.put('/booking-settings', writeLimiter, businessProfileController.updateBookingSettings);
+// Payments (ADR-0044): the owner's payment-method toggles + PayHere credentials.
+router.get('/payment-methods', paymentMethodsController.getPaymentMethods);
+router.put('/payment-methods', writeLimiter, paymentMethodsController.updatePaymentMethods);
+router.put('/payment-methods/payhere/credentials', writeLimiter, paymentMethodsController.savePayhereCredentials);
+router.delete('/payment-methods/payhere/credentials', writeLimiter, paymentMethodsController.removePayhereCredentials);
 
 module.exports = router;

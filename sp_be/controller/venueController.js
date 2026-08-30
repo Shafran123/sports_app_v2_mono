@@ -6,6 +6,7 @@ const { slugify } = require('../utils/widget');
 const { ensureForOwner } = require('../services/businesses');
 const siteDomains = require('../services/siteDomains');
 const { buildVenueDetail } = require('../services/venuePayload');
+const businessPaymentMethods = require('../services/businessPaymentMethods');
 
 // Derive a unique, URL-safe slug for a venue's branded page. On collision the
 // slug is suffixed -2, -3, ... so the page URL stays stable and human-typed.
@@ -49,7 +50,7 @@ exports.createVenue = async (req, res) => {
       return fail(res, 403, 'ONBOARDING_REQUIRED', 'Accept your owner agreement before creating venues');
     }
 
-    const { name, description, address, city, phone, lat, lng, photos, amenities, sports, courts, hours, accepts_cash, venue_tax_rate } = req.body;
+    const { name, description, address, city, phone, lat, lng, photos, amenities, sports, courts, hours, venue_tax_rate } = req.body;
 
     if (!name || !city || !address) {
       return fail(res, 400, 'VENUE_VALIDATION', 'name, city, and address are required');
@@ -82,14 +83,14 @@ exports.createVenue = async (req, res) => {
     const business = await ensureForOwner(req.user.id, name, client);
 
     const { rows: venueRows } = await client.query(
-      `insert into venues (owner_id, business_id, name, description, address, city, phone, lat, lng, photos, amenities, status, accepts_cash, venue_tax_rate, slug)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'pending', $12, $13, $14)
+      `insert into venues (owner_id, business_id, name, description, address, city, phone, lat, lng, photos, amenities, status, venue_tax_rate, slug)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'pending', $12, $13)
        returning *`,
       [
         req.user.id, business.id, name, description || null, address, city, phone || null,
         lat || null, lng || null,
         JSON.stringify(photos || []), JSON.stringify(amenities || []),
-        !!accepts_cash, venueTax, slug
+        venueTax, slug
       ]
     );
     const venue = venueRows[0];
@@ -295,6 +296,7 @@ exports.getVenue = async (req, res) => {
     ok(res, 200, {
       ...venue,
       business_name: rows[0].business_name,
+      payment_methods: await paymentMethodsSummary(venue.business_id),
       courts: courtsRes.rows,
       sports: sportsRes.rows.map((s) => s.name),
       hours: hoursRes.rows
@@ -351,6 +353,7 @@ exports.getVenueBySlug = async (req, res) => {
     );
     ok(res, 200, {
       ...rest,
+      payment_methods: await paymentMethodsSummary(venue.business_id),
       business: {
         id: business_id,
         name: business_name,
@@ -364,10 +367,19 @@ exports.getVenueBySlug = async (req, res) => {
   }
 };
 
+async function paymentMethodsSummary(businessId) {
+  try {
+    return await businessPaymentMethods.getMethodsSummary(businessId);
+  } catch (error) {
+    logger.error(`Error resolving payment methods for ${businessId}: ${error.message}`);
+    return { cash_enabled: false, payhere_enabled: false, payhere_configured: false };
+  }
+}
+
 exports.updateVenue = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, address, city, phone, photos, amenities, accepts_cash, venue_tax_rate, cancel_cutoff_hours } = req.body;
+    const { name, description, address, city, phone, photos, amenities, venue_tax_rate, cancel_cutoff_hours } = req.body;
 
     const { rows: venueRows } = await pool.query(
       `select * from venues where id = $1`,
@@ -410,9 +422,8 @@ exports.updateVenue = async (req, res) => {
          phone = coalesce($6, phone),
          photos = coalesce($7::jsonb, photos),
          amenities = coalesce($8::jsonb, amenities),
-         accepts_cash = coalesce($9, accepts_cash),
-         venue_tax_rate = coalesce($10, venue_tax_rate),
-         cancel_cutoff_hours = coalesce($11, cancel_cutoff_hours),
+         venue_tax_rate = coalesce($9, venue_tax_rate),
+         cancel_cutoff_hours = coalesce($10, cancel_cutoff_hours),
          updated_at = now()
        where id = $1
        returning *`,
@@ -425,7 +436,6 @@ exports.updateVenue = async (req, res) => {
         phone ?? null,
         photos !== undefined ? JSON.stringify(photos) : null,
         amenities !== undefined ? JSON.stringify(amenities) : null,
-        accepts_cash !== undefined ? !!accepts_cash : null,
         venueTax,
         cancelCutoff
       ]

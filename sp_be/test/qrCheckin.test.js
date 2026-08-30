@@ -37,7 +37,6 @@ describe('QR check-in', () => {
         name: 'QR Venue',
         address: '4 Test Ave',
         city: 'Colombo',
-        accepts_cash: true,
         sports: ['badminton'],
         courts: [
           { name: 'QR Court', sport: 'badminton', price_per_slot: 1500, slot_duration_min: 60, capacity: 4, is_indoor: true }

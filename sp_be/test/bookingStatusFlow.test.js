@@ -3,6 +3,7 @@ const { SignJWT } = require('jose');
 const app = require('../app');
 const pool = require('../db');
 const { enableLegacyFlags } = require('./helpers/flags');
+const { enableBusinessCash, enableBusinessPayhere } = require('./helpers/methods');
 
 const secret = new TextEncoder().encode('test-secret');
 const tokenFor = (uid) =>
@@ -50,6 +51,15 @@ describe('booking status overhaul (ADR-0037/0038/0040)', () => {
       [owner[0].id]
     );
     BUSINESS_ID = biz[0].id;
+    // ADR-0044: this suite's cash/online checkouts ride the Business methods.
+    await pool.query(
+      `insert into business_payment_methods (business_id, method, enabled) values
+         ($1, 'cash', true),
+         ($1, 'payhere', false)
+       on conflict (business_id, method) do update set enabled = excluded.enabled`,
+      [BUSINESS_ID]
+    );
+    await enableBusinessPayhere(OWNER_UID, true);
 
     const { rows: player } = await pool.query(
       `insert into users (firebase_uid, email, name, role, status, phone, phone_verified_at, email_verified_at)
@@ -68,7 +78,6 @@ describe('booking status overhaul (ADR-0037/0038/0040)', () => {
         name: 'Status Venue',
         address: '9 Status Ave',
         city: 'Colombo',
-        accepts_cash: true,
         sports: ['badminton'],
         courts: [
           { name: 'Status Court', sport: 'badminton', price_per_slot: 1500, slot_duration_min: 60, capacity: 4, is_indoor: true }
