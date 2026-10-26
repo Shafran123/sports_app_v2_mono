@@ -372,8 +372,10 @@ async function googleUpsert({ site_hostname, id_token }) {
   const sub = String(decoded.sub || decoded.uid || '').trim();
   const email = String(decoded.email || '').trim().toLowerCase();
   const name = String(decoded.name || '').trim().slice(0, 80);
+  // Firebase email/password sign-up does not prove inbox control, so an
+  // unverified email claim must never identify (or link onto) a customer.
   const emailVerified = decoded.email_verified === true;
-  if (!sub || !EMAIL_RE.test(email)) {
+  if (!sub || !EMAIL_RE.test(email) || !emailVerified) {
     throw Object.assign(new Error('A Google profile with a verified email is required.'), { code: 'GOOGLE_PROFILE_INVALID' });
   }
 
@@ -398,6 +400,14 @@ async function googleUpsert({ site_hostname, id_token }) {
       [businessId, email]
     );
     if (byEmail.rows[0]) {
+      // Pre-registration hijack guard: an email/password row whose email was
+      // never verified may have been created by someone who does not control
+      // the inbox. Linking a verified Google identity makes the real owner the
+      // account holder, so drop the unproven password and revoke its sessions.
+      if (!byEmail.rows[0].email_verified_at) {
+        await pool.query(`update site_customers set password_hash = null where id = $1`, [byEmail.rows[0].id]);
+        await pool.query(`delete from site_customer_sessions where site_customer_id = $1`, [byEmail.rows[0].id]);
+      }
       const linked = await pool.query(
         `update site_customers
          set google_sub = $2, name = coalesce(name, $3),
