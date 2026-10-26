@@ -26,7 +26,8 @@ export function QrScanDialog({
   const [scanned, setScanned] = useState<Booking | null>(null);
 
   const lookup = useMutation({
-    mutationFn: (token: string) => business.qrLookup(token)
+    mutationFn: (token: string) => business.qrLookup(token),
+    onSuccess: (booking) => setScanned(booking)
   });
 
   const checkin = useMutation({
