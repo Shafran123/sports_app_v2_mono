@@ -153,6 +153,62 @@ export const copy = {
       }
     ]
   },
+  pricing: {
+    metaTitle: "Pricing — free for 3 months, then a simple monthly plan",
+    metaDescription:
+      "MySlot.LK is free for your first 3 months with no setup fees and no lock-in. After that, a simple monthly plan with a booking allowance. Your booking revenue stays yours.",
+    eyebrow: "Pricing",
+    title: "Simple pricing for sports venues",
+    sub: "Free for your first 3 months. No setup fees, no lock-in, and your booking revenue stays yours.",
+    primaryCta: "Book a demo with us",
+    steps: [
+      {
+        title: "3 months free",
+        body: "Your dedicated website, live bookings, QR check-ins and owner console — everything, at no cost, with no setup fee and no lock-in."
+      },
+      {
+        title: "Then a simple monthly plan",
+        body: "A fixed monthly price with a booking allowance, written into your agreement with MySlot so there are no surprises. We confirm the price for your venue on your demo call."
+      },
+      {
+        title: "Beyond your allowance",
+        body: "Bookings over your monthly allowance carry a small platform fee (5% by default). It is invoiced to you — never deducted from your customers' payments."
+      }
+    ],
+    includedTitle: "What every plan includes",
+    included: [
+      "Your own dedicated booking website, on your domain",
+      "Real-time slot booking for every court",
+      "One-tap QR check-ins and walk-in bookings",
+      "An owner console with your day, bookings and revenue reports",
+      "Peak and off-peak pricing per court",
+      "Take payments at the venue, with online payment going to your own account where you set it up"
+    ],
+    moneyTitle: "Where your money goes",
+    moneyBody:
+      "Your booking revenue is yours: MySlot never holds it, and nothing is taken out of your customers' payments. The only thing you pay us is your plan, plus the fee on bookings beyond your allowance.",
+    faqTitle: "Pricing questions",
+    faq: [
+      {
+        q: "What counts toward my booking allowance?",
+        a: "Every confirmed booking counts once, however many slots it covers, including walk-in bookings you record at the front desk. Pending, cancelled and refunded bookings don't count. The allowance is shared across all your venues."
+      },
+      {
+        q: "What happens when the 3 months end?",
+        a: "You move to your monthly plan, which we agree with you in writing before the trial ends. If you decide not to continue, your site goes offline after a short grace period, and bookings already confirmed still play out."
+      },
+      {
+        q: "How do I pay for my plan?",
+        a: "Plan fees and any fee on extra bookings are invoiced and paid by bank transfer. We never take them out of your customers' payments."
+      },
+      {
+        q: "Are there setup fees or contracts?",
+        a: "No setup fees and no lock-in. You accept a plain-language owner agreement when you first sign in."
+      }
+    ],
+    ctaTitle: "Ready to see it for your venue?",
+    ctaBody: "Book a demo and we'll set up your listing and website, apply your free 3 months, and quote your monthly plan."
+  },
   trialBand: {
     title: "List your venue free for 3 months",
     sub: "No setup fees. No lock-in. We're building a player network — be one of the first venues on it."
@@ -224,6 +280,7 @@ export const copy = {
         links: [
           { label: "Features", href: "#features" },
           { label: "How it works", href: "#how-it-works" },
+          { label: "Pricing", href: "/pricing" },
           { label: "List your venue", href: "#inquire" }
         ]
       },
