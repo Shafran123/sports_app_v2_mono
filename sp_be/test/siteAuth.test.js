@@ -236,6 +236,32 @@ describe('site customer auth (ADR-0030, ticket 01)', () => {
     expect(rows[0].name).toBe('Site Pam');
   });
 
+  it('rejects a Google token whose email is not verified (no takeover of an existing customer)', async () => {
+    const email = `victim-${rand}@abc.test`;
+    const reg = await registerAt('site-customer.test', email, 'correct-horse-9');
+    const forged = await tokenFor(`gforged-${rand}`, { sub: `gforged-${rand}`, email, email_verified: false });
+    const res = await request(app).post('/api/v1/site-auth/google').send({ site_hostname: 'site-customer.test', id_token: forged });
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('GOOGLE_PROFILE_INVALID');
+    const { rows } = await pool.query(`select google_sub from site_customers where id = $1`, [reg.body.data.customer.id]);
+    expect(rows[0].google_sub).toBeNull();
+  });
+
+  it('linking Google onto an unverified email/password row drops the password and revokes its sessions', async () => {
+    const email = `prehijack-${rand}@abc.test`;
+    const reg = await registerAt('site-customer.test', email, 'attacker-pass-9');
+    await pool.query(`update site_customers set email_verified_at = null where id = $1`, [reg.body.data.customer.id]);
+    const gToken = await tokenFor(`gowner-${rand}`, { sub: `gowner-${rand}`, email });
+    const google = await request(app).post('/api/v1/site-auth/google').send({ site_hostname: 'site-customer.test', id_token: gToken });
+    expect(google.status).toBe(201);
+    expect(google.body.data.customer.id).toBe(reg.body.data.customer.id);
+
+    const me = await request(app).get('/api/v1/site-auth/me').set('Authorization', `Bearer ${reg.body.data.token}`);
+    expect(me.status).toBe(401);
+    const login = await request(app).post('/api/v1/site-auth/login').send({ site_hostname: 'site-customer.test', email, password: 'attacker-pass-9' });
+    expect(login.status).toBe(401);
+  });
+
   it('rejects an unverifiable or missing Google ID token', async () => {
     const missing = await request(app).post('/api/v1/site-auth/google').send({ site_hostname: 'site-customer.test' });
     expect(missing.status).toBe(400);

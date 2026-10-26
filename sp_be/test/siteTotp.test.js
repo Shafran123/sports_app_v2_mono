@@ -298,6 +298,8 @@ describe('site customer second factor (tickets 07-08)', () => {
     expect(login.status).toBe(403);
     expect(login.body.error.code).toBe('SECOND_FACTOR_REQUIRED');
 
+    // A verified email keeps its password on Google link (unverified rows drop it).
+    await pool.query(`update site_customers set email_verified_at = now() where business_id = $1 and lower(email) = $2`, [BUSINESS.id, email]);
     const gToken = await tokenFor(`greq-${rand}`, { sub: `gsubreq-${rand}`, name: 'Req Totp', email });
     const google = await request(app).post('/api/v1/site-auth/google').send({ site_hostname: 'site-totp.test', id_token: gToken });
     expect(google.status).toBe(403);
