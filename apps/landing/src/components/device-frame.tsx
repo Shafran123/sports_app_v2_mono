@@ -1,4 +1,5 @@
 import * as React from "react";
+import Image from "next/image";
 import { cn } from "@myslot/utils";
 import { getScreenshot, resolveScreenshot, type FrameKind } from "@/lib/screenshots";
 
@@ -28,7 +29,14 @@ export function DeviceFrame({ shotId, children, className }: DeviceFrameProps) {
           className
         )}
       >
-        <img src={src} alt={`Screenshot: ${shot?.label ?? shotId}`} className="block h-auto w-full" />
+        <Image
+          src={src}
+          alt={`Screenshot: ${shot?.label ?? shotId}`}
+          width={shot?.width ?? 1200}
+          height={shot?.height ?? 800}
+          sizes={frame === "phone" ? "320px" : "(max-width: 640px) 100vw, 560px"}
+          className="block h-auto w-full"
+        />
       </figure>
     );
   }

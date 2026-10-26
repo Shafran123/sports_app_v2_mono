@@ -6,6 +6,9 @@ export interface Screenshot {
   frame: FrameKind;
   /** Set `src` to a real product screenshot to swap out the CSS mockup. */
   src?: string;
+  /** Intrinsic pixel size of the file at `src` (lets next/image reserve space and avoid layout shift). */
+  width?: number;
+  height?: number;
 }
 
 /**
@@ -18,10 +21,10 @@ export interface Screenshot {
  *   3. `DeviceFrame` renders the image instead of the mockup — nothing else changes.
  */
 export const screenshots: Screenshot[] = [
-  { id: "dedicated-site", label: "Your venue's own website", frame: "phone", src: "/shots/dedicated-site.png" },
-  { id: "real-time-bookings", label: "Bookings — live slot grid", frame: "tablet", src: "/shots/real-time-bookings.png" },
-  { id: "front-desk", label: "Front-desk & walk-in check-ins", frame: "tablet", src: "/shots/front-desk.png" },
-  { id: "owner-dashboard", label: "Dashboard — your venue's day", frame: "tablet", src: "/shots/owner-dashboard.png" }
+  { id: "dedicated-site", label: "Your venue's own website", frame: "phone", src: "/shots/dedicated-site.png", width: 816, height: 1664 },
+  { id: "real-time-bookings", label: "Bookings — live slot grid", frame: "tablet", src: "/shots/real-time-bookings.png", width: 2018, height: 1316 },
+  { id: "front-desk", label: "Front-desk & walk-in check-ins", frame: "tablet", src: "/shots/front-desk.png", width: 2018, height: 1316 },
+  { id: "owner-dashboard", label: "Dashboard — your venue's day", frame: "tablet", src: "/shots/owner-dashboard.png", width: 2018, height: 1316 }
 ];
 
 export function getScreenshot(id: string): Screenshot | undefined {

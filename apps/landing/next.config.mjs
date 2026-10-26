@@ -8,6 +8,7 @@ const nextConfig = {
   env: {
     NEXT_PUBLIC_APP_VERSION: rootPackage.version
   },
+  images: { formats: ["image/avif", "image/webp"] },
   transpilePackages: ["@myslot/ui", "@myslot/utils", "@myslot/types", "@myslot/api"],
   async rewrites() {
     const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:2400";
