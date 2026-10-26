@@ -17,6 +17,10 @@
     "test": {
       "dependsOn": ["^build"],
       "outputs": ["coverage/**"]
+    },
+    "test:ui": {
+      "cache": false,
+      "persistent": true
     }
   }
 }

@@ -12,7 +12,13 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
-    "test:watch": "turbo run test:watch"
+    "test:watch": "turbo run test:watch",
+    "test:ui": "turbo run test:ui",
+    "e2e": "pnpm --dir e2e e2e",
+    "e2e:ui": "pnpm --dir e2e e2e:ui",
+    "e2e:headed": "pnpm --dir e2e e2e:headed",
+    "e2e:install": "pnpm --dir e2e install && pnpm --dir e2e install:browsers",
+    "e2e:report": "pnpm --dir e2e e2e:report"
   },
   "devDependencies": {
     "turbo": "^2.3.3"

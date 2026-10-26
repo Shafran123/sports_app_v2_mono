@@ -1,0 +1,20 @@
+{
+  "name": "@myslot/e2e",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Playwright e2e suite: Site Customer + Venue Owner flows against the real local stack",
+  "scripts": {
+    "e2e": "node scripts/run.mjs",
+    "e2e:ui": "node scripts/run.mjs --ui",
+    "e2e:headed": "node scripts/run.mjs --headed",
+    "e2e:report": "playwright show-report reports/html",
+    "install:browsers": "playwright install chromium"
+  },
+  "dependencies": {
+    "jose": "^6.2.9",
+    "pg": "^8.23.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.2"
+  }
+}

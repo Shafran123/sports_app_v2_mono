@@ -14,18 +14,19 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui"
   },
   "dependencies": {
-    "@myslot/utils": "workspace:*",
     "@myslot/types": "workspace:*",
-    "next": "15.2.2",
+    "@myslot/utils": "workspace:*",
     "@radix-ui/react-dialog": "^1.1.4",
     "@radix-ui/react-dropdown-menu": "^2.1.4",
     "@radix-ui/react-tabs": "^1.1.2",
     "@radix-ui/react-tooltip": "^1.1.6",
     "class-variance-authority": "^0.7.1",
     "lucide-react": "^0.469.0",
+    "next": "15.2.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
@@ -36,17 +37,18 @@
     "@testing-library/user-event": "^14.5.2",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.20.0",
+    "@typescript-eslint/parser": "^8.20.0",
+    "@vitest/ui": "^3.2.7",
+    "eslint": "^9.18.0",
+    "eslint-config-prettier": "^10.0.1",
     "jsdom": "^26.0.0",
     "typescript": "^5.7.2",
-    "vitest": "^3.0.5",
-    "eslint": "^9.18.0",
-    "@typescript-eslint/parser": "^8.20.0",
-    "@typescript-eslint/eslint-plugin": "^8.20.0",
-    "eslint-config-prettier": "^10.0.1"
+    "vitest": "^3.2.7"
   },
   "peerDependencies": {
+    "next": "^15.0.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "next": "^15.0.0"
+    "react-dom": "^19.0.0"
   }
 }

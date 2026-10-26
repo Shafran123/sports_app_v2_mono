@@ -58,6 +58,12 @@ export function toAppUser(customer: {
   };
 }
 
+// E2E seam (ADR-0048): the Playwright harness cannot sign console users in
+// through real Firebase, so when NEXT_PUBLIC_E2E=1 the provider restores the
+// platform session from the persisted token (spots_token) instead of waiting
+// on Firebase's onAuthStateChanged. Never set outside the e2e stack.
+const E2E_SEAM = process.env.NEXT_PUBLIC_E2E === "1";
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -73,6 +79,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .me()
         .then((customer) => setUser(toAppUser(customer)))
         .catch(() => persistSiteToken(null))
+        .finally(() => setLoading(false));
+      return;
+    }
+
+    if (E2E_SEAM) {
+      const token = window.localStorage.getItem(TOKEN_KEY);
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+      authApi
+        .me()
+        .then((me) => setUser(me))
+        .catch(() => {
+          window.localStorage.removeItem(TOKEN_KEY);
+          setUser(null);
+        })
         .finally(() => setLoading(false));
       return;
     }

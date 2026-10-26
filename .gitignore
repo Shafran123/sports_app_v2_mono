@@ -46,3 +46,9 @@ sports-app-20029-firebase*.json
 # rendered transactional-emails preview output (node sp_be/scripts/render-emails.js)
 .scratch/emails-preview/
 .vercel
+
+# e2e
+/e2e/node_modules/
+/e2e/test-results/
+/e2e/reports/
+!/e2e/package.json
