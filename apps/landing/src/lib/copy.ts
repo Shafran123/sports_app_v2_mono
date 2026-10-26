@@ -289,6 +289,7 @@ export const copy = {
           { label: "Features", href: "#features" },
           { label: "How it works", href: "#how-it-works" },
           { label: "Pricing", href: "/pricing" },
+          { label: "Website vs marketplace", href: "/compare/own-website-vs-marketplace" },
           { label: "List your venue", href: "#inquire" }
         ]
       },
