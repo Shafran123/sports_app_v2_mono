@@ -52,3 +52,7 @@ sports-app-20029-firebase*.json
 /e2e/test-results/
 /e2e/reports/
 !/e2e/package.json
+
+# generated brag videos/images
+/brag-output/
+/brag-output-*/
