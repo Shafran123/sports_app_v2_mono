@@ -1,1 +1,8 @@
 @import "@myslot/ui/globals.css";
+
+/* Landing-only contrast fixes (WCAG AA on the #fafaf7 page base); other apps keep the shared tokens. */
+:root {
+  --color-ink-3: #6b7280;
+  --color-primary: #15803d;
+  --color-primary-hover: #166534;
+}

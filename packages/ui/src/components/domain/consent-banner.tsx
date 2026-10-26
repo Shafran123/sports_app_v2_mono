@@ -59,7 +59,7 @@ export function ConsentBanner({ brandName = "our site", privacyHref = "/privacy"
             Decline
           </Button>
           <Link href={privacyHref} className="text-sm font-medium text-primary underline-offset-2 hover:underline">
-            Learn more
+            Read our privacy policy
           </Link>
           {hasChoice && (
             <button

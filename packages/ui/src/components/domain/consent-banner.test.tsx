@@ -16,7 +16,7 @@ describe("ConsentBanner", () => {
     expect(within(region).getByText(/MySlot.LK/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Accept analytics" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Decline" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Learn more" })).toHaveAttribute("href", "/privacy");
+    expect(screen.getByRole("link", { name: "Read our privacy policy" })).toHaveAttribute("href", "/privacy");
   });
 
   it("accept stores the choice and hides the banner", async () => {
