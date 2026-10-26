@@ -70,7 +70,7 @@ export function PricingCard({ currency }: { currency: Currency }) {
       <Link href="/#inquire" className={`${buttonVariants({ variant: "primary", size: "lg" })} mt-6`}>
         {p.primaryCta}
       </Link>
-      <p className="mt-3 text-xs text-ink-3">First 3 months free. No setup fees, no lock-in.</p>
+      <p className="mt-3 text-xs text-ink-3">Prices include VAT. First 3 months free. No setup fees, no lock-in.</p>
     </section>
   );
 }

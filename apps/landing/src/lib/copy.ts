@@ -206,6 +206,10 @@ export const copy = {
         a: "You move to the monthly plan, or annual billing if you prefer, which we confirm with you in writing before the trial ends. If you decide not to continue, your site goes offline after a short grace period, and bookings already confirmed still play out."
       },
       {
+        q: "Do the prices include VAT?",
+        a: "Yes. The price you see is the total you pay, with VAT included."
+      },
+      {
         q: "How do I pay?",
         a: "Plans are invoiced and paid by bank transfer. We never take fees out of your customers' payments."
       },

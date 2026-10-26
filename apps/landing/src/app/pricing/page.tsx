@@ -23,6 +23,7 @@ function offer(currency: Currency, billing: "monthly" | "annual") {
       "@type": "UnitPriceSpecification",
       price: String(periodTotal(currency, billing)),
       priceCurrency: currency,
+      valueAddedTaxIncluded: true,
       billingDuration: billing === "monthly" ? "P1M" : "P1Y"
     },
     description: `Full access, unlimited bookings, billed ${billing === "monthly" ? "monthly" : "annually"} (${PLAN.annualDiscountPct}% off annual)`
