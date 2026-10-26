@@ -302,7 +302,7 @@ function DurationSelector({
         id="duration-select"
         value={durationMin ? String(durationMin) : ""}
         onChange={(e) => onPick(Number(e.target.value))}
-        aria-label="Pick a duration"
+        ariaLabel="Pick a duration"
         className="w-40"
       >
         <option value="">Select duration</option>

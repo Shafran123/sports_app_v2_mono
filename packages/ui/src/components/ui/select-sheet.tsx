@@ -28,6 +28,7 @@ export function SelectSheet({
   disabled,
   className,
   error,
+  ariaLabel,
   children
 }: {
   id?: string;
@@ -37,6 +38,7 @@ export function SelectSheet({
   disabled?: boolean;
   className?: string;
   error?: boolean;
+  ariaLabel?: string;
   children?: React.ReactNode;
 }) {
   const [open, setOpen] = React.useState(false);
@@ -59,6 +61,7 @@ export function SelectSheet({
           value={value}
           onChange={onChange}
           disabled={disabled}
+          aria-label={ariaLabel}
           className={cn(
             "h-11 w-full appearance-none rounded-2xl border bg-surface px-4 pr-9 text-sm text-ink transition-colors",
             "focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20",
@@ -77,6 +80,7 @@ export function SelectSheet({
         disabled={disabled}
         onClick={() => setOpen(true)}
         aria-haspopup="listbox"
+        aria-label={ariaLabel}
         className={cn(
           "flex h-11 w-full items-center justify-between gap-2 rounded-2xl border bg-surface px-4 text-sm transition-colors md:hidden",
           error ? "border-error" : "border-border",
