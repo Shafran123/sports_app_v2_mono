@@ -11,10 +11,14 @@ export async function generateMetadata(): Promise<Metadata> {
       title: site.business.brand?.tagline
         ? `${site.business.name} — ${site.business.brand.tagline}`
         : site.business.name,
+      description:
+        site.business.brand?.about ||
+        `Book courts online at ${site.business.name}. Real-time availability and instant confirmation.`,
       robots: isPlatformSubdomain(await currentHost()) ? { index: false, follow: true } : { index: true, follow: true }
     };
   }
-  return {};
+  // Platform host: the marketplace is closed (ADR-0045), nothing here to index.
+  return { robots: { index: false, follow: true } };
 }
 
 // Marketplace retirement (ADR-0045): the marketplace home is closed to

@@ -5,6 +5,24 @@ import { readFileSync } from "node:fs";
 // the same number with no per-app ceremony.
 const rootPackage = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8"));
 
+// Routes that must never be indexed: the retired marketplace (ADR-0045) and
+// account/checkout utility pages. Done with a header (not robots.txt Disallow)
+// so crawlers can still fetch the page and see the noindex.
+const NOINDEX_SOURCES = [
+  "/explore",
+  "/events/:path*",
+  "/venues/:path*",
+  "/bookings/:path*",
+  "/book/:path*",
+  "/profile",
+  "/notifications",
+  "/become-owner",
+  "/style-guide",
+  "/login",
+  "/register",
+  "/dashboard"
+];
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   env: {
@@ -26,6 +44,10 @@ const nextConfig = {
     // by the browser's frame policy. Next.js sets no frame headers by default,
     // but an explicit CSP keeps middleware/future proxies honest.
     return [
+      ...NOINDEX_SOURCES.map((source) => ({
+        source,
+        headers: [{ key: "X-Robots-Tag", value: "noindex, follow" }]
+      })),
       {
         source: "/embed/:path*",
         headers: [{ key: "Content-Security-Policy", value: "frame-ancestors *" }]

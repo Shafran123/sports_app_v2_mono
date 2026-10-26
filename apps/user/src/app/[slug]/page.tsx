@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { BrandedVenuePage } from "@/features/widget/branded-venue-page";
 import { SiteChrome } from "@/features/site/site-chrome";
 import { VenueDetailPage } from "@/features/venue-detail/venue-detail-page";
-import { getSiteContext, currentHost } from "@/lib/site-context";
+import { getSiteContext, currentHost, isPlatformSubdomain } from "@/lib/site-context";
 import type { WidgetConfig } from "@myslot/types";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +29,14 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   if (site) {
     const venue = site.venues.find((v) => v.slug === slug);
     if (!venue) return {};
-    return { title: venue.name, robots: { index: true, follow: true } };
+    const sports = venue.sports.map((sport) => sport.name).join(", ");
+    return {
+      title: venue.city ? `${venue.name} — ${venue.city}` : venue.name,
+      description:
+        site.business.brand?.about ||
+        `Book ${sports || "courts"} at ${venue.name}${venue.city ? ` in ${venue.city}` : ""}. Real-time availability, instant confirmation.`,
+      robots: isPlatformSubdomain(await currentHost()) ? { index: false, follow: true } : { index: true, follow: true }
+    };
   }
   const venue = await fetchVenueBySlug(slug);
   if (!venue) return {};
