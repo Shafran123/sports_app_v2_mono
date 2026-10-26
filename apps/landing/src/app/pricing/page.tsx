@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { headers } from "next/headers";
 import { buttonVariants } from "@myslot/ui";
+import { PricingCard } from "@/components/pricing-card";
 import { contact, copy } from "@/lib/copy";
+import { PLAN, defaultCurrency, periodTotal } from "@/lib/pricing";
+import { SITE_URL } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: copy.pricing.metaTitle,
@@ -9,10 +13,38 @@ export const metadata: Metadata = {
   alternates: { canonical: "/pricing" }
 };
 
-export default function PricingPage() {
+// Prices as schema.org offers: monthly and annual, in both currencies.
+function offer(currency: "USD" | "LKR", billing: "monthly" | "annual") {
+  return {
+    "@type": "Offer",
+    price: String(periodTotal(currency, billing)),
+    priceCurrency: currency,
+    priceSpecification: {
+      "@type": "UnitPriceSpecification",
+      price: String(periodTotal(currency, billing)),
+      priceCurrency: currency,
+      billingDuration: billing === "monthly" ? "P1M" : "P1Y"
+    },
+    description: `Full access, unlimited bookings, billed ${billing === "monthly" ? "monthly" : "annually"} (${PLAN.annualDiscountPct}% off annual)`
+  };
+}
+
+export default async function PricingPage() {
   const p = copy.pricing;
+  // Vercel sets this per request; unknown (local dev, crawlers) falls back to USD.
+  const country = (await headers()).get("x-vercel-ip-country");
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: "MySlot.LK",
+    url: `${SITE_URL}/pricing`,
+    applicationCategory: "BusinessApplication",
+    operatingSystem: "Web",
+    offers: [offer("USD", "monthly"), offer("USD", "annual"), offer("LKR", "monthly"), offer("LKR", "annual")]
+  };
   return (
     <main className="min-h-screen bg-paper text-ink">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <div className="mx-auto max-w-4xl px-4 py-16">
         <Link href="/" className="text-sm font-medium text-primary transition-colors hover:underline">
           ← Back to home
@@ -20,9 +52,7 @@ export default function PricingPage() {
         <p className="mt-8 text-sm font-semibold uppercase tracking-wide text-primary">{p.eyebrow}</p>
         <h1 className="mt-1 font-display text-3xl font-extrabold tracking-tight text-ink md:text-5xl">{p.title}</h1>
         <p className="mt-3 max-w-2xl text-lg text-ink-2">{p.sub}</p>
-        <Link href="/#inquire" className={`${buttonVariants({ variant: "primary", size: "lg" })} mt-6`}>
-          {p.primaryCta}
-        </Link>
+        <PricingCard initialCurrency={defaultCurrency(country)} />
 
         <ol className="mt-12 grid gap-4 md:grid-cols-3">
           {p.steps.map((step, i) => (

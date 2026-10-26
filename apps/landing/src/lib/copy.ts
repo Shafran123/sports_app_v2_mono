@@ -149,57 +149,65 @@ export const copy = {
       },
       {
         term: "A clear plan & agreement",
-        desc: "A simple monthly plan with a booking allowance, and a written agreement with MySlot — no surprises."
+        desc: "One simple plan with unlimited bookings, and a written agreement with MySlot — no surprises."
       }
     ]
   },
   pricing: {
-    metaTitle: "Pricing — free for 3 months, then a simple monthly plan",
+    metaTitle: "Pricing — USD 20 a month, free for your first 3 months",
     metaDescription:
-      "MySlot.LK is free for your first 3 months with no setup fees and no lock-in. After that, a simple monthly plan with a booking allowance. Your booking revenue stays yours.",
+      "One plan with full access and unlimited bookings: USD 20 a month (LKR 6,000 in Sri Lanka), or save 20% billed annually. Free for your first 3 months, no setup fees, no lock-in.",
     eyebrow: "Pricing",
-    title: "Simple pricing for sports venues",
-    sub: "Free for your first 3 months. No setup fees, no lock-in, and your booking revenue stays yours.",
+    title: "One plan. Everything included.",
+    sub: "Free for your first 3 months. No setup fees, no lock-in, unlimited bookings, and your booking revenue stays yours.",
     primaryCta: "Book a demo with us",
+    planName: "Full access",
+    planNote: "Every feature, every court, unlimited bookings.",
+    monthlyLabel: "Monthly",
+    annualLabel: "Annual (save 20%)",
     steps: [
       {
         title: "3 months free",
         body: "Your dedicated website, live bookings, QR check-ins and owner console — everything, at no cost, with no setup fee and no lock-in."
       },
       {
-        title: "Then a simple monthly plan",
-        body: "A fixed monthly price with a booking allowance, written into your agreement with MySlot so there are no surprises. We confirm the price for your venue on your demo call."
+        title: "Then one simple plan",
+        body: "Full access to every feature with unlimited bookings, billed monthly. No tiers, no per-booking fees, and nothing taken out of your customers' payments."
       },
       {
-        title: "Beyond your allowance",
-        body: "Bookings over your monthly allowance carry a small platform fee (5% by default). It is invoiced to you — never deducted from your customers' payments."
+        title: "Save 20% annually",
+        body: "Prefer to pay once a year? Annual billing takes 20% off, and we confirm it in your written agreement with MySlot."
       }
     ],
-    includedTitle: "What every plan includes",
+    includedTitle: "What's included",
     included: [
       "Your own dedicated booking website, on your domain",
-      "Real-time slot booking for every court",
+      "Real-time slot booking for every court, with unlimited bookings",
       "One-tap QR check-ins and walk-in bookings",
       "An owner console with your day, bookings and revenue reports",
-      "Peak and off-peak pricing per court",
-      "Take payments at the venue, with online payment going to your own account where you set it up"
+      "Peak and off-peak pricing per court, plus offers and discounts",
+      "An embeddable booking widget for your existing website"
     ],
     moneyTitle: "Where your money goes",
     moneyBody:
-      "Your booking revenue is yours: MySlot never holds it, and nothing is taken out of your customers' payments. The only thing you pay us is your plan, plus the fee on bookings beyond your allowance.",
+      "Your booking revenue is yours: MySlot never holds it, and nothing is taken out of your customers' payments. The only thing you pay us is your plan.",
     faqTitle: "Pricing questions",
     faq: [
       {
-        q: "What counts toward my booking allowance?",
-        a: "Every confirmed booking counts once, however many slots it covers, including walk-in bookings you record at the front desk. Pending, cancelled and refunded bookings don't count. The allowance is shared across all your venues."
+        q: "Is there a limit on bookings?",
+        a: "No. Every plan has unlimited bookings, including walk-ins you record at the front desk, across all your venues."
+      },
+      {
+        q: "Which currency do I pay in?",
+        a: "Venues in Sri Lanka pay a fixed amount in LKR. Venues elsewhere pay in USD. Either way the price is fixed for your plan, not tied to the daily exchange rate."
       },
       {
         q: "What happens when the 3 months end?",
-        a: "You move to your monthly plan, which we agree with you in writing before the trial ends. If you decide not to continue, your site goes offline after a short grace period, and bookings already confirmed still play out."
+        a: "You move to the monthly plan, or annual billing if you prefer, which we confirm with you in writing before the trial ends. If you decide not to continue, your site goes offline after a short grace period, and bookings already confirmed still play out."
       },
       {
-        q: "How do I pay for my plan?",
-        a: "Plan fees and any fee on extra bookings are invoiced and paid by bank transfer. We never take them out of your customers' payments."
+        q: "How do I pay?",
+        a: "Plans are invoiced and paid by bank transfer. We never take fees out of your customers' payments."
       },
       {
         q: "Are there setup fees or contracts?",
@@ -207,7 +215,7 @@ export const copy = {
       }
     ],
     ctaTitle: "Ready to see it for your venue?",
-    ctaBody: "Book a demo and we'll set up your listing and website, apply your free 3 months, and quote your monthly plan."
+    ctaBody: "Book a demo and we'll set up your listing and website and apply your free 3 months."
   },
   trialBand: {
     title: "List your venue free for 3 months",
@@ -220,7 +228,7 @@ export const copy = {
     items: [
       {
         q: "How much does it cost to get started?",
-        a: "Nothing. Every venue gets a 3-month free plan — no setup fees, no lock-in. After the trial you'll move to a simple monthly plan with a booking allowance."
+        a: "Nothing. Every venue gets a 3-month free plan — no setup fees, no lock-in. After the trial it's one simple plan — USD 20 a month (LKR 6,000 in Sri Lanka) with unlimited bookings, or save 20% billed annually."
       },
       {
         q: "Do I really get my own dedicated website?",
