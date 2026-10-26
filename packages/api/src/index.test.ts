@@ -279,6 +279,7 @@ describe("business.customers", () => {
       phone: "+94771234567",
       email_verified_at: "2026-08-01T00:00:00Z",
       phone_verified_at: "2026-08-01T00:00:00Z",
+      totp_enabled_at: null,
       joined_at: "2026-08-01T00:00:00Z",
       booking_count: 2,
       total_spend: 3000,
