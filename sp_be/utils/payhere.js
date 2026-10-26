@@ -8,6 +8,13 @@ const MERCHANT_ID = process.env.PAYHERE_MERCHANT_ID;
 const MERCHANT_SECRET = process.env.PAYHERE_MERCHANT_SECRET;
 const CHECKOUT_URL = process.env.PAYHERE_CHECKOUT_URL || 'https://sandbox.payhere.lk/pay/checkout';
 
+// PayHere's documented format: the amount is hashed (and echoed) with exactly
+// two decimals ("1000.00") — a raw number like 1150.0000000000002 or "1000"
+// makes the checkout hash mismatch and PayHere rejects the payment.
+function formatAmount(amount) {
+  return Number(amount).toFixed(2);
+}
+
 // The PayHere hash is upper(md5(merchant_id + order_id + amount + currency +
 // upper(md5(merchant_secret)))) — computed with the credentials the payment
 // runs on, never a global.
@@ -15,7 +22,7 @@ function computeHash({ merchantId, merchantSecret, orderId, amount, currency = '
   return crypto
     .createHash('md5')
     .update(
-      `${merchantId}${orderId}${amount}${currency}${crypto
+      `${merchantId}${orderId}${formatAmount(amount)}${currency}${crypto
         .createHash('md5')
         .update(merchantSecret)
         .digest('hex')
@@ -35,6 +42,7 @@ function buildCheckoutParams({ orderId, amount, firstName, email, phone, city, b
   const notify = process.env.PAYHERE_NOTIFY_URL || `${process.env.API_PUBLIC_URL || base}/api/v1/payments/payhere/notify`;
   const id = merchantId || MERCHANT_ID;
   const secret = merchantSecret || MERCHANT_SECRET;
+  const formattedAmount = formatAmount(amount);
 
   return {
     checkout_url: CHECKOUT_URL,
@@ -42,7 +50,7 @@ function buildCheckoutParams({ orderId, amount, firstName, email, phone, city, b
     order_id: orderId,
     items: 'Court booking',
     currency: 'LKR',
-    amount: String(amount),
+    amount: formattedAmount,
     first_name: firstName || '',
     email: email || '',
     phone: phone || '',
@@ -53,7 +61,7 @@ function buildCheckoutParams({ orderId, amount, firstName, email, phone, city, b
     // Widget returns to its own embed so the iframe lands back in the flow.
     return_url: returnUrl || base,
     cancel_url: returnUrl || base,
-    hash: computeHash({ merchantId: id, merchantSecret: secret, orderId, amount, currency: 'LKR' })
+    hash: computeHash({ merchantId: id, merchantSecret: secret, orderId, amount: formattedAmount, currency: 'LKR' })
   };
 }
 
