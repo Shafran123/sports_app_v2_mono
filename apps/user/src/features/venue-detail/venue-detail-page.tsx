@@ -44,7 +44,14 @@ function VenueDetailSkeleton() {
   );
 }
 
-export function VenueDetailPage({ venueId }: { venueId: string }) {
+export function VenueDetailPage({
+  venueId,
+  loadingFallback
+}: {
+  venueId: string;
+  /** Server-rendered stand-in shown while the venue loads (replaces the skeleton, so crawlers see real content). */
+  loadingFallback?: React.ReactNode;
+}) {
   const router = useRouter();
   const { user } = useAuth();
   const [date, setDate] = useState(() => toDateKey(new Date()));
@@ -115,7 +122,7 @@ export function VenueDetailPage({ venueId }: { venueId: string }) {
     setSelected({});
   };
 
-  if (venueQuery.isLoading) return <VenueDetailSkeleton />;
+  if (venueQuery.isLoading) return loadingFallback ?? <VenueDetailSkeleton />;
 
   if (venueQuery.isError || !venue) {
     return (

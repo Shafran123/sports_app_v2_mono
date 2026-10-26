@@ -3,8 +3,11 @@ import { notFound, redirect } from "next/navigation";
 import { BrandedVenuePage } from "@/features/widget/branded-venue-page";
 import { SiteChrome } from "@/features/site/site-chrome";
 import { VenueDetailPage } from "@/features/venue-detail/venue-detail-page";
+import { VenueSeoSummary } from "@/features/venue-detail/venue-seo-summary";
 import { getSiteContext, currentHost, isPlatformSubdomain } from "@/lib/site-context";
-import type { WidgetConfig } from "@myslot/types";
+import { prettyCity, jsonLdString, venueDescription, venueJsonLd } from "@/lib/venue-seo";
+import { VenueDetailSchema, type VenueDetail, type WidgetConfig } from "@myslot/types";
+import { cache } from "react";
 
 export const dynamic = "force-dynamic";
 
@@ -23,19 +26,52 @@ async function fetchVenueBySlug(slug: string): Promise<WidgetConfig | null> {
   }
 }
 
+// Full venue detail (courts, hours, photos) for server-rendered content and
+// structured data. A site host passes its hostname so private venues serve.
+const fetchVenueDetail = cache(async (id: string, siteHost: string): Promise<VenueDetail | null> => {
+  try {
+    const backend = process.env.NEXT_PUBLIC_API_URL || "http://localhost:2400";
+    const res = await fetch(`${backend}/api/v1/venues/${encodeURIComponent(id)}?site_hostname=${encodeURIComponent(siteHost)}`, {
+      cache: "no-store"
+    });
+    if (!res.ok) return null;
+    const body = await res.json();
+    const parsed = VenueDetailSchema.safeParse(body?.data ?? body);
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+});
+
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   const site = await getSiteContext();
   if (site) {
     const venue = site.venues.find((v) => v.slug === slug);
     if (!venue) return {};
-    const sports = venue.sports.map((sport) => sport.name).join(", ");
+    const host = await currentHost();
+    const detail = await fetchVenueDetail(venue.id, host);
+    const city = prettyCity(detail?.city ?? venue.city);
+    const title = city ? `${venue.name} — ${city}` : venue.name;
+    const description = detail
+      ? venueDescription(detail, site.business.brand?.about)
+      : site.business.brand?.about || `Book courts at ${venue.name}. Real-time availability, instant confirmation.`;
+    const image = (detail?.photos[0] ?? venue.photos[0]) || site.business.brand?.banner_image;
     return {
-      title: venue.city ? `${venue.name} — ${venue.city}` : venue.name,
-      description:
-        site.business.brand?.about ||
-        `Book ${sports || "courts"} at ${venue.name}${venue.city ? ` in ${venue.city}` : ""}. Real-time availability, instant confirmation.`,
-      robots: isPlatformSubdomain(await currentHost()) ? { index: false, follow: true } : { index: true, follow: true }
+      metadataBase: new URL(`https://${host}`),
+      title,
+      description,
+      alternates: { canonical: `/${slug}` },
+      openGraph: {
+        type: "website",
+        siteName: site.business.name,
+        title,
+        description,
+        url: `/${slug}`,
+        ...(image ? { images: [image] } : {})
+      },
+      twitter: { card: image ? "summary_large_image" : "summary", title, description },
+      robots: isPlatformSubdomain(host) ? { index: false, follow: true } : { index: true, follow: true }
     };
   }
   const venue = await fetchVenueBySlug(slug);
@@ -60,9 +96,24 @@ export default async function VenueSlugPage({ params }: { params: Promise<{ slug
   if (site) {
     const venue = site.venues.find((v) => v.slug === slug);
     if (!venue) notFound();
+    const host = await currentHost();
+    const detail = await fetchVenueDetail(venue.id, host);
     return (
       <SiteChrome config={site}>
-        <VenueDetailPage venueId={venue.id} />
+        {detail && (
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{
+              __html: jsonLdString(
+                venueJsonLd(detail, { origin: `https://${host}`, path: `/${slug}`, businessName: site.business.name })
+              )
+            }}
+          />
+        )}
+        <VenueDetailPage
+          venueId={venue.id}
+          loadingFallback={detail ? <VenueSeoSummary venue={detail} /> : undefined}
+        />
       </SiteChrome>
     );
   }
