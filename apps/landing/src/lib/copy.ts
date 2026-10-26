@@ -156,7 +156,7 @@ export const copy = {
   pricing: {
     metaTitle: "Pricing — USD 20 a month, free for your first 3 months",
     metaDescription:
-      "One plan with full access and unlimited bookings: USD 20 a month (LKR 6,000 in Sri Lanka), or save 20% billed annually. Free for your first 3 months, no setup fees, no lock-in.",
+      "One plan with full access and unlimited bookings: USD 20 a month (LKR 5,990 in Sri Lanka), or save 20% billed annually. Free for your first 3 months, no setup fees, no lock-in.",
     eyebrow: "Pricing",
     title: "One plan. Everything included.",
     sub: "Free for your first 3 months. No setup fees, no lock-in, unlimited bookings, and your booking revenue stays yours.",
@@ -228,7 +228,7 @@ export const copy = {
     items: [
       {
         q: "How much does it cost to get started?",
-        a: "Nothing. Every venue gets a 3-month free plan — no setup fees, no lock-in. After the trial it's one simple plan — USD 20 a month (LKR 6,000 in Sri Lanka) with unlimited bookings, or save 20% billed annually."
+        a: "Nothing. Every venue gets a 3-month free plan — no setup fees, no lock-in. After the trial it's one simple plan — USD 20 a month (LKR 5,990 in Sri Lanka) with unlimited bookings, or save 20% billed annually."
       },
       {
         q: "Do I really get my own dedicated website?",

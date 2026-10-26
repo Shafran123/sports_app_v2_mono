@@ -6,7 +6,7 @@
  */
 export const PLAN = {
   usdMonthly: 20,
-  lkrMonthly: 6000,
+  lkrMonthly: 5990,
   annualDiscountPct: 20
 } as const;
 
