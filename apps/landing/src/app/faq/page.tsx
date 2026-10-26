@@ -3,7 +3,10 @@ import Link from "next/link";
 import { contact, copy } from "@/lib/copy";
 
 export const metadata: Metadata = {
-  title: "FAQ"
+  title: "Venue booking software FAQ",
+  description:
+    "Answers for sports venue owners: how MySlot.LK works, what it costs after the free 3 months, payments, QR check-ins and getting your venue live.",
+  alternates: { canonical: "/faq" }
 };
 
 export default function FaqPage() {
