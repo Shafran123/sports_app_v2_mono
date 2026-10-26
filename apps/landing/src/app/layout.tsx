@@ -6,6 +6,7 @@ import { ConsentBanner } from "@/components/consent-banner";
 import { DEFAULT_BRAND_NAME } from "@myslot/utils";
 import { contact } from "@/lib/copy";
 import { SITE_URL } from "@/lib/site";
+import { visitorCurrency } from "@/lib/region";
 
 const plusJakarta = Plus_Jakarta_Sans({
   variable: "--font-plus-jakarta",
@@ -46,7 +47,7 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-const jsonLd = {
+const buildJsonLd = (currency: string) => ({
   "@context": "https://schema.org",
   "@graph": [
     {
@@ -73,13 +74,15 @@ const jsonLd = {
       operatingSystem: "Web",
       description:
         "Dedicated booking website for sports venues with real-time slot booking, QR check-ins and an owner dashboard.",
-      offers: { "@type": "Offer", price: "0", priceCurrency: "LKR", description: "Free for the first 3 months" },
+      offers: { "@type": "Offer", price: "0", priceCurrency: currency, description: "Free for the first 3 months" },
       publisher: { "@id": `${SITE_URL}/#organization` }
     }
   ]
-};
+});
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // The free-trial offer is priced in the visitor's regional currency only.
+  const jsonLd = buildJsonLd(await visitorCurrency());
   return (
     <html lang="en">
       <body className={`${plusJakarta.variable} ${sora.variable} antialiased`}>

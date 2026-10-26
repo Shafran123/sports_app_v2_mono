@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { headers } from "next/headers";
 import { buttonVariants } from "@myslot/ui";
 import { PricingCard } from "@/components/pricing-card";
 import { contact, copy } from "@/lib/copy";
-import { PLAN, defaultCurrency, periodTotal } from "@/lib/pricing";
+import { PLAN, periodTotal, type Currency } from "@/lib/pricing";
+import { visitorCurrency } from "@/lib/region";
 import { SITE_URL } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -13,8 +13,8 @@ export const metadata: Metadata = {
   alternates: { canonical: "/pricing" }
 };
 
-// Prices as schema.org offers: monthly and annual, in both currencies.
-function offer(currency: "USD" | "LKR", billing: "monthly" | "annual") {
+// Prices as schema.org offers: monthly and annual, in the visitor's regional currency only.
+function offer(currency: Currency, billing: "monthly" | "annual") {
   return {
     "@type": "Offer",
     price: String(periodTotal(currency, billing)),
@@ -31,8 +31,7 @@ function offer(currency: "USD" | "LKR", billing: "monthly" | "annual") {
 
 export default async function PricingPage() {
   const p = copy.pricing;
-  // Vercel sets this per request; unknown (local dev, crawlers) falls back to USD.
-  const country = (await headers()).get("x-vercel-ip-country");
+  const currency = await visitorCurrency();
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
@@ -40,7 +39,7 @@ export default async function PricingPage() {
     url: `${SITE_URL}/pricing`,
     applicationCategory: "BusinessApplication",
     operatingSystem: "Web",
-    offers: [offer("USD", "monthly"), offer("USD", "annual"), offer("LKR", "monthly"), offer("LKR", "annual")]
+    offers: [offer(currency, "monthly"), offer(currency, "annual")]
   };
   return (
     <main className="min-h-screen bg-paper text-ink">
@@ -52,7 +51,7 @@ export default async function PricingPage() {
         <p className="mt-8 text-sm font-semibold uppercase tracking-wide text-primary">{p.eyebrow}</p>
         <h1 className="mt-1 font-display text-3xl font-extrabold tracking-tight text-ink md:text-5xl">{p.title}</h1>
         <p className="mt-3 max-w-2xl text-lg text-ink-2">{p.sub}</p>
-        <PricingCard initialCurrency={defaultCurrency(country)} />
+        <PricingCard currency={currency} />
 
         <ol className="mt-12 grid gap-4 md:grid-cols-3">
           {p.steps.map((step, i) => (

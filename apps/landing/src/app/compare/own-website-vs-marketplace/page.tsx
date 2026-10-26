@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { buttonVariants } from "@myslot/ui";
 import { contact } from "@/lib/copy";
-import { PLAN } from "@/lib/pricing";
+import { PLAN, formatPrice } from "@/lib/pricing";
+import { visitorCurrency } from "@/lib/region";
 import { SITE_URL } from "@/lib/site";
 
 const PATH = "/compare/own-website-vs-marketplace";
@@ -80,7 +81,18 @@ const CHECKLIST = [
   "Can you change fees or rules, and how much notice do I get?"
 ];
 
-export default function ComparePage() {
+// Illustration only (invented numbers), in the visitor's regional currency.
+const EXAMPLE = {
+  LKR: { bookings: 300, each: 4000 },
+  USD: { bookings: 300, each: 13 }
+} as const;
+
+export default async function ComparePage() {
+  const currency = await visitorCurrency();
+  const planMonthly = formatPrice(currency, currency === "USD" ? PLAN.usdMonthly : PLAN.lkrMonthly);
+  const { bookings, each } = EXAMPLE[currency];
+  const revenue = bookings * each;
+  const commission = revenue * 0.1;
   const jsonLd = {
     "@context": "https://schema.org",
     "@graph": [
@@ -197,16 +209,15 @@ export default function ComparePage() {
           <h2 className="pt-6 font-display text-2xl font-extrabold tracking-tight text-ink">Cost: a flat price against a percentage</h2>
           <p>
             Marketplaces differ: some charge a listing fee, some a commission on every booking, some both. A flat plan
-            behaves differently, because it does not grow when you do. MySlot.LK costs USD {PLAN.usdMonthly} a month
-            (LKR {PLAN.lkrMonthly.toLocaleString("en-US")} in Sri Lanka) with unlimited bookings, or {PLAN.annualDiscountPct}% less
-            billed annually, after a free first 3 months.
+            behaves differently, because it does not grow when you do. MySlot.LK costs {planMonthly} a month with
+            unlimited bookings, or {PLAN.annualDiscountPct}% less billed annually, after a free first 3 months.
           </p>
           <p>
-            To see why that matters, take an illustration with made-up numbers: a venue with 300 bookings a month at
-            LKR 4,000 each takes LKR 1,200,000. If a platform kept 10% of that, which is an example and not any
-            platform's actual rate, that is LKR 120,000 a month. The flat plan is LKR {PLAN.lkrMonthly.toLocaleString("en-US")}. The
-            busier the venue, the wider that gap gets. If your own bookings are modest, the gap is smaller, and a
-            marketplace's reach may be worth paying for.
+            To see why that matters, take an illustration with made-up numbers: a venue with {bookings} bookings a
+            month at {formatPrice(currency, each)} each takes {formatPrice(currency, revenue)}. If a platform kept 10%
+            of that, which is an example and not any platform&apos;s actual rate, that is {formatPrice(currency, commission)}{" "}
+            a month. The flat plan is {planMonthly}. The busier the venue, the wider that gap gets. If your own
+            bookings are modest, the gap is smaller, and a marketplace&apos;s reach may be worth paying for.
           </p>
 
           <h2 className="pt-6 font-display text-2xl font-extrabold tracking-tight text-ink">Payments, brand and control</h2>

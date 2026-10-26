@@ -6,8 +6,6 @@ import { buttonVariants } from "@myslot/ui";
 import { copy } from "@/lib/copy";
 import { formatPrice, perMonth, periodTotal, type Billing, type Currency } from "@/lib/pricing";
 
-const OTHER: Record<Currency, Currency> = { USD: "LKR", LKR: "USD" };
-
 function Toggle<T extends string>({
   value,
   options,
@@ -39,38 +37,24 @@ function Toggle<T extends string>({
 }
 
 /**
- * The plan price. Both currencies are always in the server HTML (the second one
- * as the secondary line); `initialCurrency` is picked on the server from the
- * visitor's country, and the toggles let anyone switch.
+ * The plan price in the visitor's regional currency only (chosen on the server
+ * from their IP's country); the only toggle is monthly vs annual billing.
  */
-export function PricingCard({ initialCurrency }: { initialCurrency: Currency }) {
+export function PricingCard({ currency }: { currency: Currency }) {
   const p = copy.pricing;
-  const [currency, setCurrency] = React.useState<Currency>(initialCurrency);
   const [billing, setBilling] = React.useState<Billing>("monthly");
-  const other = OTHER[currency];
 
   return (
     <section className="mt-10 rounded-3xl border border-primary bg-primary-light p-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <Toggle
-          label="Billing period"
-          value={billing}
-          onChange={setBilling}
-          options={[
-            { value: "monthly", label: p.monthlyLabel },
-            { value: "annual", label: p.annualLabel }
-          ]}
-        />
-        <Toggle
-          label="Currency"
-          value={currency}
-          onChange={setCurrency}
-          options={[
-            { value: "LKR", label: "LKR" },
-            { value: "USD", label: "USD" }
-          ]}
-        />
-      </div>
+      <Toggle
+        label="Billing period"
+        value={billing}
+        onChange={setBilling}
+        options={[
+          { value: "monthly", label: p.monthlyLabel },
+          { value: "annual", label: p.annualLabel }
+        ]}
+      />
 
       <p className="mt-6 text-sm font-semibold uppercase tracking-wide text-primary">{p.planName}</p>
       <p className="mt-1 font-display text-5xl font-extrabold tracking-tight text-ink">
@@ -81,8 +65,6 @@ export function PricingCard({ initialCurrency }: { initialCurrency: Currency }) 
         {billing === "annual"
           ? `Billed ${formatPrice(currency, periodTotal(currency, "annual"))} once a year`
           : "Billed monthly"}
-        {" · "}
-        {formatPrice(other, perMonth(other, billing))} / month
       </p>
       <p className="mt-3 text-ink-2">{p.planNote}</p>
       <Link href="/#inquire" className={`${buttonVariants({ variant: "primary", size: "lg" })} mt-6`}>
