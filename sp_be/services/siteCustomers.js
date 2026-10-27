@@ -351,6 +351,39 @@ async function completeChallenge({ challenge_id, code }) {
   return { customer, session };
 }
 
+// An email/password row whose email was never verified carries nothing the
+// real owner of the inbox has proven. When a verified Google identity takes it
+// over, drop every credential and in-flight sign-in state the earlier holder
+// could still use: password, Second Factor (secret, backup codes), phone,
+// sessions, pending OTPs and open challenges. One transaction: all or none.
+async function resetUnverifiedAccount(customer) {
+  const client = await pool.connect();
+  try {
+    await client.query('begin');
+    await client.query(
+      `update site_customers
+       set password_hash = null, totp_secret_enc = null, totp_enabled_at = null,
+           phone = null, phone_verified_at = null, updated_at = now()
+       where id = $1`,
+      [customer.id]
+    );
+    await client.query(`delete from site_customer_sessions where site_customer_id = $1`, [customer.id]);
+    await client.query(`delete from site_customer_backup_codes where site_customer_id = $1`, [customer.id]);
+    await client.query(`delete from site_customer_otps where site_customer_id = $1`, [customer.id]);
+    await client.query(
+      `delete from site_auth_challenges
+       where site_customer_id = $1 or (business_id = $2 and lower(email) = $3)`,
+      [customer.id, customer.business_id, String(customer.email).toLowerCase()]
+    );
+    await client.query('commit');
+  } catch (error) {
+    await client.query('rollback').catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 // Google sign-in: map a verified Google identity to a per-Business Site
 // Customer. The client hands us the Firebase ID token; we verify it with the
 // Admin SDK (never trust client-supplied identity), then resolve the Business
@@ -405,8 +438,7 @@ async function googleUpsert({ site_hostname, id_token }) {
       // the inbox. Linking a verified Google identity makes the real owner the
       // account holder, so drop the unproven password and revoke its sessions.
       if (!byEmail.rows[0].email_verified_at) {
-        await pool.query(`update site_customers set password_hash = null where id = $1`, [byEmail.rows[0].id]);
-        await pool.query(`delete from site_customer_sessions where site_customer_id = $1`, [byEmail.rows[0].id]);
+        await resetUnverifiedAccount(byEmail.rows[0]);
       }
       const linked = await pool.query(
         `update site_customers
