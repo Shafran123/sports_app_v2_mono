@@ -289,6 +289,40 @@ describe('site customer second factor (tickets 07-08)', () => {
     expect(fresh.status).toBe(200);
   });
 
+  it('linking Google onto an unverified row wipes the earlier holder\'s factor, backup codes and open challenges', async () => {
+    const email = `link-${rand}@abc.test`;
+    const enrolled = await enrolledCustomer(email, 'attacker-pass-9');
+    await pool.query(`update site_customers set email_verified_at = null where id = $1`, [enrolled.customerId]);
+    // The earlier holder keeps an unconsumed Second Factor challenge open.
+    const login = await request(app).post('/api/v1/site-auth/login').send({ site_hostname: 'site-totp.test', email, password: 'attacker-pass-9' });
+    expect(login.status).toBe(202);
+
+    const gToken = await tokenFor(`glink-${rand}`, { sub: `gsublink-${rand}`, email });
+    const google = await request(app).post('/api/v1/site-auth/google').send({ site_hostname: 'site-totp.test', id_token: gToken });
+    expect(google.status).toBe(201);
+    expect(google.body.data.customer.id).toBe(enrolled.customerId);
+
+    // The held challenge can no longer be completed with the old authenticator.
+    const held = await request(app).post('/api/v1/site-auth/challenge/confirm').send({ challenge_id: login.body.data.challenge_id, code: siteTotp.totpCode(enrolled.secret) });
+    expect(held.status).toBeGreaterThanOrEqual(400);
+
+    const { rows } = await pool.query(
+      `select password_hash, totp_secret_enc, totp_enabled_at, phone, phone_verified_at from site_customers where id = $1`,
+      [enrolled.customerId]
+    );
+    expect(rows[0].password_hash).toBeNull();
+    expect(rows[0].totp_secret_enc).toBeNull();
+    expect(rows[0].totp_enabled_at).toBeNull();
+    expect(rows[0].phone).toBeNull();
+    const codes = await pool.query(`select count(*)::int as n from site_customer_backup_codes where site_customer_id = $1`, [enrolled.customerId]);
+    expect(codes.rows[0].n).toBe(0);
+    const challenges = await pool.query(`select count(*)::int as n from site_auth_challenges where site_customer_id = $1`, [enrolled.customerId]);
+    expect(challenges.rows[0].n).toBe(0);
+    // The earlier holder's session no longer resolves.
+    const me = await request(app).get('/api/v1/site-auth/me').set('Authorization', `Bearer ${enrolled.token}`);
+    expect(me.status).toBe(401);
+  });
+
   it('enforces the per-Business require toggle at sign-in (both paths) and still challenges enrolled customers', async () => {
     const email = `req-${rand}@abc.test`;
     await registerAt('site-totp.test', email, 'password-4');
